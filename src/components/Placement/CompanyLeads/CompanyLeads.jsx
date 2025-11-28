@@ -305,6 +305,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
               time: followup.time,
               date: followup.date,
               remarks: followup.remarks,
+              template: followup.template,
               assignedTo: lead.assignedTo,
               leadId: lead.id,
               followupKey: followup.key
@@ -1817,7 +1818,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
                 month: 'short',
                 day: 'numeric'
               });
-              return `${index + 1}. ${date} - ${followup.remarks || 'No remarks'}`;
+              return `${index + 1}. ${date} - ${followup.template || 'No template'}`;
             }).join('\n');
           } else {
             remarks = lead.notes || 'No remarks';
@@ -2244,6 +2245,8 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
             await fetchTodayFollowUps();
             setLoading(false);
           }}
+          onScheduleMeeting={handleScheduleMeeting}
+          onStatusChange={handleStatusChange}
         />
       ) : (
         <LeadsTable

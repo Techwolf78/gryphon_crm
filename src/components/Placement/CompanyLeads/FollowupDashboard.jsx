@@ -7,7 +7,9 @@ const FollowupDashboard = ({
   user,
   showDashboard,
   onClose,
-  onRefresh
+  onRefresh,
+  onScheduleMeeting,
+  onStatusChange
 }) => {
   const [allFollowUps, setAllFollowUps] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -20,22 +22,44 @@ const FollowupDashboard = ({
       return {
         status: [],
         assignedTo: [userName],
-        dateRange: 'all'
+        dateRange: 'all',
+        template: []
       };
     } else {
       return {
         status: [],
         assignedTo: [],
-        dateRange: 'all'
+        dateRange: 'all',
+        template: []
       };
     }
   });
   const [filterDropdowns, setFilterDropdowns] = useState({
     status: false,
     assignedTo: false,
-    dateRange: false
+    dateRange: false,
+    template: false
   });
   const [chartsVisible, setChartsVisible] = useState(true);
+  const [openDropdownId, setOpenDropdownId] = useState(null);
+  const [allUniqueTemplates, setAllUniqueTemplates] = useState([]);
+  const [statusChangeModal, setStatusChangeModal] = useState({
+    isOpen: false,
+    followup: null,
+    lead: null,
+    selectedStatus: ''
+  });
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (openDropdownId && !event.target.closest('.dropdown-menu')) {
+        setOpenDropdownId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [openDropdownId]);
 
   // Fetch follow-ups for current page
   const fetchFollowUpsForPage = useCallback(async (page = 1) => {
@@ -57,6 +81,7 @@ const FollowupDashboard = ({
             time: followup.time,
             date: followup.date,
             remarks: followup.remarks,
+            template: followup.template,
             assignedTo: lead.assignedTo,
             leadId: lead.id,
             followupKey: followup.key,
@@ -80,6 +105,10 @@ const FollowupDashboard = ({
 
       // Sort by created date descending (most recent first)
       filteredFollowUpsData.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
+      // Collect all unique templates from all data
+      const allTemplates = [...new Set(filteredFollowUpsData.map(f => f.template).filter(Boolean))].sort();
+      setAllUniqueTemplates(allTemplates);
 
       // Set total count
       setTotalFollowUps(filteredFollowUpsData.length);
@@ -119,11 +148,13 @@ const FollowupDashboard = ({
         .sort();
     }
   })();
+  const uniqueTemplates = allUniqueTemplates;
 
   // Filter follow-ups
   const filteredFollowUps = allFollowUps.filter(followup => {
     const statusMatch = filters.status.length === 0 || filters.status.includes(followup.status);
     const assignedMatch = filters.assignedTo.length === 0 || filters.assignedTo.includes(followup.assignedUserName);
+    const templateMatch = filters.template.length === 0 || filters.template.includes(followup.template);
     const dateMatch = (() => {
       if (filters.dateRange === 'all') return true;
       const followupDate = new Date(followup.createdAt);
@@ -157,7 +188,7 @@ const FollowupDashboard = ({
           return true;
       }
     })();
-    return statusMatch && assignedMatch && dateMatch;
+    return statusMatch && assignedMatch && templateMatch && dateMatch;
   });
 
   // Calculate KPIs
@@ -253,7 +284,7 @@ const FollowupDashboard = ({
 
   // Handle filter changes
   const handleFilterChange = (filterType, value) => {
-    if (filterType === 'status' || filterType === 'assignedTo') {
+    if (filterType === 'status' || filterType === 'assignedTo' || filterType === 'template') {
       if (value === 'all') {
         setFilters(prev => ({
           ...prev,
@@ -305,10 +336,10 @@ const FollowupDashboard = ({
                 </svg>
               </button>
               {filterDropdowns.status && (
-                <div className="absolute right-0 top-full mt-1 w-32 bg-white rounded-lg shadow-lg border border-blue-200 z-20">
+                <div className="absolute right-0 top-full mt-1 w-32 bg-white shadow-lg border border-gray-200 z-20">
                   <div className="p-1">
                     <div 
-                      className="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 rounded cursor-pointer"
+                      className="flex items-center px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50 rounded cursor-pointer transition-colors"
                       onClick={(e) => { e.stopPropagation(); handleFilterChange('status', 'all'); }}
                     >
                       <input
@@ -322,7 +353,7 @@ const FollowupDashboard = ({
                     {uniqueStatuses.map(status => (
                       <div 
                         key={status} 
-                        className="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 rounded cursor-pointer"
+                        className="flex items-center px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50 rounded cursor-pointer transition-colors"
                         onClick={(e) => { e.stopPropagation(); handleFilterChange('status', status); }}
                       >
                         <input
@@ -351,11 +382,11 @@ const FollowupDashboard = ({
                 </svg>
               </button>
               {filterDropdowns.assignedTo && (
-                <div className="absolute right-0 top-full mt-1 w-40 bg-white rounded-lg shadow-lg border border-blue-200 z-20">
+                <div className="absolute right-0 top-full mt-1 w-40 bg-white shadow-lg border border-gray-200 z-20">
                   <div className="p-1">
                     {!['Manager', 'Assistant Manager', 'Executive'].includes(user?.role) && (
                     <div 
-                      className="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 rounded cursor-pointer"
+                      className="flex items-center px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50 rounded cursor-pointer transition-colors"
                       onClick={(e) => { e.stopPropagation(); handleFilterChange('assignedTo', 'all'); }}
                     >
                       <input
@@ -370,7 +401,7 @@ const FollowupDashboard = ({
                     {uniqueAssignedUsers.map(user => (
                       <div 
                         key={user} 
-                        className="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 rounded cursor-pointer"
+                        className="flex items-center px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50 rounded cursor-pointer transition-colors"
                         onClick={(e) => { e.stopPropagation(); handleFilterChange('assignedTo', user); }}
                         title={user}
                       >
@@ -381,6 +412,52 @@ const FollowupDashboard = ({
                           className="mr-2 h-3 w-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                         />
                         <span className="truncate">{user.length > 15 ? `${user.substring(0, 15)}...` : user}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Template Filter */}
+            <div className="relative">
+              <button
+                onClick={(e) => { e.stopPropagation(); toggleFilterDropdown('template'); }}
+                className="flex items-center px-3 py-1.5 bg-blue-100 hover:bg-blue-200 rounded-lg text-blue-900 text-xs font-medium transition-colors"
+              >
+                <span>Template: {filters.template.length === 0 ? 'All' : filters.template.length === 1 ? filters.template[0] : `${filters.template.length} selected`}</span>
+                <svg className="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {filterDropdowns.template && (
+                <div className="absolute right-0 top-full mt-1 w-40 bg-white shadow-lg border border-gray-200 z-20">
+                  <div className="p-1">
+                    <div 
+                      className="flex items-center px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50 rounded cursor-pointer transition-colors"
+                      onClick={(e) => { e.stopPropagation(); handleFilterChange('template', 'all'); }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={filters.template.length === 0}
+                        onChange={() => {}} // Handled by parent onClick
+                        className="mr-2 h-3 w-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      All
+                    </div>
+                    {uniqueTemplates.map(template => (
+                      <div 
+                        key={template} 
+                        className="flex items-center px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50 rounded cursor-pointer transition-colors"
+                        onClick={(e) => { e.stopPropagation(); handleFilterChange('template', template); }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={filters.template.includes(template)}
+                          onChange={() => {}} // Handled by parent onClick
+                          className="mr-2 h-3 w-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        />
+                        <span className="truncate">{template}</span>
                       </div>
                     ))}
                   </div>
@@ -400,41 +477,41 @@ const FollowupDashboard = ({
                 </svg>
               </button>
               {filterDropdowns.dateRange && (
-                <div className="absolute right-0 top-full mt-1 w-24 bg-white rounded-lg shadow-lg border border-blue-200 z-20">
+                <div className="absolute right-0 top-full mt-1 w-24 bg-white shadow-lg border border-gray-200 z-20">
                   <div className="p-1">
                     <button
                       onClick={(e) => { e.stopPropagation(); handleFilterChange('dateRange', 'all'); toggleFilterDropdown('dateRange'); }}
-                      className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 rounded"
+                      className="w-full text-left px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50 rounded transition-colors"
                     >
                       All
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); handleFilterChange('dateRange', 'today'); toggleFilterDropdown('dateRange'); }}
-                      className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 rounded"
+                      className="w-full text-left px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50 rounded transition-colors"
                     >
                       Today
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); handleFilterChange('dateRange', 'yesterday'); toggleFilterDropdown('dateRange'); }}
-                      className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 rounded"
+                      className="w-full text-left px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50 rounded transition-colors"
                     >
                       Yesterday
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); handleFilterChange('dateRange', 'week'); toggleFilterDropdown('dateRange'); }}
-                      className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 rounded"
+                      className="w-full text-left px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50 rounded transition-colors"
                     >
                       This Week
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); handleFilterChange('dateRange', 'month'); toggleFilterDropdown('dateRange'); }}
-                      className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 rounded"
+                      className="w-full text-left px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50 rounded transition-colors"
                     >
                       This Month
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); handleFilterChange('dateRange', 'year'); toggleFilterDropdown('dateRange'); }}
-                      className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 rounded"
+                      className="w-full text-left px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50 rounded transition-colors"
                     >
                       This Year
                     </button>
@@ -578,10 +655,11 @@ const FollowupDashboard = ({
                   <th className="px-3 py-2 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">Company</th>
                   <th className="px-3 py-2 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">Contact</th>
                   <th className="px-3 py-2 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">Date & Time</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">Remarks</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">Template</th>
                   <th className="px-3 py-2 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">Action Date</th>
                   <th className="px-3 py-2 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">Status</th>
                   <th className="px-3 py-2 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">Assigned To</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -612,8 +690,11 @@ const FollowupDashboard = ({
                       </div>
                     </td>
                     <td className="px-3 py-2 text-sm text-gray-900 max-w-xs">
-                      <div className="truncate" title={followup.remarks}>
-                        {followup.remarks || 'No remarks'}
+                      <div className="truncate" title={`${followup.template || 'No template'}${followup.remarks ? ` - ${followup.remarks}` : ''}`}>
+                        <div className="font-medium text-blue-700">{followup.template || 'No template'}</div>
+                        {followup.remarks && (
+                          <div className="text-xs text-gray-600 mt-1 truncate">{followup.remarks}</div>
+                        )}
                       </div>
                     </td>
                     <td className="px-3 py-2 text-sm text-gray-500">
@@ -641,6 +722,44 @@ const FollowupDashboard = ({
                     </td>
                     <td className="px-3 py-2 text-sm text-gray-500">
                       {followup.assignedUserName}
+                    </td>
+                    <td className="px-3 py-2 text-sm">
+                      <div className="flex items-center space-x-1">
+                        {/* Schedule Follow-up Icon */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const lead = allLeads.find(l => l.id === followup.leadId);
+                            if (lead && onScheduleMeeting) {
+                              onScheduleMeeting(lead);
+                            }
+                          }}
+                          className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                          title="Schedule Follow-up"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                        </button>
+
+                        {/* Change Status Icon */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setStatusChangeModal({ 
+                              isOpen: true, 
+                              followup: followup,
+                              lead: allLeads.find(l => l.id === followup.leadId)
+                            });
+                          }}
+                          className="p-1.5 text-green-600 hover:bg-green-50 rounded transition-colors"
+                          title="Change Status"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                          </svg>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -725,6 +844,94 @@ const FollowupDashboard = ({
           </div>
         )}
       </div>
+
+      {/* Status Change Modal */}
+      {statusChangeModal.isOpen && (
+        <div className="fixed inset-0 bg-white/20 backdrop-blur-md flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">Change Status</h3>
+              <p className="text-sm text-gray-600 mt-1">
+                Current status: <span className="font-medium capitalize">{statusChangeModal.followup?.status}</span>
+              </p>
+            </div>
+
+            <div className="px-6 py-4">
+              <label className="block text-sm font-medium text-gray-700 mb-3">
+                Select new status:
+              </label>
+              <select
+                value={statusChangeModal.selectedStatus}
+                onChange={(e) => setStatusChangeModal(prev => ({ ...prev, selectedStatus: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="">Choose status...</option>
+                <option value="hot">Hot</option>
+                <option value="warm">Warm</option>
+                <option value="cold">Cold</option>
+                <option value="called">Called</option>
+                <option value="onboarded">Onboarded</option>
+                <option value="deleted">Deleted</option>
+              </select>
+
+              {statusChangeModal.selectedStatus && statusChangeModal.selectedStatus !== statusChangeModal.followup?.status && (
+                <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+                  <div className="flex items-center">
+                    <div className="shrink-0">
+                      <svg className="h-5 w-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="ml-3">
+                      <h3 className="text-sm font-medium text-yellow-800">
+                        Confirm Status Change
+                      </h3>
+                      <div className="mt-2 text-sm text-yellow-700">
+                        <p>
+                          Change status from <span className="font-medium capitalize">{statusChangeModal.followup?.status}</span> to <span className="font-medium capitalize">{statusChangeModal.selectedStatus}</span>?
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end space-x-3 mt-6">
+                <button
+                  onClick={() => setStatusChangeModal({ isOpen: false, followup: null, lead: null, selectedStatus: '' })}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    if (statusChangeModal.lead && onStatusChange && statusChangeModal.selectedStatus && statusChangeModal.selectedStatus !== statusChangeModal.followup?.status) {
+                      // Update local state immediately for better UX
+                      setAllFollowUps(prevFollowUps =>
+                        prevFollowUps.map(f =>
+                          f.leadId === statusChangeModal.followup.leadId
+                            ? { ...f, status: statusChangeModal.selectedStatus }
+                            : f
+                        )
+                      );
+
+                      await onStatusChange(statusChangeModal.lead.id, statusChangeModal.selectedStatus);
+                      if (onRefresh) {
+                        await onRefresh();
+                      }
+                    }
+                    setStatusChangeModal({ isOpen: false, followup: null, lead: null, selectedStatus: '' });
+                  }}
+                  disabled={!statusChangeModal.selectedStatus || statusChangeModal.selectedStatus === statusChangeModal.followup?.status}
+                  className="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed rounded-md transition-colors"
+                >
+                  Confirm & Change
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
