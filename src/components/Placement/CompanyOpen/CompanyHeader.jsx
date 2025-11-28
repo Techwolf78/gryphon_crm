@@ -86,26 +86,28 @@ function CompanyHeader({
   activeTab,
   setActiveTab,
   setShowJDForm,
-  fetchCompanies
+  fetchCompanies,
+  showPlacedStudentDashboard,
+  setShowPlacedStudentDashboard
 }) {
   return (
-    <div className="sticky top-0 z-40 bg-gradient-to-br from-gray-50 to-gray-100 pt-2 pb-4">
+    <div className="sticky top-0 z-40 bg-linear-to-br from-gray-50 to-gray-100 pt-1 pb-2">
       {/* Search and filter row */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 mb-3">
-        <div className="relative flex-grow md:flex-grow-0 md:w-64">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 mb-2">
+        <div className="relative grow md:grow-0 md:w-64">
           <input
             type="text"
             placeholder="Search Bar..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+            className="w-full px-2 py-1 bg-white border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 text-xs"
           />
           {searchTerm && (
             <button
               onClick={() => setSearchTerm("")}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
             >
-              <XIcon className="h-5 w-5" />
+              <XIcon className="h-3 w-3" />
             </button>
           )}
         </div>
@@ -117,11 +119,11 @@ function CompanyHeader({
 
           <button
             onClick={() => setIsFilterOpen(prev => !prev)}
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
+            className="flex items-center justify-center px-2 py-1 bg-white border border-gray-300 rounded-lg shadow-sm text-xs font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 ease-in-out hover:shadow-md"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
-              className="h-5 w-5"
+              className="h-4 w-4 mr-2"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -136,11 +138,11 @@ function CompanyHeader({
 
           <button
             onClick={() => setShowJDForm(true)}
-            className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white px-5 py-2 rounded-xl font-semibold hover:opacity-90 transition-all shadow-md flex items-center whitespace-nowrap"
+            className="flex items-center justify-center px-2 py-1 bg-linear-to-r from-blue-600 to-indigo-700 text-white rounded-lg font-semibold hover:opacity-90 transition-all shadow-md text-xs"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
-              className="h-5 w-5 mr-2"
+              className="h-4 w-4 mr-2"
               viewBox="0 0 20 20"
               fill="currentColor"
             >
@@ -152,12 +154,18 @@ function CompanyHeader({
             </svg>
             Add JD
           </button>
+
           <button
-            className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white px-5 py-2 rounded-xl font-semibold hover:opacity-90 transition-all shadow-md flex items-center whitespace-nowrap"
+            onClick={() => setShowPlacedStudentDashboard(true)}
+            className={`flex items-center justify-center px-2 py-1 rounded-lg font-semibold transition-all shadow-md text-xs ${
+              showPlacedStudentDashboard
+                ? 'bg-green-600 hover:bg-green-700 text-white'
+                : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+            }`}
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
-              className="h-5 w-5 mr-2"
+              className="h-4 w-4 mr-2"
               viewBox="0 0 24 24"
               fill="currentColor"
             >
@@ -185,12 +193,12 @@ function CompanyHeader({
       )}
 
       {/* Status tabs row */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-2">
         {Object.keys(tabLabels).map((key) => (
           <button
             key={key}
             onClick={() => setActiveTab(key)}
-            className={`py-2 rounded-xl text-sm font-semibold transition-all duration-300 ease-out transform hover:scale-[1.02] ${
+            className={`py-1.5 rounded-xl text-sm font-semibold transition-all duration-300 ease-out transform hover:scale-[1.02] ${
               activeTab === key
                 ? statusColorMap[key].tab.active
                 : statusColorMap[key].tab.inactive
@@ -219,18 +227,7 @@ function CompanyHeader({
       </div>
 
       {/* Table header row */}
-      <div
-        className={`grid grid-cols-8 ${headerColorMap[activeTab]} text-sm font-medium px-4 py-2 rounded-lg`}
-      >
-        <div className="break-words">Company</div>
-        <div className="break-words">College</div>
-        <div className="break-words">Eligible</div>
-        <div className="break-words">Source</div>
-        <div className="break-words">Salary</div>
-        <div className="break-words">Type</div>
-        <div className="break-words">Date</div>
-        <div className="text-center break-words">Actions</div>
-      </div>
+     
     </div>
   );
 }

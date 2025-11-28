@@ -139,11 +139,12 @@ export const generateInvoicePDF = async (invoiceData) => {
     const food = safeInvoiceData.food || 0;
     const lodging = safeInvoiceData.lodging || 0;
     const subTotal = trainingAmount + conveyance + food + lodging;
-    const tdsAmount = (trainingAmount * (safeInvoiceData.tds || 0)) / 100;
+    const gstAmount = safeInvoiceData.gst === "18" ? Math.round(trainingAmount * 0.18) : 0;
+    const taxableAmount = trainingAmount + gstAmount;
+    const tdsAmount = (taxableAmount * (safeInvoiceData.tds || 0)) / 100;
+    const otherExpenses = subTotal - trainingAmount;
     const adhocAdjustment = safeInvoiceData.adhocAdjustment || 0;
-    const amountBeforeGST = subTotal - tdsAmount + adhocAdjustment;
-    const gstAmount = safeInvoiceData.gst === "18" ? Math.round(amountBeforeGST * 0.18) : 0;
-    const netPayable = amountBeforeGST - gstAmount;
+    const netPayable = taxableAmount - tdsAmount + otherExpenses + adhocAdjustment;
 
     // Calculate number of sessions (training days)
     const calculateSessions = () => {
@@ -169,7 +170,7 @@ export const generateInvoicePDF = async (invoiceData) => {
         [{ content: 'Total Amount', colSpan: 3, styles: { halign: 'left' } }, `Rs. ${subTotal}`],
         ['Adhoc Addition/Deduction', '-', '-', `Rs. ${adhocAdjustment}`],
         ['Less (TDS)', '-', '-', `Rs. ${tdsAmount}`],
-        ['GST', safeInvoiceData.gst === "NA" ? "NA" : `${safeInvoiceData.gst}%`, '-', `Rs. ${gstAmount === 0 ? '0' : '-' + gstAmount}`],
+        ['GST', safeInvoiceData.gst === "NA" ? "NA" : `${safeInvoiceData.gst}%`, '-', `Rs. ${gstAmount}`],
         [{ content: 'Net Payment', colSpan: 3, styles: { halign: 'left', fontStyle: 'bold' } }, `Rs. ${netPayable}`],
       ],
       theme: 'grid',

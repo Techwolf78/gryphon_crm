@@ -2,32 +2,29 @@ import { PlusIcon, CloudUploadIcon } from "@heroicons/react/outline";
 
 const LeadsHeader = ({ searchTerm, setSearchTerm, onAddLead, onBulkUpload }) => {
   return (
-    <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-2 gap-2">
-      <div className="w-full md:max-w-xs">
+    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-1 w-full">
+      <div className="flex-1 max-w-md">
         <input
           type="text"
           placeholder="Search companies or contacts..."
-          className="w-full px-3 py-1 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+          className="w-full px-2 py-1 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
       </div>
-      <div className="flex gap-2 w-full md:w-auto">
+      <div className="flex gap-1 shrink-0">
         <button
           onClick={onAddLead}
-          className="flex-1 md:flex-none px-3 py-1 text-white rounded-lg font-semibold flex items-center justify-center focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-md relative overflow-hidden text-sm"
+          className="px-3 py-1 bg-linear-to-r from-blue-600 to-blue-700 text-white rounded-lg font-semibold flex items-center justify-center hover:from-blue-700 hover:to-blue-800 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-md transition-all duration-200 text-xs"
         >
-          <span className="absolute inset-0 bg-linear-to-r from-blue-600 to-indigo-700 opacity-100 hover:opacity-90 transition-opacity duration-200 z-0"></span>
-          <span className="relative z-10 flex items-center">
-            <PlusIcon className="h-4 w-4 mr-1" />
-            Add Company
-          </span>
+          <PlusIcon className="h-3 w-3 mr-1" />
+          Add Company
         </button>
         <button
           onClick={onBulkUpload}
-          className="flex-1 md:flex-none px-3 py-1 bg-green-600 text-white rounded-lg font-semibold flex items-center justify-center hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 shadow-md text-sm"
+          className="px-3 py-1 bg-green-600 text-white rounded-lg font-semibold flex items-center justify-center hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 shadow-md text-xs"
         >
-          <CloudUploadIcon className="h-4 w-4 mr-1" />
+          <CloudUploadIcon className="h-3 w-3 mr-1" />
           Bulk Upload
         </button>
       </div>

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion as _motion } from 'framer-motion';
 
 
 // Custom hook for escape key
@@ -61,7 +61,7 @@ const AlertBase = ({
   useClickOutside(alertRef, onClose);
 
   return (
-    <motion.div
+    <_motion.div
       ref={alertRef}
       initial={{ x: 300, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
@@ -85,12 +85,12 @@ const AlertBase = ({
         )}
         
         {/* Colored top border */}
-        <div className={`absolute top-0 left-0 w-full h-0.5 bg-gradient-to-r from-${color}-500 to-${color}-600`}></div>
+        <div className={`absolute top-0 left-0 w-full h-0.5 bg-linear-to-r from-${color}-500 to-${color}-600`}></div>
         
         <div className="p-3 flex items-start gap-3">
           {/* Icon */}
-          <div className="flex-shrink-0">
-            <div className={`flex items-center justify-center w-8 h-8 bg-gradient-to-br from-${color}-100 to-${color}-200 rounded-lg shadow-inner`}>
+          <div className="shrink-0">
+            <div className={`flex items-center justify-center w-8 h-8 bg-linear-to-br from-${color}-100 to-${color}-200 rounded-lg shadow-inner`}>
               {React.cloneElement(icon, { className: 'w-4 h-4' })}
             </div>
           </div>
@@ -129,7 +129,7 @@ const AlertBase = ({
           </div>
         </div>
       </div>
-    </motion.div>
+    </_motion.div>
   );
 };
 
@@ -141,6 +141,25 @@ const FollowupAlerts = ({
   setReminderPopup,
 }) => {
   const [alerts, setAlerts] = useState([]);
+
+  // Check if today's follow-up alert should be shown (once per day)
+  const shouldShowTodayAlert = () => {
+    const today = new Date().toDateString();
+    const lastShown = localStorage.getItem('salesTodayFollowupAlertLastShown');
+    return lastShown !== today;
+  };
+
+  // Mark today's follow-up alert as shown for today
+  const markTodayAlertShown = () => {
+    const today = new Date().toDateString();
+    localStorage.setItem('salesTodayFollowupAlertLastShown', today);
+  };
+
+  // Handle close today's alert
+  const handleCloseTodayAlert = useCallback(() => {
+    setShowTodayFollowUpAlert(false);
+    markTodayAlertShown();
+  }, [setShowTodayFollowUpAlert]);
 
   // Handle escape key for all alerts
   const handleCloseAll = useCallback(() => {
@@ -157,6 +176,7 @@ const FollowupAlerts = ({
     
     // Hide the current alert
     setShowTodayFollowUpAlert(false);
+    markTodayAlertShown();
     
     // Set a timeout to show it again
     setTimeout(() => {
@@ -180,6 +200,7 @@ const FollowupAlerts = ({
   // Simplified View meetings action - just open Outlook
   const handleViewMeetings = useCallback(() => {
     setShowTodayFollowUpAlert(false);
+    markTodayAlertShown();
     window.open('https://outlook.office.com/calendar/view/week', '_blank');
   }, [setShowTodayFollowUpAlert]);
 
@@ -198,7 +219,7 @@ const FollowupAlerts = ({
     <>
       <AnimatePresence>
         {/* Today's Follow-ups Alert */}
-        {showTodayFollowUpAlert && (
+        {showTodayFollowUpAlert && shouldShowTodayAlert() && (
           <AlertBase
             icon={
               <svg className={`w-4 h-4 text-indigo-600`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -207,7 +228,7 @@ const FollowupAlerts = ({
             }
             color="indigo"
             title="Today's Meetings"
-            onClose={() => setShowTodayFollowUpAlert(false)}
+            onClose={handleCloseTodayAlert}
             autoDismiss={true}
             actions={
               <>
@@ -219,7 +240,7 @@ const FollowupAlerts = ({
                 </button>
                 <button
                   onClick={handleViewMeetings}
-                  className="px-2 py-1 bg-gradient-to-br from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-medium rounded shadow-sm transition-all"
+                  className="px-2 py-1 bg-linear-to-br from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-medium rounded shadow-sm transition-all"
                 >
                   View meetings
                 </button>
@@ -263,7 +284,7 @@ const FollowupAlerts = ({
                 </button>
                 <button
                   onClick={handleJoinMeeting}
-                  className={`px-2 py-1 bg-gradient-to-br ${reminderPopup.urgent ? 'from-red-500 to-red-600 hover:from-red-600 hover:to-red-700' : 'from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600'} text-white text-xs font-medium rounded shadow-sm transition-all`}
+                  className={`px-2 py-1 bg-linear-to-br ${reminderPopup.urgent ? 'from-red-500 to-red-600 hover:from-red-600 hover:to-red-700' : 'from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600'} text-white text-xs font-medium rounded shadow-sm transition-all`}
                 >
                   {reminderPopup.urgent ? 'Join NOW' : 'Join'}
                 </button>
@@ -292,7 +313,7 @@ const FollowupAlerts = ({
             actions={
               <button
                 onClick={handleDismissAll}
-                className="px-2 py-1 bg-gradient-to-br from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-xs font-medium rounded shadow-sm transition-all"
+                className="px-2 py-1 bg-linear-to-br from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-xs font-medium rounded shadow-sm transition-all"
               >
                 Dismiss All
               </button>

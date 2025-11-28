@@ -17,9 +17,9 @@ import ExcelUploadModal from "./ExcelUploadModal";
 
 // EmailJS configuration
 const EMAILJS_CONFIG = {
-  SERVICE_ID: "service_pskknsn",
-  TEMPLATE_ID: "template_p2as3pp",
-  PUBLIC_KEY: "zEVWxxT-QvGIrhvTV",
+  SERVICE_ID: "service_sl0i7kr",
+  TEMPLATE_ID: "template_q0oarab",
+  PUBLIC_KEY: "V5rET66jxvg4gqulO",
 };
 
 // Academic year calculation helper
@@ -68,6 +68,7 @@ function AddJD({ show, onClose, company }) {
     jobDesignation: "",
     jobLocation: "",
     salary: "",
+    hiringRounds: [], 
     internshipDuration: "",
     stipend: "",
     modeOfInterview: "",
@@ -78,6 +79,7 @@ function AddJD({ show, onClose, company }) {
     source: "",
     coordinator: "",
     status: "ongoing",
+    
     createdAt: serverTimestamp(),
   });
   const [placementUsers, setPlacementUsers] = useState([]);
@@ -88,7 +90,7 @@ function AddJD({ show, onClose, company }) {
     try {
       const usersQuery = query(
         collection(db, "users"),
-        where("department", "==", "Placement")
+        where("departments", "array-contains", "Placement")
       );
 
       const querySnapshot = await getDocs(usersQuery);
@@ -290,9 +292,6 @@ function AddJD({ show, onClose, company }) {
     }
   };
 
-  const closeStudentView = () => {
-    setViewingCollege(null);
-  };
 
   const handleDownloadTemplate = (college) => {
     setSelectedCollegeForUpload(college);
@@ -340,19 +339,6 @@ function AddJD({ show, onClose, company }) {
         return;
       }
 
-      const formatDate = (dateString) => {
-        if (!dateString) return "N/A";
-        try {
-          const date = new Date(dateString);
-          return date.toLocaleDateString("en-IN", {
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric",
-          });
-        } catch {
-          return dateString;
-        }
-      };
 
       // Create template fields with styling
       const fieldNames = {
@@ -391,37 +377,45 @@ function AddJD({ show, onClose, company }) {
           }">${fieldName}</span>`;
         })
         .join("");
+        
 
       // Send individual emails to each college
       const emailPromises = collegesWithTPO
         .filter(({ tpoEmail }) => tpoEmail && tpoEmail.trim() !== "")
         .map(async ({ college, tpoEmail }) => {
-          const templateParams = {
-            to_email: "deepgryphon@gmail.com",
-            subject: `Student Data Submission Required - ${formData.companyName}`,
-            company_name: formData.companyName,
-            last_date: formatDate(formData.companyOpenDate),
-            passing_year: formData.passingYear,
-            course: formData.course,
-            job_designation: formData.jobDesignation,
-            job_location: formData.jobLocation,
-            salary: formData.salary,
-            college_count: validEmails.length,
-            college_name: college,
-            template_fields: templateFieldsHTML, // ✅ Styled template fields
-            field_count: templateFields.length, // ✅ Field count
-            upload_link: `http://localhost:5173/upload-student-data?college=${encodeURIComponent(
-              college
-            )}&company=${encodeURIComponent(
-              formData.companyName
-            )}&course=${encodeURIComponent(
-              formData.course
-            )}&fields=${encodeURIComponent(JSON.stringify(templateFields))}`,
-            coordinator_name: formData.coordinator,
-            coordinator_phone: "+91-9876543210",
-            bcc: tpoEmail,
-          };
-
+const templateParams = {
+    to_email: "placements@gryphonacademy.co.in",
+    company_name: formData.companyName,
+    company_website: formData.companyWebsite || "Not provided", 
+    job_designation: formData.jobDesignation,
+    job_location: formData.jobLocation,
+    salary: formData.salary,
+    job_type: formData.jobType, 
+    mode_of_interview: formData.modeOfInterview, 
+    course: formData.course,
+    passing_year: formData.passingYear,
+    Gender: formData.gender, 
+    marks_criteria: formData.marksCriteria, 
+    backlog_criteria: formData.backlogCriteria,
+    college_count: validEmails.length,
+    college_name: college,
+    template_fields: templateFieldsHTML,
+    field_count: templateFields.length,
+    hiring_rounds_html: formData.hiringRounds
+      .map(round => `<li>${round}</li>`)
+      .join(''),
+      
+    upload_link: `${window.location.origin}/upload-student-data?college=${encodeURIComponent(
+        college
+    )}&company=${encodeURIComponent(
+        formData.companyName
+    )}&course=${encodeURIComponent(
+        formData.course
+    )}&fields=${encodeURIComponent(JSON.stringify(templateFields))}`,
+    coordinator_name: formData.coordinator,
+    coordinator_phone: "+91-9876543210",
+    bcc: tpoEmail,
+};
           return emailjs.send(
             EMAILJS_CONFIG.SERVICE_ID,
             EMAILJS_CONFIG.TEMPLATE_ID,

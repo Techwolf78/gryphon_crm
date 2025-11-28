@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from "react";
 import { db } from "../../../firebase";
 import { collection, getDocs, doc, getDoc } from "firebase/firestore";
-import { FiX, FiCheck, FiChevronRight } from "react-icons/fi";
+import { FiX, FiCheck, FiChevronRight, FiSearch } from "react-icons/fi";
 
-function JDMergeModal({ onClose, onProceed, preSelectedColleges = [] }) {
+function JDMergeModal({ onClose, onProceed, preSelectedColleges = [], referenceTraining = null }) {
   const [availableColleges, setAvailableColleges] = useState([]);
   const [selectedColleges, setSelectedColleges] = useState(preSelectedColleges);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [existingConfig, setExistingConfig] = useState(null);
   const [checkingExisting, setCheckingExisting] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
 
   // Fetch all available colleges from trainingForms collection
   useEffect(() => {
@@ -58,7 +59,7 @@ function JDMergeModal({ onClose, onProceed, preSelectedColleges = [] }) {
 
   // Check for existing merged configuration when colleges are selected
   const checkExistingMergedConfig = async (colleges) => {
-    if (colleges.length < 2) {
+    if (colleges.length === 0) {
       setExistingConfig(null);
       return;
     }
@@ -70,7 +71,7 @@ function JDMergeModal({ onClose, onProceed, preSelectedColleges = [] }) {
       // Sort colleges by ID for consistent comparison
       const sortedSelectedIds = colleges.map(c => c.id).sort();
 
-      // Check each selected college for merged JD training
+      // Check each selected college for existing JD training
       for (const college of colleges) {
         try {
           const jdDocRef = doc(db, "trainingForms", college.id, "trainings", "JD");
@@ -79,15 +80,62 @@ function JDMergeModal({ onClose, onProceed, preSelectedColleges = [] }) {
           if (jdDocSnap.exists()) {
             const jdData = jdDocSnap.data();
 
-            // Check if this is a merged training
-            if (jdData.isMergedTraining && jdData.mergedColleges) {
+            // For single college selection, check if JD exists (regardless of merge status)
+            if (colleges.length === 1) {
+              // Found existing JD configuration for single college
+              try {
+                const domainDocRef = doc(db, "trainingForms", college.id, "trainings", "JD", "domains", "JD");
+                const domainDocSnap = await getDoc(domainDocRef);
+                const domainData = domainDocSnap.exists() ? domainDocSnap.data() : {};
+
+                setExistingConfig({
+                  operationsConfig: jdData.operationsConfig,
+                  commonFields: {
+                    trainingStartDate: jdData.trainingStartDate,
+                    trainingEndDate: jdData.trainingEndDate,
+                    collegeStartTime: jdData.collegeStartTime,
+                    collegeEndTime: jdData.collegeEndTime,
+                    lunchStartTime: jdData.lunchStartTime,
+                    lunchEndTime: jdData.lunchEndTime,
+                  },
+                  customPhaseHours: { JD: jdData.customHours || "" },
+                  table1DataByDomain: {
+                    JD: domainData.table1Data || []
+                  },
+                  mergedColleges: jdData.mergedColleges || [college] // Use merged colleges if available, otherwise single college
+                });
+                return;
+              } catch (domainErr) {
+                console.warn(`Error fetching domain data for college ${college.id}:`, domainErr);
+                // Continue without domain data
+                setExistingConfig({
+                  operationsConfig: jdData.operationsConfig,
+                  commonFields: {
+                    trainingStartDate: jdData.trainingStartDate,
+                    trainingEndDate: jdData.trainingEndDate,
+                    collegeStartTime: jdData.collegeStartTime,
+                    collegeEndTime: jdData.collegeEndTime,
+                    lunchStartTime: jdData.lunchStartTime,
+                    lunchEndTime: jdData.lunchEndTime,
+                  },
+                  customPhaseHours: { JD: jdData.customHours || "" },
+                  table1DataByDomain: {
+                    JD: []
+                  },
+                  mergedColleges: jdData.mergedColleges || [college]
+                });
+                return;
+              }
+            }
+            // For multiple colleges, check if this is a merged training
+            else if (jdData.isMergedTraining && jdData.mergedColleges) {
               // Sort the merged college IDs for comparison
               const sortedMergedIds = jdData.mergedColleges.map(c => c.id).sort();
 
               // Check if the merged colleges match exactly with selected colleges
               if (sortedMergedIds.length === sortedSelectedIds.length &&
                   sortedMergedIds.every(id => sortedSelectedIds.includes(id))) {
-                
+
                 // Found matching merged configuration - now fetch domain data
                 try {
                   const domainDocRef = doc(db, "trainingForms", college.id, "trainings", "JD", "domains", "JD");
@@ -141,7 +189,7 @@ function JDMergeModal({ onClose, onProceed, preSelectedColleges = [] }) {
         }
       }
 
-      // No matching merged configuration found
+      // No matching configuration found
       setExistingConfig(null);
       } catch (err) {
       console.error("Error checking existing merged config:", err);
@@ -172,11 +220,23 @@ function JDMergeModal({ onClose, onProceed, preSelectedColleges = [] }) {
   };
 
   const handleSelectAll = () => {
-    setSelectedColleges(availableColleges);
+    setSelectedColleges((prev) => {
+      const newSelections = [...prev];
+      filteredColleges.forEach((college) => {
+        if (!newSelections.some((c) => c.id === college.id)) {
+          newSelections.push(college);
+        }
+      });
+      return newSelections;
+    });
   };
 
   const handleDeselectAll = () => {
-    setSelectedColleges([]);
+    setSelectedColleges((prev) => {
+      return prev.filter((selectedCollege) =>
+        !filteredColleges.some((filteredCollege) => filteredCollege.id === selectedCollege.id)
+      );
+    });
   };
 
   const handleProceed = () => {
@@ -188,94 +248,143 @@ function JDMergeModal({ onClose, onProceed, preSelectedColleges = [] }) {
     onProceed(selectedColleges, existingConfig);
   };
 
+  // Filter colleges based on search term
+  const filteredColleges = availableColleges.filter((college) => {
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      college.collegeName.toLowerCase().includes(searchLower) ||
+      college.projectCode.toLowerCase().includes(searchLower) ||
+      (college.collegeCode && college.collegeCode.toLowerCase().includes(searchLower))
+    );
+  });
+
   return (
     <div className="fixed inset-0 backdrop-blur-sm overflow-y-auto h-full w-full z-50">
-      <div className="relative top-20 mx-auto p-5 border w-full  bg-white">
+      <div className="relative top-20 mx-auto p-5 border w-full bg-white rounded-2xl shadow-xl max-h-[90vh] overflow-y-auto">
         <div className="mt-3">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="text-xl font-semibold text-gray-900">
+              <h3 className="text-lg font-semibold text-gray-900">
                 Select Colleges for JD Training
               </h3>
               <p className="text-sm text-gray-600 mt-1">
                 Choose one or more colleges for JD training. {selectedColleges.length > 1 ? 'Trainer costs will be divided equally among selected colleges.' : 'Trainer costs will be assigned to the selected college.'}
               </p>
+              {referenceTraining && (
+                <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-xl shadow-sm">
+                  <div className="text-sm">
+                    <span className="font-medium text-blue-900">Reference Training:</span>
+                    <div className="mt-2 text-blue-800">
+                      <div className="font-medium">{referenceTraining.collegeName}</div>
+                      <div className="text-xs text-blue-600">
+                        Project: {referenceTraining.projectCode}
+                        {referenceTraining.collegeCode && ` | Code: ${referenceTraining.collegeCode}`}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600"
+              className="p-2 text-gray-400 hover:text-gray-600 rounded-xl hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors"
             >
-              <FiX className="w-6 h-6" />
+              <FiX className="w-5 h-5" />
             </button>
           </div>
 
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl shadow-sm text-red-700 text-sm">
               {error}
             </div>
           )}
 
           {existingConfig && !checkingExisting && (
-            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded text-green-700 text-sm">
+            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-xl shadow-sm text-green-700 text-sm">
               <div className="flex items-center">
-                <FiCheck className="w-4 h-4 mr-2" />
+                <FiCheck className="w-5 h-5 mr-2" />
                 <span className="font-medium">Existing Configuration Found!</span>
               </div>
               <p className="mt-1 text-xs">
-                Previous JD training configuration for these colleges has been loaded and will be pre-filled in the next steps.
+                Previous JD training configuration {selectedColleges.length > 1 ? 'for these colleges' : 'for this college'} has been loaded and will be pre-filled in the next steps.
               </p>
             </div>
           )}
 
           {checkingExisting && (
-            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded text-blue-700 text-sm">
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-xl shadow-sm text-blue-700 text-sm">
               <div className="flex items-center">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mr-3"></div>
                 <span>Checking for existing configurations...</span>
               </div>
             </div>
           )}
 
-          <div className="mb-4 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <span className="text-sm font-medium text-gray-700">
-                {selectedColleges.length} of {availableColleges.length} colleges selected
-              </span>
-              <div className="flex gap-2">
-                <button
-                  onClick={handleSelectAll}
-                  className="px-3 py-1 text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded hover:bg-blue-100"
-                >
-                  Select All
-                </button>
-                <button
-                  onClick={handleDeselectAll}
-                  className="px-3 py-1 text-xs bg-gray-50 text-gray-700 border border-gray-200 rounded hover:bg-gray-100"
-                >
-                  Deselect All
-                </button>
+          {/* Search and Selection Controls */}
+          <div className="mb-4">
+            <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center">
+              {/* Search Input */}
+              <div className="flex-1 min-w-0">
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <FiSearch className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Search colleges by name or project code..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                  />
+                </div>
+                {searchTerm && (
+                  <div className="mt-2 text-xs text-gray-500">
+                    Showing {filteredColleges.length} of {availableColleges.length} colleges
+                  </div>
+                )}
+              </div>
+
+              {/* Selection Info and Buttons */}
+              <div className="flex items-center gap-4 shrink-0">
+                <span className="text-sm font-medium text-gray-700 whitespace-nowrap">
+                  {selectedColleges.length} of {availableColleges.length} colleges selected
+                </span>
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleSelectAll}
+                    className="px-4 py-2 text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded-xl hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                  >
+                    {searchTerm ? `Select All (${filteredColleges.length})` : 'Select All'}
+                  </button>
+                  <button
+                    onClick={handleDeselectAll}
+                    className="px-4 py-2 text-xs bg-gray-50 text-gray-700 border border-gray-200 rounded-xl hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors"
+                  >
+                    {searchTerm ? `Deselect All (${filteredColleges.filter(college => selectedColleges.some(c => c.id === college.id)).length})` : 'Deselect All'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
 
-          <div className="max-h-96 overflow-y-auto border border-gray-200 rounded">
+          <div className="max-h-80 overflow-y-auto border border-gray-200 rounded-xl shadow-sm mb-4">
             {loading ? (
               <div className="p-8 text-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
                 <p className="text-sm text-gray-600 mt-2">Loading colleges...</p>
               </div>
-            ) : availableColleges.length === 0 ? (
+            ) : filteredColleges.length === 0 ? (
               <div className="p-8 text-center text-gray-500">
-                <p>No colleges found</p>
+                <p>{searchTerm ? "No colleges match your search" : "No colleges found"}</p>
               </div>
             ) : (
               <div className="divide-y divide-gray-200">
-                {availableColleges.map((college) => {
+                {filteredColleges.map((college) => {
                   const isSelected = selectedColleges.some((c) => c.id === college.id);
                   return (
                     <div
                       key={college.id}
-                      className={`p-4 hover:bg-gray-50 cursor-pointer transition-colors ${
+                      className={`p-3 hover:bg-gray-50 cursor-pointer transition-colors ${
                         isSelected ? "bg-blue-50" : ""
                       }`}
                       onClick={() => handleCollegeToggle(college)}
@@ -305,7 +414,7 @@ function JDMergeModal({ onClose, onProceed, preSelectedColleges = [] }) {
                         </div>
                         <div className="text-right">
                           <span
-                            className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                            className={`inline-flex px-3 py-1 text-xs font-medium rounded-full ${
                               college.status === "Active"
                                 ? "bg-green-100 text-green-800"
                                 : college.status === "Completed"
@@ -325,37 +434,41 @@ function JDMergeModal({ onClose, onProceed, preSelectedColleges = [] }) {
           </div>
 
           {selectedColleges.length > 0 && (
-            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
-              <h4 className="text-sm font-medium text-blue-900 mb-2">
-                Selected Colleges ({selectedColleges.length}):
-              </h4>
-              <div className="flex flex-wrap gap-2">
-                {selectedColleges.map((college) => (
-                  <span
-                    key={college.id}
-                    className="inline-flex items-center px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full"
-                  >
-                    {college.collegeName} ({college.projectCode})
-                    <button
-                      onClick={() => handleCollegeToggle(college)}
-                      className="ml-1 text-blue-600 hover:text-blue-800"
-                    >
-                      <FiX className="w-3 h-3" />
-                    </button>
-                  </span>
-                ))}
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-xl shadow-sm">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <h4 className="text-sm font-medium text-blue-900">
+                    Selected Colleges ({selectedColleges.length}):
+                  </h4>
+                  <div className="flex flex-wrap gap-1">
+                    {selectedColleges.map((college) => (
+                      <span
+                        key={college.id}
+                        className="inline-flex items-center px-2 py-0.5 text-xs bg-blue-100 text-blue-800 rounded-full"
+                      >
+                        {college.collegeName} ({college.projectCode})
+                        <button
+                          onClick={() => handleCollegeToggle(college)}
+                          className="ml-1 text-blue-600 hover:text-blue-800"
+                        >
+                          <FiX className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
               </div>
-              <div className="mt-2 text-xs text-blue-700">
+              <div className="mt-1 text-xs text-blue-700">
                 💰 Trainer costs will be {selectedColleges.length > 1 ? `divided equally among these ${selectedColleges.length} colleges` : 'assigned to this college'}
               </div>
             </div>
           )}
 
-          <div className="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-200">
+          <div className="flex justify-end space-x-3 pt-3 border-t border-gray-200">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+              className="px-4 py-2 bg-gray-300 text-gray-700 rounded-xl hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors"
             >
               Cancel
             </button>
@@ -363,7 +476,7 @@ function JDMergeModal({ onClose, onProceed, preSelectedColleges = [] }) {
               type="button"
               onClick={handleProceed}
               disabled={selectedColleges.length === 0}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
             >
               {selectedColleges.length > 1 ? 'Merge and Next' : 'Next'}
               <FiChevronRight className="w-4 h-4" />

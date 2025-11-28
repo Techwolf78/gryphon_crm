@@ -68,14 +68,14 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated, onToast }) {
             panNumber: data.pan || "",
             trainerEmail: data.email || "",
             trainerPhone: data.phone || "",
-            gst: data.gst ? "0" : "NA",
+            gst: prev.gst || (data.gst ? "0" : "NA"),
           }));
         } else {
           // Trainer document doesn't exist - this is expected for new trainers
           console.warn(`Trainer document not found for trainerId: ${queryDeps.trainerId}`);
           setInvoiceData((prev) => ({
             ...prev,
-            gst: "NA", // Default to NA if trainer not found
+            gst: prev.gst || "NA", // Default to NA if trainer not found
           }));
         }
       } catch (error) {
@@ -119,7 +119,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated, onToast }) {
             ...prev,
             ...latestInvoice,
             billingDate: latestInvoice.billingDate || new Date().toISOString().split("T")[0],
-            gst: latestInvoice.gst !== undefined ? latestInvoice.gst : (queryDeps.gst ? "0" : "NA"),
+            gst: latestInvoice.gst !== undefined ? String(latestInvoice.gst) : (queryDeps.gst ? "0" : "NA"),
           }));
         }
       } catch (error) {
@@ -215,19 +215,15 @@ const handleSubmit = async (e) => {
 
   const calculateNetPayment = () => {
     const trainingFees = roundToNearestWhole((invoiceData.trainingRate || 0) * (invoiceData.totalHours || 0));
-    const tdsAmount = roundToNearestWhole((trainingFees * (parseFloat(invoiceData.tds) || 0)) / 100);
-    const totalAmount = calculateTotalAmount();
-    const amountBeforeGST = roundToNearestWhole(
-      totalAmount + (parseFloat(invoiceData.adhocAdjustment) || 0) - tdsAmount
+    const gstAmount = invoiceData.gst === "18" ? roundToNearestWhole(trainingFees * 0.18) : 0;
+    const taxableAmount = trainingFees + gstAmount;
+    const tdsAmount = roundToNearestWhole((taxableAmount * (parseFloat(invoiceData.tds) || 0)) / 100);
+    const otherExpenses = calculateTotalAmount() - trainingFees;
+    
+    // Final calculation: (Training Fees + GST - TDS) + Other Expenses + Adhoc Adjustment
+    return roundToNearestWhole(
+      taxableAmount - tdsAmount + otherExpenses + (parseFloat(invoiceData.adhocAdjustment) || 0)
     );
-    
-    // Apply GST deduction if applicable
-    let gstAmount = 0;
-    if (invoiceData.gst === "18") {
-      gstAmount = roundToNearestWhole(amountBeforeGST * 0.18);
-    }
-    
-    return roundToNearestWhole(amountBeforeGST - gstAmount);
   };
 
   const isReadOnly = viewMode;
@@ -612,6 +608,29 @@ const handleSubmit = async (e) => {
                   <span>₹{roundToNearestWhole((invoiceData.trainingRate || 0) * (invoiceData.totalHours || 0)).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between items-center">
+                  <span className="font-medium">GST ({invoiceData.gst === "NA" ? "NA" : invoiceData.gst + "%"}):</span>
+                  <span className={invoiceData.gst === "18" ? "text-green-600" : ""}>₹{(() => {
+                    const trainingFees = roundToNearestWhole((invoiceData.trainingRate || 0) * (invoiceData.totalHours || 0));
+                    if (invoiceData.gst === "18") {
+                      return roundToNearestWhole(trainingFees * 0.18).toLocaleString();
+                    }
+                    return "0";
+                  })()}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="font-medium">TDS ({invoiceData.tds}% on Training Fees + GST only):</span>
+                  <span>₹{(() => {
+                    const trainingFees = roundToNearestWhole((invoiceData.trainingRate || 0) * (invoiceData.totalHours || 0));
+                    const gstAmount = invoiceData.gst === "18" ? roundToNearestWhole(trainingFees * 0.18) : 0;
+                    const taxableAmount = trainingFees + gstAmount;
+                    return roundToNearestWhole((taxableAmount * (parseFloat(invoiceData.tds) || 0)) / 100).toLocaleString();
+                  })()}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="font-medium">Adhoc Adjustment:</span>
+                  <span>₹{roundToNearestWhole(parseFloat(invoiceData.adhocAdjustment) || 0).toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between items-center">
                   <span className="font-medium">Conveyance (one-time):</span>
                   <span>₹{roundToNearestWhole(parseFloat(invoiceData.conveyance) || 0).toLocaleString()}</span>
                 </div>
@@ -626,46 +645,27 @@ const handleSubmit = async (e) => {
 
                 <div className="border-t border-blue-300 pt-1">
                   <div className="flex justify-between items-center font-semibold">
-                    <span className="text-blue-800">Total Amount:</span>
-                    <span className="text-blue-800">₹{calculateTotalAmount().toLocaleString()}</span>
+                    <span className="text-blue-800">Taxable Amount (Training Fees + GST):</span>
+                    <span className="text-blue-800">₹{(() => {
+                      const trainingFees = roundToNearestWhole((invoiceData.trainingRate || 0) * (invoiceData.totalHours || 0));
+                      const gstAmount = invoiceData.gst === "18" ? roundToNearestWhole(trainingFees * 0.18) : 0;
+                      return (trainingFees + gstAmount).toLocaleString();
+                    })()}</span>
                   </div>
-                </div>
-
-                <div className="flex justify-between items-center">
-                  <span className="font-medium">TDS ({invoiceData.tds}% on Training Fees):</span>
-                  <span>₹{roundToNearestWhole((((invoiceData.trainingRate || 0) * (invoiceData.totalHours || 0) * (parseFloat(invoiceData.tds) || 0)) / 100)).toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="font-medium">Adhoc Adjustment:</span>
-                  <span>₹{roundToNearestWhole(parseFloat(invoiceData.adhocAdjustment) || 0).toLocaleString()}</span>
                 </div>
 
                 <div className="border-t border-blue-300 pt-1">
                   <div className="flex justify-between items-center font-semibold">
-                    <span className="text-blue-800">Amount:</span>
+                    <span className="text-blue-800">Amount (after TDS):</span>
                     <span className="text-blue-800">₹{(() => {
                       const trainingFees = roundToNearestWhole((invoiceData.trainingRate || 0) * (invoiceData.totalHours || 0));
-                      const tdsAmount = roundToNearestWhole((trainingFees * (parseFloat(invoiceData.tds) || 0)) / 100);
-                      const totalAmount = calculateTotalAmount();
-                      return roundToNearestWhole(totalAmount + (parseFloat(invoiceData.adhocAdjustment) || 0) - tdsAmount);
-                    })().toLocaleString()}</span>
+                      const gstAmount = invoiceData.gst === "18" ? roundToNearestWhole(trainingFees * 0.18) : 0;
+                      const taxableAmount = trainingFees + gstAmount;
+                      const tdsAmount = roundToNearestWhole((taxableAmount * (parseFloat(invoiceData.tds) || 0)) / 100);
+                      const otherExpenses = calculateTotalAmount() - trainingFees;
+                      return roundToNearestWhole(taxableAmount - tdsAmount + otherExpenses + (parseFloat(invoiceData.adhocAdjustment) || 0)).toLocaleString();
+                    })()}</span>
                   </div>
-                </div>
-
-                <div className="flex justify-between items-center">
-                  <span className="font-medium">GST ({invoiceData.gst === "NA" ? "NA" : invoiceData.gst + "%"}):</span>
-                  <span className={invoiceData.gst === "18" ? "text-red-600" : ""}>₹{(() => {
-                    const trainingFees = roundToNearestWhole((invoiceData.trainingRate || 0) * (invoiceData.totalHours || 0));
-                    const tdsAmount = roundToNearestWhole((trainingFees * (parseFloat(invoiceData.tds) || 0)) / 100);
-                    const totalAmount = calculateTotalAmount();
-                    const amountBeforeGST = roundToNearestWhole(
-                      totalAmount + (parseFloat(invoiceData.adhocAdjustment) || 0) - tdsAmount
-                    );
-                    if (invoiceData.gst === "18") {
-                      return "-" + roundToNearestWhole(amountBeforeGST * 0.18).toLocaleString();
-                    }
-                    return "0";
-                  })()}</span>
                 </div>
 
                 <div className="border-t-2 border-blue-400 pt-1 mt-2">

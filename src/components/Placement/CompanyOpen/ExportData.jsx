@@ -9,6 +9,7 @@ import {
 import * as XLSX from "xlsx-js-style";
 import { saveAs } from "file-saver";
 import StudentListExportModal from './StudentListExportModal';
+import { formatSalary, formatStipend } from "../../../utils/salaryUtils";
 
 const ExportData = ({ companies, filteredCompanies }) => {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -60,8 +61,8 @@ const ExportData = ({ companies, filteredCompanies }) => {
           "Specialization": company.specialization || "",
           "Job Type": company.jobType || "",
           "Source": company.source || "",
-          "Salary (LPA)": company.salary || "",
-          "Stipend (₹/month)": company.stipend || "",
+          "Salary (LPA)": company.salary ? formatSalary(company.salary) : "",
+          "Stipend (₹/month)": company.stipend ? formatStipend(company.stipend) : "",
           "Job Location": company.jobLocation || "",
           "Company Website": company.companyWebsite || "",
           "Eligibility Criteria": company.marksCriteria || "",

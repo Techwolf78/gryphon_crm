@@ -123,8 +123,27 @@ const Navbar = ({ onImageClick = () => {} }) => {
 
   const handleLogout = () => {
     setIsDropdownOpen(false);
+    
+    // Hard clear cache
+    localStorage.clear();
+    sessionStorage.clear();
+    
+    // Clear any cached data
+    if ('caches' in window) {
+      caches.keys().then(names => {
+        names.forEach(name => {
+          caches.delete(name);
+        });
+      });
+    }
+    
     logout();
     navigate("/login", { state: { showLogoutToast: true } });
+    
+    // Force page reload to ensure clean state
+    setTimeout(() => {
+      window.location.reload();
+    }, 100);
   };
 
   const navItemClass =
@@ -136,7 +155,7 @@ const Navbar = ({ onImageClick = () => {} }) => {
         <img
           src="https://res.cloudinary.com/dcjmaapvi/image/upload/v1740489025/ga-hori_ylcnm3.png"
           alt="Gryphon CRM Logo"
-          className="h-20 w-auto"
+          className="h-16 w-auto"
         />
       </Link>
 

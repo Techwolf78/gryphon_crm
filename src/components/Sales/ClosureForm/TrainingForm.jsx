@@ -451,15 +451,15 @@ const TrainingForm = ({
  
     return (
         <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center px-4 z-54">
-            <div className="bg-white w-full max-w-7xl h-[90vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col relative animate-fadeIn">
-                <div className="flex justify-between items-center px-6 py-4 border-b bg-blue-100">
-                    <h2 className="text-2xl font-bold text-blue-800">Client Onboarding Form</h2>
+            <div className="bg-white w-full max-w-7xl h-[98vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col relative animate-fadeIn">
+                <div className="flex justify-between items-center px-4 py-2 border-b bg-blue-100">
+                    <h2 className="text-xl font-bold text-blue-800">Client Onboarding Form</h2>
                     <div className="flex items-center space-x-3 w-[450px]">
                         <input
                             name="projectCode"
                             value={formData.projectCode}
                             placeholder="Project Code"
-                            className={`px-4 py-2 border rounded-lg text-base w-full font-semibold ${duplicateProjectCode ? "text-red-600 bg-red-50 border-red-300" : "text-blue-700 bg-gray-100"
+                            className={`px-3 py-1 border rounded-lg text-base w-full font-semibold ${duplicateProjectCode ? "text-red-600 bg-red-50 border-red-300" : "text-blue-700 bg-gray-100"
                                 } cursor-not-allowed`}
                             readOnly
                         />
@@ -477,7 +477,7 @@ const TrainingForm = ({
                         </div>
                     )}
                 </div>
-                <form className="flex-1 overflow-y-auto p-6 space-y-6" onSubmit={handleSubmit} noValidate>
+                <form className="flex-1 overflow-y-auto p-4 space-y-4" onSubmit={handleSubmit} noValidate>
                     <CollegeInfoSection
                         formData={formData}
                         setFormData={setFormData}
@@ -507,18 +507,18 @@ const TrainingForm = ({
                         contractEndDate={contractEndDate}
                         setContractEndDate={setContractEndDate}
                     />
-                    <div className="pt-4 flex justify-end space-x-4">
+                    <div className="pt-2 flex justify-end space-x-4">
                         <button
                             type="button"
                             onClick={handleClose}
-                            className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-100"
+                            className="px-4 py-1 border border-gray-300 rounded-lg hover:bg-gray-100"
                             disabled={isSubmitting}
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
-                            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:bg-blue-400"
+                            className="bg-blue-600 text-white px-4 py-1 rounded-lg hover:bg-blue-700 disabled:bg-blue-400"
                             disabled={isSubmitting || !isFormValid}
                         >
                             {isSubmitting ? "Submitting..." : "Submit"}

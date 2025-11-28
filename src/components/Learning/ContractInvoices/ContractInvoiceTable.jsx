@@ -11,7 +11,6 @@ import {
   where,
 } from "firebase/firestore";
 import { db } from "../../../firebase";
-import { useAuth } from "../../../context/AuthContext";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faChevronUp,
@@ -25,6 +24,7 @@ import RowClickModal from "./RowClickModal";
 import MergeInvoicesModal from "./MergeInvoicesModal ";
 import InvoiceExcelExport from "./InvoiceExcelExport";
 import AuditLogsModal from "./AuditLogsModal";
+import { logInvoiceOperation } from "../../../utils/learningAuditLogger";
 
 export default function ContractInvoiceTable() {
   const [invoices, setInvoices] = useState([]);
@@ -78,8 +78,6 @@ export default function ContractInvoiceTable() {
 
   // Dynamic Installment Recalculation State - REMOVED FOR SIMPLICITY
 
-  const { user } = useAuth();
-
   // Core Functions - Simplified
 
   useEffect(() => {
@@ -96,6 +94,21 @@ export default function ContractInvoiceTable() {
           id: doc.id,
           ...doc.data(),
         }));
+        console.log(`Training Forms: ${trainingFormsData.length} colleges fetched`);
+
+        // 1️⃣.1️⃣ Fetch digital marketing contracts
+        const digitalMarketingSnapshot = await getDocs(
+          query(collection(db, "digitalMarketing"), orderBy("createdAt", "desc"))
+        );
+        const digitalMarketingData = digitalMarketingSnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        console.log(`Digital Marketing: ${digitalMarketingData.length} colleges fetched`);
+
+        // Combine both collections
+        const combinedContracts = [...trainingFormsData, ...digitalMarketingData];
+        console.log(`Total Combined: ${combinedContracts.length} colleges from both collections`);
 
         // 2️⃣ Fetch ContractInvoices
         const invoicesSnapshot = await getDocs(
@@ -125,7 +138,7 @@ export default function ContractInvoiceTable() {
         }));
         setExistingProformas(proformaData);
 
-        setInvoices(trainingFormsData);
+        setInvoices(combinedContracts);
       } catch {
         setError("Failed to load data. Please try again.");
       } finally {
@@ -281,31 +294,34 @@ const [locallyGeneratedNumbers, setLocallyGeneratedNumbers] = useState(new Set()
 
 const generateInvoiceNumber = async (invoiceType = "Tax Invoice") => {
   const financialYear = getCurrentFinancialYear();
-  let prefix = "TI";
+  let prefix = "TI"; // Default for Tax Invoice
   if (invoiceType === "Proforma Invoice") prefix = "PI";
   if (invoiceType === "Cash Invoice") prefix = "CI";
 
   try {
-    const [invoicesSnapshot, proformaSnapshot] = await Promise.all([
-      getDocs(query(collection(db, "ContractInvoices"), 
-        where("financialYear", "==", financialYear.year))),
-      getDocs(query(collection(db, "ProformaInvoices"), 
-        where("financialYear", "==", financialYear.year))),
-    ]);
+    // Har invoice type ke liye alag collection mein search karo
+    let collectionName = "ContractInvoices"; // Tax aur Cash invoices yahan hain
+    if (invoiceType === "Proforma Invoice") {
+      collectionName = "ProformaInvoices";
+    }
 
-    // Combine existing invoices from database
-    const allInvoices = [
-      ...invoicesSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
-      ...proformaSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
-    ];
+    const invoicesSnapshot = await getDocs(
+      query(
+        collection(db, collectionName),
+        where("financialYear", "==", financialYear.year),
+        where("invoiceType", "==", invoiceType)
+      )
+    );
 
-    // Filter current financial year invoices
-    const currentFYInvoices = allInvoices.filter((inv) => {
-      if (!inv.invoiceNumber) return false;
-      return inv.invoiceNumber.includes(financialYear.year);
-    });
+    // Current financial year ke invoices filter karo
+    const currentFYInvoices = invoicesSnapshot.docs
+      .map((doc) => ({ id: doc.id, ...doc.data() }))
+      .filter((inv) => {
+        if (!inv.invoiceNumber) return false;
+        return inv.invoiceNumber.includes(financialYear.year);
+      });
 
-    // Extract sequential numbers from ALL invoice types
+    // Sirf isi invoice type ke numbers extract karo
     const invoiceNumbers = currentFYInvoices
       .map((inv) => {
         const parts = inv.invoiceNumber.split("/");
@@ -319,29 +335,38 @@ const generateInvoiceNumber = async (invoiceType = "Tax Invoice") => {
       })
       .filter((num) => num > 0);
 
-    // Also consider locally generated numbers in this session
+    // Locally generated numbers bhi check karo (sirf isi type ke)
     const localNumbers = Array.from(locallyGeneratedNumbers)
-      .map(num => parseInt(num))
+      .filter(numStr => {
+        const parts = numStr.split('-');
+        return parts.length === 2 && parts[0] === prefix;
+      })
+      .map(numStr => {
+        const parts = numStr.split('-');
+        return parseInt(parts[1]);
+      })
       .filter(num => !isNaN(num) && num > 0);
 
     const allNumbers = [...invoiceNumbers, ...localNumbers];
     
-    // Find the lowest available number starting from 1
+    // Lowest available number find karo starting from 1
     let nextInvoiceNumber = 1;
     const usedNumbers = new Set(allNumbers);
     while (usedNumbers.has(nextInvoiceNumber)) {
       nextInvoiceNumber++;
     }
 
-    // Update local tracking
-    setLocallyGeneratedNumbers(prev => new Set([...prev, nextInvoiceNumber]));
+    // Local tracking update karo with type prefix
+    const trackingKey = `${prefix}-${nextInvoiceNumber}`;
+    setLocallyGeneratedNumbers(prev => new Set([...prev, trackingKey]));
 
     const invoiceNumber = nextInvoiceNumber.toString().padStart(2, "0");
     const finalInvoiceNumber = `GAPL/${financialYear.year}/${prefix}/${invoiceNumber}`;
 
     return finalInvoiceNumber;
-  } catch {
-    // Fallback with timestamp to ensure uniqueness
+  } catch (error) {
+    console.error("Error generating invoice number:", error);
+    // Fallback with timestamp
     const fallbackNumber = `GAPL/${financialYear.year}/${prefix}/F${Date.now().toString().slice(-2)}`;
     return fallbackNumber;
   }
@@ -552,18 +577,20 @@ const generateInvoiceNumber = async (invoiceType = "Tax Invoice") => {
       console.log("Successfully deleted invoice from Firestore");
 
       // Remove the undone invoice number from local tracking to allow reuse
-      const parts = invoice.invoiceNumber.split("/");
-      if (parts.length === 4) {
-        const sequentialPart = parts[3];
-        const num = parseInt(sequentialPart, 10);
-        if (!isNaN(num)) {
-          setLocallyGeneratedNumbers(prev => {
-            const newSet = new Set(prev);
-            newSet.delete(num);
-            return newSet;
-          });
-        }
-      }
+ const parts = invoice.invoiceNumber.split("/");
+  if (parts.length === 4) {
+    const prefix = parts[2]; // PI, TI, CI
+    const sequentialPart = parts[3];
+    const num = parseInt(sequentialPart, 10);
+    if (!isNaN(num)) {
+      const trackingKey = `${prefix}-${num}`;
+      setLocallyGeneratedNumbers(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(trackingKey);
+        return newSet;
+      });
+    }
+  }
 
       // If this is a converted Tax invoice, also delete the original Proforma
       if (invoice.convertedFromProforma) {
@@ -590,16 +617,22 @@ const generateInvoiceNumber = async (invoiceType = "Tax Invoice") => {
         }
       }
 
-      // Log the undo action
-      console.log("Logging audit action");
-      await addDoc(collection(db, 'audit_logs'), {
-        action: 'undo',
-        invoiceId: invoice.id,
-        invoiceNumber: invoice.invoiceNumber,
-        timestamp: new Date(),
-        user: user?.email || 'Unknown',
-        details: `Invoice ${invoice.invoiceNumber} cancelled`
-      });
+      // Audit logging for invoice cancellation
+      await logInvoiceOperation(
+        "invoice_cancellation",
+        invoice.id,
+        {
+          invoiceType: invoice.invoiceType,
+          invoiceNumber: invoice.invoiceNumber,
+          contractId: invoice.originalInvoiceId,
+          collegeName: invoice.collegeName,
+          course: invoice.course,
+          year: invoice.year,
+          amount: invoice.amountRaised || invoice.netPayableAmount,
+          installment: invoice.installment,
+          isMergedInvoice: invoice.isMergedInvoice || false
+        }
+      );
 
       console.log("Audit log created successfully");
 
@@ -730,6 +763,22 @@ const generateInvoiceNumber = async (invoiceType = "Tax Invoice") => {
         alert(
           `Invoice converted to Tax Invoice successfully! Invoice Number: ${updatedInvoiceNumber}`
         );
+
+        // Audit logging for invoice conversion
+        await logInvoiceOperation(
+          "invoice_conversion",
+          editInvoice.id,
+          {
+            fromType: "Proforma Invoice",
+            toType: "Tax Invoice",
+            originalNumber: editInvoice.invoiceNumber,
+            newNumber: updatedInvoiceNumber,
+            contractId: editInvoice.originalInvoiceId,
+            collegeName: editInvoice.collegeName,
+            course: editInvoice.course,
+            year: editInvoice.year
+          }
+        );
       }
     } else if (isRegenerate && editInvoice) {
   // CASE 2: Regenerate invoice (same logic with collection selection)
@@ -815,6 +864,21 @@ const generateInvoiceNumber = async (invoiceType = "Tax Invoice") => {
 
   alert(
     `Invoice regenerated successfully! New Invoice Number: ${newInvoiceNumber}`
+  );
+
+  // Audit logging for invoice regeneration
+  await logInvoiceOperation(
+    "invoice_regeneration",
+    newInvoice.id,
+    {
+      invoiceType: formData.invoiceType,
+      newNumber: newInvoiceNumber,
+      regeneratedFrom: editInvoice.invoiceNumber,
+      contractId: editInvoice.originalInvoiceId,
+      collegeName: editInvoice.collegeName,
+      course: editInvoice.course,
+      year: editInvoice.year
+    }
   );
 } else {
   // CASE 3: Naya invoice generate karna
@@ -936,6 +1000,22 @@ const generateInvoiceNumber = async (invoiceType = "Tax Invoice") => {
   }
 
   alert(`Invoice ${invoiceNumber} raised successfully!`);
+
+  // Audit logging for new invoice creation
+  await logInvoiceOperation(
+    "invoice_creation",
+    newInvoice.id,
+    {
+      invoiceType: formData.invoiceType,
+      invoiceNumber,
+      contractId: contract.id,
+      installment: installment.name,
+      collegeName: contract.collegeName,
+      course: contract.course,
+      year: contract.year,
+      amount: totalAmount
+    }
+  );
 }
     setShowModal(false);
     setSelectedContract(null);
@@ -1314,6 +1394,25 @@ const handleMergeSubmit = async (formData) => {
       `GST Amount: ${formatCurrency(gstAmount)}\n` +
       `Final Amount: ${formatCurrency(finalNetPayableAmount)}\n` +
       `Invoice Type: ${formData.invoiceType}`
+    );
+
+    // Audit logging for merged invoice creation
+    await logInvoiceOperation(
+      "merged_invoice_creation",
+      newInvoice.id,
+      {
+        invoiceType: formData.invoiceType,
+        invoiceNumber,
+        mergedContractsCount: selectedContractsForMerge.length,
+        collegeName: firstContract.collegeName,
+        course: [...new Set(courses)].join(", "),
+        year: [...new Set(years)].join(", "),
+        totalBaseAmount,
+        gstAmount,
+        finalAmount: finalNetPayableAmount,
+        installment: selectedInstallmentForMerge.name,
+        mergedContractIds: selectedContractsForMerge.map(c => c.id)
+      }
     );
 
     // Reset modal

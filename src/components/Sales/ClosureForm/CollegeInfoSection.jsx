@@ -27,12 +27,12 @@ const CollegeInfoSection = ({
       : [];
 
   return (
-    <section className="p-5 bg-white rounded-xl shadow space-y-6">
-      <h3 className="font-semibold text-2xl text-blue-700 border-b pb-2">
+    <section className="p-4 bg-white rounded-xl shadow space-y-4">
+      <h3 className="font-semibold text-xl text-blue-700 border-b pb-2">
         College Information
       </h3>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* College Name */}
         <div>
           <label className="font-medium block mb-1">
@@ -81,7 +81,7 @@ const CollegeInfoSection = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Address */}
         <div>
           <label className="font-medium block mb-1">
@@ -187,7 +187,7 @@ const CollegeInfoSection = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Pincode */}
         <div>
           <label className="font-medium block mb-1">

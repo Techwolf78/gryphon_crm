@@ -313,7 +313,7 @@ function InitiationTrainingDetails({ training, onBack }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen w-full bg-gradient-to-br from-gray-50 to-gray-200">
+      <div className="min-h-screen w-full bg-linear-to-br from-gray-50 to-gray-200">
         <button
           className="mb-2 flex items-center text-blue-600 hover:underline"
           onClick={onBack}
@@ -332,7 +332,7 @@ function InitiationTrainingDetails({ training, onBack }) {
 
   if (error) {
     return (
-      <div className="min-h-screen w-full bg-gradient-to-br from-gray-50 to-gray-200 ">
+      <div className="min-h-screen w-full bg-linear-to-br from-gray-50 to-gray-200 ">
         <button
           className="mb-2 flex items-center text-blue-600 hover:underline"
           onClick={onBack}
@@ -350,7 +350,7 @@ function InitiationTrainingDetails({ training, onBack }) {
   }
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-gray-50 to-gray-200 ">
+    <div className="min-h-screen w-full bg-linear-to-br from-gray-50 to-gray-200 ">
       <button
         className="mb-4 flex items-center text-blue-600 hover:underline text-sm"
         onClick={onBack}

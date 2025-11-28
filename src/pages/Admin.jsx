@@ -12,6 +12,11 @@ import {
   FiActivity,
   FiClock,
   FiEdit,
+  FiChevronUp,
+  FiChevronDown,
+  FiArrowUp,
+  FiArrowDown,
+  FiChevronsUp,
 } from "react-icons/fi";
 import {
   collection,
@@ -22,6 +27,9 @@ import {
   orderBy,
   limit,
   getDoc,
+  where,
+  updateDoc,
+  serverTimestamp,
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
@@ -45,14 +53,46 @@ const Admin = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   const [currentUser, setCurrentUser] = useState(null);
+  const [timeReports, setTimeReports] = useState([]);
+  const [timeFilter, setTimeFilter] = useState('all');
+  const [loadingTime, setLoadingTime] = useState(false);
+  const [sortOrder, setSortOrder] = useState(null);
+  const formatTimeAgo = (date) => {
+    if (!date) return "Unknown";
+    
+    const now = new Date();
+    const diffMs = now - date;
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
+    const diffHour = Math.floor(diffMin / 60);
+    const diffDay = Math.floor(diffHour / 24);
+    const diffMonth = Math.floor(diffDay / 30);
+    const diffYear = Math.floor(diffMonth / 12);
+
+    if (diffSec < 60) return `Last Active ${diffSec}s ago`;
+    if (diffMin < 60) return `Last Active ${diffMin}m ago`;
+    if (diffHour < 24) return `Last Active ${diffHour}h ago`;
+    if (diffDay < 30) return `Last Active ${diffDay}d ago`;
+    if (diffMonth < 12) return `Last Active ${diffMonth}M ago`;
+    return `Last Active ${diffYear}y ago`;
+  }; // null, 'asc', 'desc'
 
   useEffect(() => {
     const cachedLogs = sessionStorage.getItem("auditLogs");
     const cachedUsers = sessionStorage.getItem("userList");
 
     if (cachedLogs && cachedUsers) {
-      setLogs(JSON.parse(cachedLogs));
+      const parsedLogs = JSON.parse(cachedLogs).map(log => ({
+        ...log,
+        timestamp: typeof log.timestamp === 'string' ? log.timestamp : 
+                  (log.timestamp?.toDate ? log.timestamp.toDate().toISOString() : 
+                   (log.timestamp?._seconds ? new Date(log.timestamp._seconds * 1000 + log.timestamp._nanoseconds / 1000000).toISOString() :
+                    (log.timestamp?.seconds ? new Date(log.timestamp.seconds * 1000 + (log.timestamp.nanoseconds || 0) / 1000000).toISOString() :
+                     new Date().toISOString())))
+      }));
+      setLogs(parsedLogs);
       setUsers(JSON.parse(cachedUsers));
+      fetchTimeReports('all'); // Load time reports
       return;
     }
 
@@ -109,6 +149,7 @@ const Admin = () => {
       const logData = logsSnap.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
+        timestamp: doc.data().timestamp?.toDate ? doc.data().timestamp.toDate().toISOString() : doc.data().timestamp,
       }));
 
       setUsers(userData);
@@ -120,6 +161,7 @@ const Admin = () => {
       // Refresh error - handled silently
     }
     setRefreshing(false);
+    fetchTimeReports('all'); // Load time reports after refresh
   };
 
   const handleDeleteUserConfirm = async () => {
@@ -145,6 +187,152 @@ const Admin = () => {
     setEditUser(null);
   };
 
+  const cleanupStaleSessions = async () => {
+    try {
+      const now = new Date();
+      const tenMinutesAgo = new Date(now.getTime() - 10 * 60 * 1000); // 10 minutes ago
+      
+      // Get all active sessions
+      const activeSessionsQuery = query(
+        collection(db, "user_sessions"), 
+        where('isActive', '==', true)
+      );
+      const activeSessionsSnap = await getDocs(activeSessionsQuery);
+      
+      const updatePromises = [];
+      activeSessionsSnap.docs.forEach(docSnap => {
+        const sessionData = docSnap.data();
+        const lastActive = sessionData.lastActive?.toDate();
+        
+        // If lastActive is more than 10 minutes ago, mark as inactive
+        if (lastActive && lastActive < tenMinutesAgo) {
+          updatePromises.push(
+            updateDoc(docSnap.ref, {
+              isActive: false,
+              endTime: serverTimestamp(),
+              duration: Math.floor((lastActive - sessionData.startTime.toDate()) / 1000)
+            })
+          );
+        }
+      });
+      
+      if (updatePromises.length > 0) {
+        await Promise.all(updatePromises);
+        console.log(`Cleaned up ${updatePromises.length} stale sessions`);
+      }
+    } catch (error) {
+      console.error("Error cleaning up stale sessions:", error);
+    }
+  };
+
+  const fetchTimeReports = async (filter = 'all') => {
+    setLoadingTime(true);
+    try {
+      // First, clean up stale sessions (inactive sessions that haven't been updated in 10+ minutes)
+      await cleanupStaleSessions();
+
+      let q = collection(db, "user_sessions");
+      if (filter === '1day') {
+        const oneDayAgo = new Date(Date.now() - 1 * 24 * 60 * 60 * 1000);
+        q = query(q, where('startTime', '>=', oneDayAgo));
+      } else if (filter === '3days') {
+        const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+        q = query(q, where('startTime', '>=', threeDaysAgo));
+      } else if (filter === '7days') {
+        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        q = query(q, where('startTime', '>=', sevenDaysAgo));
+      } else if (filter === '30days') {
+        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+        q = query(q, where('startTime', '>=', thirtyDaysAgo));
+      }
+      const snap = await getDocs(q);
+      const sessions = snap.docs.map(d => d.data());
+      // Aggregate by user - get latest location for each user
+      const userTotals = {};
+      const userLocations = {};
+      const userLastActive = {};
+      const userLastEndTime = {};
+      const now = new Date();
+      
+      sessions.forEach(s => {
+        let dur = s.duration || 0;
+        if (s.isActive) {
+          const start = s.startTime.toDate();
+          dur = Math.floor((now - start) / 1000); // current duration in seconds
+        }
+        if (!userTotals[s.userId]) {
+          userTotals[s.userId] = 0;
+          userLocations[s.userId] = s.location || { address: "Unknown" };
+          userLastActive[s.userId] = s.isActive ? "Active now" : "Last session";
+          userLastEndTime[s.userId] = s.endTime ? s.endTime.toDate() : null;
+        } else {
+          // Update location if this session has location data and current is unknown
+          if (s.location && !s.location.error && userLocations[s.userId].address === "Unknown") {
+            userLocations[s.userId] = s.location;
+          }
+          // Update active status and last end time
+          if (s.isActive) {
+            userLastActive[s.userId] = "Active now";
+          } else if (s.endTime && (!userLastEndTime[s.userId] || s.endTime.toDate() > userLastEndTime[s.userId])) {
+            userLastEndTime[s.userId] = s.endTime.toDate();
+          }
+        }
+        userTotals[s.userId] += dur;
+      });
+      // Fetch user names
+      const userIds = Object.keys(userTotals);
+      const userNames = {};
+      for (const uid of userIds) {
+        try {
+          const userQuery = query(collection(db, "users"), where("uid", "==", uid));
+          const userSnap = await getDocs(userQuery);
+          if (!userSnap.empty) {
+            const userData = userSnap.docs[0].data();
+            userNames[uid] = userData.name || 'Unknown';
+          } else {
+            userNames[uid] = 'Unknown';
+          }
+        } catch (error) {
+          console.error("Error fetching user:", error);
+          userNames[uid] = 'Unknown';
+        }
+      }
+      const reports = Object.entries(userTotals).map(([uid, totalSeconds]) => {
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+        const location = userLocations[uid];
+        const lastEndTime = userLastEndTime[uid];
+        const status = userLastActive[uid] === "Active now" ? "Active now" : formatTimeAgo(lastEndTime);
+        return {
+          userId: uid,
+          name: userNames[uid] || 'Unknown',
+          timeString: `${hours}h ${minutes}m ${seconds}s`,
+          location: location.error ? "Location unavailable" : location.address || "Unknown",
+          city: location.city || "Unknown",
+          country: location.country || "Unknown",
+          status: status,
+          totalSeconds: totalSeconds
+        };
+      });
+      setTimeReports(reports);
+    } catch (error) {
+      console.error("Error fetching time reports:", error);
+      setTimeReports([]);
+    }
+    setLoadingTime(false);
+  };
+
+  const handleSort = () => {
+    if (sortOrder === 'asc') {
+      setSortOrder('desc');
+    } else if (sortOrder === 'desc') {
+      setSortOrder(null);
+    } else {
+      setSortOrder('asc');
+    }
+  };
+
   const filteredUsers = users.filter((u) => {
     return (
       (!search ||
@@ -164,7 +352,7 @@ const Admin = () => {
   const todayLogins = logs.filter((log) => {
     if (!log.action || !log.action.trim().startsWith("Logged in")) return false;
     const today = new Date();
-    const logDate = log.timestamp?.toDate ? log.timestamp.toDate() : new Date(log.timestamp);
+    const logDate = new Date(log.timestamp);
     
     if (!logDate || isNaN(logDate.getTime())) return false;
     
@@ -403,7 +591,7 @@ const Admin = () => {
 
           {/* Desktop Table Layout */}
           <div className="hidden lg:block" data-tour="user-table">
-            <div className="overflow-x-auto">
+            <div className="overflow-hidden">
               <table className="w-full text-left">
                 <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
                   <tr>
@@ -561,6 +749,127 @@ const Admin = () => {
       <div data-tour="audit-logs">
         <AuditLogs logs={logs} />
       </div>
+
+      {/* Time Tracking Reports */}
+      <section className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="p-4 sm:p-6">
+          <div className="flex flex-col gap-4 mb-6">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <FiClock className="text-indigo-500" />
+                Time Tracking Reports
+              </h2>
+              <p className="text-sm text-gray-500 mt-1">
+                View employee time spent in the system
+                <br />
+                <span className="text-xs text-gray-400">
+                  Location shows last known location (may be "Unknown" for older sessions or denied permissions)
+                </span>
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <select
+                value={timeFilter}
+                onChange={(e) => {
+                  setTimeFilter(e.target.value);
+                  fetchTimeReports(e.target.value);
+                }}
+                className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              >
+                <option value="all">All Time</option>
+                <option value="1day">Last 1 Day</option>
+                <option value="3days">Last 3 Days</option>
+                <option value="7days">Last 7 Days</option>
+                <option value="30days">Last 30 Days</option>
+              </select>
+              <button
+                onClick={() => fetchTimeReports(timeFilter)}
+                disabled={loadingTime}
+                className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-gray-50 rounded-lg transition-colors border border-gray-200"
+                aria-label="Refresh time reports"
+              >
+                <FiRefreshCw className={`w-4 h-4 ${loadingTime ? "animate-spin" : ""}`} />
+              </button>
+            </div>
+          </div>
+          <div className="overflow-hidden">
+            {(() => {
+              const sortedReports = [...timeReports].sort((a, b) => {
+                if (!sortOrder) return 0;
+                const aSec = a.totalSeconds;
+                const bSec = b.totalSeconds;
+                if (sortOrder === 'asc') {
+                  return aSec - bSec;
+                } else {
+                  return bSec - aSec;
+                }
+              });
+              return (
+                <table className="w-full text-left">
+                  <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
+                    <tr>
+                      <th className="px-6 py-3 font-medium">Employee</th>
+                      <th className="px-6 py-3 font-medium">Status</th>
+                      <th className="px-6 py-3 font-medium">Location</th>
+                      <th className="px-6 py-3 font-medium cursor-pointer select-none hover:bg-gray-100 transition-colors" onClick={handleSort}>
+                        <div className="flex items-center">
+                          <span>Total Time</span>
+                          <div className="ml-1">
+                            {!sortOrder && <FiChevronsUp className="w-4 h-4 text-gray-400" />}
+                            {sortOrder === 'asc' && <FiArrowUp className="w-4 h-4 text-indigo-600" />}
+                            {sortOrder === 'desc' && <FiArrowDown className="w-4 h-4 text-indigo-600" />}
+                          </div>
+                        </div>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {sortedReports.length > 0 ? (
+                      sortedReports.map((report) => (
+                        <tr key={report.userId} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
+                            {report.name}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {report.status === "Active now" ? (
+                              <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
+                                {report.status}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-gray-600">
+                                {report.status}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-gray-500">
+                            <div className="text-sm">
+                              <div>{report.location}</div>
+                              {report.city !== "Unknown" && (
+                                <div className="text-xs text-gray-400">
+                                  {report.city}, {report.country}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-gray-500">
+                            {report.timeString}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="4" className="px-6 py-4 text-center text-gray-500">
+                          No time tracking data available
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              );
+            })()}
+          </div>
+        </div>
+      </section>
 
       {/* Delete Confirmation Modal - Make responsive */}
       {deleteUser && (

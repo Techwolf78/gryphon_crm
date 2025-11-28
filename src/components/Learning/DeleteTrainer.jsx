@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { doc, deleteDoc } from "firebase/firestore";
 import { db } from "../../firebase";
 import { FiAlertTriangle, FiX, FiTrash2 } from "react-icons/fi";
+import { auditLogTrainerOperations, auditLogErrorOperations } from "../../utils/learningAuditLogger";
 
 function DeleteTrainer({ trainerId, trainerName, onClose, onTrainerDeleted }) {
   const [loading, setLoading] = useState(false);
@@ -11,11 +12,22 @@ function DeleteTrainer({ trainerId, trainerName, onClose, onTrainerDeleted }) {
     try {
       setLoading(true);
       setError("");
-      
-  await deleteDoc(doc(db, "trainers", trainerId));
-  onTrainerDeleted(trainerId);
+
+      await deleteDoc(doc(db, "trainers", trainerId));
+
+      // Audit log: Trainer deleted
+      await auditLogTrainerOperations.trainerDeleted(trainerId, trainerName);
+
+      onTrainerDeleted(trainerId);
       onClose();
-    } catch {
+    } catch (err) {
+      // Audit log: Database operation failed
+      await auditLogErrorOperations.databaseOperationFailed(
+        "DELETE",
+        "trainers",
+        err.code || "UNKNOWN_ERROR",
+        err.message
+      );
 
       setError("Failed to delete trainer. Please try again.");
     } finally {

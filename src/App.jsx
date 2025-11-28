@@ -33,6 +33,12 @@ const Help = React.lazy(() => import("./pages/Help"));
 const TrainersDashboard = React.lazy(() =>
   import("./components/Learning/TrainersDashboard")
 );
+const LearningAdminAuditLogs = React.lazy(() =>
+  import("./components/Learning/LearningAdminAuditLogs")
+);
+const PlacementAdminAuditLogs = React.lazy(() =>
+  import("./components/Placement/PlacementAdminAuditLogs")
+);
 const HR = React.lazy(() => import("./pages/HR"));
 const CA = React.lazy(() => import("./pages/CA"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
@@ -43,6 +49,12 @@ const PublicInvoiceDetails = React.lazy(() =>
 const Maintenance = React.lazy(() => import("./pages/Maintenance"));
 const UploadStudentData = React.lazy(() => import("./components/Placement/AddJd/UploadStudentData")); // ✅ Space removed
 const Purchase = React.lazy(() => import("./pages/Purchase"));
+
+// Lazy load UNO page
+const UNO = React.lazy(() => import("./pages/UNO"));
+
+// Lazy load Intro page
+const Intro = React.lazy(() => import("./pages/Intro"));
 
 // Loading component
 const PageLoader = () => (
@@ -99,10 +111,12 @@ const AppContent = () => {
             <Route path="admin" element={<Admin />} />
             <Route path="sales" element={<Sales />} />
             <Route path="placement" element={<Placement />} />
+            <Route path="placement/admin" element={<PlacementAdminAuditLogs />} />
             <Route path="help" element={<Help />} />
             <Route path="learning-development">
               <Route index element={<LearningDevelopment />} />
               <Route path="trainers" element={<TrainersDashboard />} />
+              <Route path="admin" element={<LearningAdminAuditLogs />} />
             </Route>
             <Route path="marketing">
               <Route index element={<DigitalMarketing />} />
@@ -111,6 +125,8 @@ const AppContent = () => {
             <Route path="hr" element={<HR />} />
             <Route path="ca" element={<CA />} />
             <Route path="purchase" element={<Purchase />} />
+            <Route path="uno" element={<UNO />} />
+            <Route path="intro" element={<Intro />} />
           </Route>
 
           {/* Add the 404 route - catch all unmatched routes */}
@@ -133,7 +149,7 @@ const App = () => (
     <ErrorBoundary>
       <AuthProvider>
         <NotificationsProvider>
-          <Router basename="/">
+          <Router basename="">
             <AppContent />
           </Router>
         </NotificationsProvider>

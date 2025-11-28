@@ -48,6 +48,7 @@ const Dashboard = () => {
         'learning-development': 'learning-development',
         'placement': 'placement',
         'marketing': 'marketing',
+        'dm': 'marketing',
         'admin': 'sales'
       };
 
@@ -84,7 +85,8 @@ const Dashboard = () => {
       'ld': 'learning-development',
       'learning-development': 'learning-development',
       'placement': 'placement',
-      'marketing': 'marketing'
+      'marketing': 'marketing',
+      'dm': 'marketing'
     };
 
     return userDepts.some(userDept => {
@@ -141,7 +143,7 @@ const Dashboard = () => {
                 <div className={`relative inline-block ${ticketAlerts.length > 0 ? 'animate-bounce' : ''}`}>
                   <FiBell className="w-6 h-6 text-gray-700" />
                   {ticketAlerts.length > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] rounded-full min-w-[16px] text-center">
+                    <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] rounded-full min-w-4 text-center">
                       {ticketAlerts.length}
                     </span>
                   )}
@@ -150,7 +152,7 @@ const Dashboard = () => {
 
               {/* Notifications Dropdown */}
               {showNotificationsDropdown && (
-                <div className="absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-[100]">
+                <div className="absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-100">
                   <div className="px-3 py-2 border-b border-gray-200">
                     <h3 className="text-sm font-semibold text-gray-900">Notifications</h3>
                   </div>

@@ -127,7 +127,7 @@ const UploadStudentData = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8">
+    <div className="min-h-screen bg-linear-to-br from-blue-50 to-indigo-100 py-8">
       <div className="max-w-4xl mx-auto px-4 relative z-10">
         {/* Header */}
         <div className="text-center mb-8">

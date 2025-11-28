@@ -50,11 +50,12 @@ const TrainerBillsTab = ({ onBillsCountChange }) => {
           const food = data.food || 0;
           const lodging = data.lodging || 0;
           const subTotal = trainingFees + conveyance + food + lodging;
-          const tdsAmount = (trainingFees * (data.tds || 0)) / 100;
+          const gstAmount = data.gst === "18" ? Math.round(trainingFees * 0.18) : 0;
+          const taxableAmount = trainingFees + gstAmount;
+          const tdsAmount = (taxableAmount * (data.tds || 0)) / 100;
+          const otherExpenses = subTotal - trainingFees;
           const adhocAdjustment = data.adhocAdjustment || 0;
-          const amountBeforeGST = subTotal - tdsAmount + adhocAdjustment;
-          const gstAmount = data.gst === "18" ? Math.round(amountBeforeGST * 0.18) : 0;
-          calculatedNetPayment = amountBeforeGST - gstAmount;
+          calculatedNetPayment = taxableAmount - tdsAmount + otherExpenses + adhocAdjustment;
         }
 
         return {
@@ -286,15 +287,15 @@ const TrainerBillsTab = ({ onBillsCountChange }) => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
+    <div className="min-h-screen bg-linear-to-br from-slate-50 via-white to-slate-50">
       {/* Unified Professional Header */}
       <div className="bg-white/90 backdrop-blur-sm border-b border-slate-200/60 sticky top-0 z-10">
-        <div className="mx-auto px-4 py-4">
+        <div className="mx-auto px-3 py-3">
           {/* Top Row: Title, Metrics, Actions */}
-          <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 mb-4">
+          <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3 mb-3">
             {/* Title and Description */}
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
+              <div className="w-8 h-8 bg-linear-to-r from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
                 <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
@@ -306,9 +307,9 @@ const TrainerBillsTab = ({ onBillsCountChange }) => {
             </div>
 
             {/* Action Buttons and Metrics */}
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               {/* Key Metrics */}
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 <div className="flex items-center gap-1.5">
                   <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
                   <span className="text-xs text-slate-600">Total Bills:</span>
@@ -327,7 +328,7 @@ const TrainerBillsTab = ({ onBillsCountChange }) => {
           </div>
 
           {/* Bottom Row: Search and Filters */}
-          <div className="border-t border-slate-100 pt-4">
+          <div className="border-t border-slate-100 pt-3">
             <FiltersSection
               searchTerm={searchTerm}
               onSearchChange={setSearchTerm}

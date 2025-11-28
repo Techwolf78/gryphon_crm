@@ -26,7 +26,7 @@ import {
   FiUser,
   FiShield,
   FiShoppingCart,
-  FiBell
+  FiBell,
 } from "react-icons/fi";
 
 const roleLinks = {
@@ -73,7 +73,14 @@ const roleLinks = {
     { label: "D M", path: "/dashboard/marketing", icon: <FiTrendingUp /> },
   ],
   ca: [{ label: "CA", path: "/dashboard/ca", icon: <FiUserCheck /> }],
-  hr: [{ label: "HR", path: "/dashboard/hr", icon: <FiShield /> }],
+  hr: [
+    { label: "HR", path: "/dashboard/hr", icon: <FiShield /> },
+    {
+      label: "Purchase",
+      path: "/dashboard/purchase",
+      icon: <FiShoppingCart />,
+    },
+  ],
   purchase: [
     {
       label: "Purchase",
@@ -104,7 +111,7 @@ const Sidebar = ({ collapsed, onToggle }) => {
   const { user } = useContext(AuthContext);
   const location = useLocation();
   const [isAIDrawerOpen, setIsAIDrawerOpen] = useState(false);
-  const [tooltip, setTooltip] = useState({ show: false, text: '', x: 0, y: 0 });
+  const [tooltip, setTooltip] = useState({ show: false, text: "", x: 0, y: 0 });
   const initializedRef = useRef(false);
 
   // Sync stored preference on mount (run once). If stored value differs from current prop, call onToggle to sync parent.
@@ -134,25 +141,28 @@ const Sidebar = ({ collapsed, onToggle }) => {
     if (typeof onToggle === "function") onToggle();
   }, [collapsed, onToggle]);
 
-  const handleMouseEnter = useCallback((text, event) => {
-    if (!collapsed) return;
-    const rect = event.currentTarget.getBoundingClientRect();
-    setTooltip({
-      show: true,
-      text,
-      x: rect.right + 8,
-      y: rect.top + rect.height / 2
-    });
-  }, [collapsed]);
+  const handleMouseEnter = useCallback(
+    (text, event) => {
+      if (!collapsed) return;
+      const rect = event.currentTarget.getBoundingClientRect();
+      setTooltip({
+        show: true,
+        text,
+        x: rect.right + 8,
+        y: rect.top + rect.height / 2,
+      });
+    },
+    [collapsed]
+  );
 
   const handleMouseLeave = useCallback(() => {
-    setTooltip({ show: false, text: '', x: 0, y: 0 });
+    setTooltip({ show: false, text: "", x: 0, y: 0 });
   }, []);
 
   // Hide tooltip when sidebar expands
   useEffect(() => {
     if (!collapsed) {
-      setTooltip({ show: false, text: '', x: 0, y: 0 });
+      setTooltip({ show: false, text: "", x: 0, y: 0 });
     }
   }, [collapsed]);
 
@@ -169,6 +179,13 @@ const Sidebar = ({ collapsed, onToggle }) => {
 
   // If admin, show all links. Otherwise, show links for each department the user belongs to
   let departmentLinks = [];
+
+  if (normalizedRole === "hr") {
+    const purchaseLink = roleLinks.purchase[0];
+    if (!departmentLinks.find((l) => l.path === purchaseLink.path)) {
+      departmentLinks.push(purchaseLink);
+    }
+  }
   if (isAdmin) {
     departmentLinks = roleLinks.admin;
   } else {
@@ -199,6 +216,11 @@ const Sidebar = ({ collapsed, onToggle }) => {
       icon: <FiHome />,
       skipRedirect: true,
     },
+    // {
+    //   label: "Intro",
+    //   path: "/dashboard/intro",
+    //   icon: <FiBook />,
+    // },
     ...departmentLinks,
     {
       label: "Help",
@@ -259,7 +281,12 @@ const Sidebar = ({ collapsed, onToggle }) => {
           />
           <button
             onClick={handleToggle}
-            onMouseEnter={(e) => handleMouseEnter(collapsed ? "Expand Sidebar" : "Collapse Sidebar", e)}
+            onMouseEnter={(e) =>
+              handleMouseEnter(
+                collapsed ? "Expand Sidebar" : "Collapse Sidebar",
+                e
+              )
+            }
             onMouseLeave={handleMouseLeave}
             className="p-1 rounded hover:bg-gray-100 lg:block"
             aria-label={collapsed ? "Expand" : "Collapse"}
@@ -277,66 +304,85 @@ const Sidebar = ({ collapsed, onToggle }) => {
         <nav className="flex-1 overflow-hidden">
           <div className="h-full p-3 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 hover:scrollbar-thumb-gray-400">
             <div className="flex flex-col space-y-2">
-              {links.map(({ label, path, icon, skipRedirect, onClick, hasNotification }) => (
-                <div key={path} className="relative">
-                  {onClick ? (
-                    <button
-                      onClick={() => {
-                        onClick();
-                        // Auto-close sidebar on mobile when opening modal
-                        if (window.innerWidth < 1024) {
-                          handleToggle();
-                        }
-                      }}
-                      onMouseEnter={(e) => handleMouseEnter(label, e)}
-                      onMouseLeave={handleMouseLeave}
-                      className={`w-full flex items-center ${collapsed ? 'justify-center px-2 py-2' : 'px-3 py-2'} rounded text-sm transition ${
-                        "text-gray-600 hover:bg-gray-100"
-                      } notifications-button`}
-                      title={!collapsed ? label : ""}
-                    >
-                      <span className="text-lg shrink-0 relative">
-                        {icon}
-                        {collapsed && hasNotification && (
-                          <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+              {links.map(
+                ({
+                  label,
+                  path,
+                  icon,
+                  skipRedirect,
+                  onClick,
+                  hasNotification,
+                }) => (
+                  <div key={path} className="relative">
+                    {onClick ? (
+                      <button
+                        onClick={() => {
+                          onClick();
+                          // Auto-close sidebar on mobile when opening modal
+                          if (window.innerWidth < 1024) {
+                            handleToggle();
+                          }
+                        }}
+                        onMouseEnter={(e) => handleMouseEnter(label, e)}
+                        onMouseLeave={handleMouseLeave}
+                        className={`w-full flex items-center ${
+                          collapsed ? "justify-center px-2 py-2" : "px-3 py-2"
+                        } rounded text-sm transition ${"text-gray-600 hover:bg-gray-100"} notifications-button`}
+                        title={!collapsed ? label : ""}
+                      >
+                        <span className="text-lg shrink-0 relative">
+                          {icon}
+                          {collapsed && hasNotification && (
+                            <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                          )}
+                        </span>
+                        {!collapsed && (
+                          <span className="ml-2 truncate">{label}</span>
                         )}
-                      </span>
-                      {!collapsed && <span className="ml-2 truncate">{label}</span>}
-                      {!collapsed && hasNotification && (
-                        <span className="ml-auto w-2 h-2 bg-red-500 rounded-full"></span>
-                      )}
-                    </button>
-                  ) : (
-                    <Link
-                      to={path}
-                      state={skipRedirect ? { skipRedirect: true } : undefined}
-                      onMouseEnter={(e) => handleMouseEnter(label, e)}
-                      onMouseLeave={handleMouseLeave}
-                      className={`flex items-center ${collapsed ? 'justify-center px-2 py-2' : 'px-3 py-2'} rounded text-sm transition ${
-                        isActive(path) ? "bg-blue-50 text-blue-600 font-medium" : "text-gray-600 hover:bg-gray-100"
-                      }`}
-                      title={!collapsed ? label : ""}
-                      onClick={() => {
-                        // Auto-close sidebar on mobile after navigation
-                        if (window.innerWidth < 1024) {
-                          handleToggle();
-                        }
-                      }}
-                    >
-                      <span className="text-lg shrink-0 relative">
-                        {icon}
-                        {collapsed && hasNotification && (
-                          <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                        {!collapsed && hasNotification && (
+                          <span className="ml-auto w-2 h-2 bg-red-500 rounded-full"></span>
                         )}
-                      </span>
-                      {!collapsed && <span className="ml-2 truncate">{label}</span>}
-                      {!collapsed && hasNotification && (
-                        <span className="ml-auto w-2 h-2 bg-red-500 rounded-full"></span>
-                      )}
-                    </Link>
-                  )}
-                </div>
-              ))}
+                      </button>
+                    ) : (
+                      <Link
+                        to={path}
+                        state={
+                          skipRedirect ? { skipRedirect: true } : undefined
+                        }
+                        onMouseEnter={(e) => handleMouseEnter(label, e)}
+                        onMouseLeave={handleMouseLeave}
+                        className={`flex items-center ${
+                          collapsed ? "justify-center px-2 py-2" : "px-3 py-2"
+                        } rounded text-sm transition ${
+                          isActive(path)
+                            ? "bg-blue-50 text-blue-600 font-medium"
+                            : "text-gray-600 hover:bg-gray-100"
+                        }`}
+                        title={!collapsed ? label : ""}
+                        onClick={() => {
+                          // Auto-close sidebar on mobile after navigation
+                          if (window.innerWidth < 1024) {
+                            handleToggle();
+                          }
+                        }}
+                      >
+                        <span className="text-lg shrink-0 relative">
+                          {icon}
+                          {collapsed && hasNotification && (
+                            <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                          )}
+                        </span>
+                        {!collapsed && (
+                          <span className="ml-2 truncate">{label}</span>
+                        )}
+                        {!collapsed && hasNotification && (
+                          <span className="ml-auto w-2 h-2 bg-red-500 rounded-full"></span>
+                        )}
+                      </Link>
+                    )}
+                  </div>
+                )
+              )}
 
               {/* AI Button */}
               <div className="pt-3 border-t border-gray-200 mb-24">
@@ -350,7 +396,9 @@ const Sidebar = ({ collapsed, onToggle }) => {
                   }}
                   onMouseEnter={(e) => handleMouseEnter("Ask AI", e)}
                   onMouseLeave={handleMouseLeave}
-                  className={`w-full flex items-center ${collapsed ? 'justify-center px-2 py-2' : 'px-3 py-2'} rounded text-sm bg-linear-to-r from-blue-50 to-sky-100 text-blue-700 hover:from-blue-100 hover:to-sky-150 hover:text-blue-800 border border-blue-200 shadow-sm transition-all duration-200`}
+                  className={`w-full flex items-center ${
+                    collapsed ? "justify-center px-2 py-2" : "px-3 py-2"
+                  } rounded text-sm bg-linear-to-r from-blue-50 to-sky-100 text-blue-700 hover:from-blue-100 hover:to-sky-150 hover:text-blue-800 border border-blue-200 shadow-sm transition-all duration-200`}
                   title={!collapsed ? "Ask AI" : ""}
                 >
                   <FiMessageSquare className="text-lg shrink-0" />
@@ -369,14 +417,12 @@ const Sidebar = ({ collapsed, onToggle }) => {
           style={{
             left: tooltip.x,
             top: tooltip.y,
-            transform: 'translateY(-50%)'
+            transform: "translateY(-50%)",
           }}
         >
           <div className="bg-gray-900 text-white text-sm px-3 py-2 rounded-lg shadow-lg backdrop-blur-sm bg-opacity-95 border border-gray-700 max-w-xs">
             {tooltip.text}
-            <div
-              className="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-1 w-0 h-0 border-t-4 border-b-4 border-r-4 border-transparent border-r-gray-900"
-            ></div>
+            <div className="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-1 w-0 h-0 border-t-4 border-b-4 border-r-4 border-transparent border-r-gray-900"></div>
           </div>
         </div>
       )}

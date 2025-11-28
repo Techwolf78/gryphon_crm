@@ -106,7 +106,7 @@ function TrainerTable({
                   {expandedPhases[`${collegeName}_${phase}`] && (
                     <div className="overflow-x-auto overflow-y-hidden">
                       <div className="min-w-0">
-                        <table className="w-full min-w-[800px]">
+                        <table className="w-full min-w-[600px]">
                           <thead className="bg-linear-to-r from-gray-50 to-gray-100">
                             <tr>
                               <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
@@ -120,6 +120,9 @@ function TrainerTable({
                               </th>
                               <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                                 Timeline & Hours
+                              </th>
+                              <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                                Net Payment
                               </th>
                               <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                                 Status

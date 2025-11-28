@@ -1,49 +1,11 @@
 import React, { useState,  } from "react";
 import { XIcon } from "@heroicons/react/outline";
-import StudentDataView from '../StudentListModal';
-import { db } from '../../../firebase';
-import { collection, getDocs, } from 'firebase/firestore';
+import StudentDataView from './StudentDataView';
+import { formatSalary } from "../../../utils/salaryUtils";
 
 function CompanyDetails({ company, onClose }) {
   const [showStudentData, setShowStudentData] = useState(false);
-  const [students, setStudents] = useState([]);
-  const [loadingStudents, setLoadingStudents] = useState(false);
-
-  // Fetch students from Firebase
-  const fetchStudents = async () => {
-    if (!company?.companyName) return;
-    
-    setLoadingStudents(true);
-    try {
-      const companyCode = company.companyName.replace(/\s+/g, '_').toUpperCase();
-      const uploadsCollectionRef = collection(db, 'studentList', companyCode, 'uploads');
-      
-      // Get all uploads for this company
-      const querySnapshot = await getDocs(uploadsCollectionRef);
-      
-      const allStudents = [];
-      querySnapshot.forEach((doc) => {
-        const uploadData = doc.data();
-        if (uploadData.students && Array.isArray(uploadData.students)) {
-          // Add upload metadata to each student
-          const studentsWithMeta = uploadData.students.map(student => ({
-            ...student,
-            uploadedAt: uploadData.uploadedAt,
-            college: uploadData.college
-          }));
-          allStudents.push(...studentsWithMeta);
-        }
-      });
-      
-      setStudents(allStudents);
-      console.log(`✅ Fetched ${allStudents.length} students for ${company.companyName}`);
-    } catch (error) {
-      console.error('❌ Error fetching students:', error);
-      alert('Error fetching student data: ' + error.message);
-    } finally {
-      setLoadingStudents(false);
-    }
-  };
+  const students = [];
 
   // Filter students by college if needed
   const getFilteredStudents = () => {
@@ -56,106 +18,112 @@ function CompanyDetails({ company, onClose }) {
 
   return (
     <div className="fixed inset-0 flex items-center justify-center z-54">
-      <div className="fixed inset-0 bg-opacity-50 backdrop-blur" onClick={onClose}></div>
+      <div className="fixed inset-0 bg-black/20 backdrop-blur-sm" onClick={onClose}></div>
 
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto z-50">
-        <div className="bg-gradient-to-r from-blue-600 to-blue-500 text-white px-6 py-4 flex justify-between items-center sticky top-0">
-          <h2 className="text-lg font-semibold">Company Details</h2>
-          <button onClick={onClose} className="p-1 rounded-full hover:bg-blue-700 transition">
-            <XIcon className="h-5 w-5 text-white" />
+      <div className="bg-white shadow-2xl w-full max-w-2xl max-h-[95vh] overflow-y-auto z-50 mx-4">
+        {/* Header */}
+        <div className="sticky top-0 bg-white border-b border-gray-100 px-3 py-2 flex justify-between items-center z-10">
+          <h2 className="text-base font-semibold text-gray-900">Company Details</h2>
+          <button
+            onClick={onClose}
+            className="p-1 rounded-full hover:bg-gray-100 transition-colors duration-200"
+          >
+            <XIcon className="h-4 w-4 text-gray-400" />
           </button>
         </div>
 
-        <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="p-3 space-y-3">
           {/* Company Information */}
-          <div className="col-span-2">
-            <h3 className="text-lg font-semibold text-blue-700 mb-2">Company Information</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-500">Company Name</label>
-                <p className="mt-1 text-gray-900">{company.companyName || "-"}</p>
+          <div className="bg-gray-50/50 p-2 border border-gray-100">
+            <h3 className="text-sm font-semibold text-gray-900 mb-2 flex items-center">
+              <div className="w-1 h-4 bg-blue-500 rounded-full mr-2"></div>
+              Company Information
+            </h3>
+            <div className="grid grid-cols-1 gap-2">
+              <div className="bg-white p-2 border border-gray-100">
+                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Company Name</label>
+                <p className="text-gray-900 font-medium text-sm">{company.companyName || "—"}</p>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-500">Website</label>
-                <p className="mt-1 text-gray-900">{company.companyWebsite || "-"}</p>
+              <div className="bg-white p-2 border border-gray-100">
+                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Website</label>
+                <p className="text-gray-900 font-medium text-sm">{company.companyWebsite || "—"}</p>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-500">College</label>
-                <p className="mt-1 text-gray-900">{company.college || "-"}</p>
+              <div className="bg-white p-2 border border-gray-100">
+                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">College</label>
+                <p className="text-gray-900 font-medium text-sm">{company.college || "—"}</p>
               </div>
             </div>
           </div>
 
-          {/* Rest of your company details... */}
           {/* Eligibility Criteria */}
-          <div className="col-span-2">
-            <h3 className="text-lg font-semibold text-blue-700 mb-2">Eligibility Criteria</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-500">Course</label>
-                <p className="mt-1 text-gray-900">{company.course || "-"}</p>
+          <div className="bg-gray-50/50 p-2 border border-gray-100">
+            <h3 className="text-sm font-semibold text-gray-900 mb-2 flex items-center">
+              <div className="w-1 h-4 bg-green-500 rounded-full mr-2"></div>
+              Eligibility Criteria
+            </h3>
+            <div className="grid grid-cols-1 gap-2">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="bg-white p-2 border border-gray-100">
+                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Course</label>
+                  <p className="text-gray-900 font-medium text-sm">{company.course || "—"}</p>
+                </div>
+                <div className="bg-white p-2 border border-gray-100">
+                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Passing Year</label>
+                  <p className="text-gray-900 font-medium text-sm">{company.passingYear || "—"}</p>
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-500">Specialization</label>
-                <p className="mt-1 text-gray-900">{company.specialization || "-"}</p>
+              <div className="bg-white p-2 border border-gray-100">
+                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Specialization</label>
+                <p className="text-gray-900 font-medium text-sm">{company.specialization || "—"}</p>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-500">Passing Year</label>
-                <p className="mt-1 text-gray-900">{company.passingYear || "-"}</p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-500">Marks Criteria</label>
-                <p className="mt-1 text-gray-900">{company.marksCriteria || "-"}</p>
+              <div className="bg-white p-2 border border-gray-100">
+                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Marks Criteria</label>
+                <p className="text-gray-900 font-medium text-sm">{company.marksCriteria || "—"}</p>
               </div>
             </div>
           </div>
 
           {/* Job Details */}
-          <div className="col-span-2">
-            <h3 className="text-lg font-semibold text-blue-700 mb-2">Job Details</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-500">Job Type</label>
-                <p className="mt-1 text-gray-900">{company.jobType || "-"}</p>
+          <div className="bg-gray-50/50 p-2 border border-gray-100">
+            <h3 className="text-sm font-semibold text-gray-900 mb-2 flex items-center">
+              <div className="w-1 h-4 bg-purple-500 rounded-full mr-2"></div>
+              Job Details
+            </h3>
+            <div className="grid grid-cols-1 gap-2">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="bg-white p-2 border border-gray-100">
+                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Job Type</label>
+                  <p className="text-gray-900 font-medium text-sm">{company.jobType || "—"}</p>
+                </div>
+                <div className="bg-white p-2 border border-gray-100">
+                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Location</label>
+                  <p className="text-gray-900 font-medium text-sm">{company.jobLocation || "—"}</p>
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-500">Designation</label>
-                <p className="mt-1 text-gray-900">{company.jobDesignation || "-"}</p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-500">Location</label>
-                <p className="mt-1 text-gray-900">{company.jobLocation || "-"}</p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-500">Salary</label>
-                <p className="mt-1 text-gray-900">{company.salary ? `${company.salary} LPA` : "-"}</p>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="bg-white p-2 border border-gray-100">
+                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Designation</label>
+                  <p className="text-gray-900 font-medium text-sm">{company.jobDesignation || "—"}</p>
+                </div>
+                <div className="bg-white p-2 border border-gray-100">
+                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Salary</label>
+                  <p className="text-gray-900 font-medium text-sm">{company.salary ? formatSalary(company.salary) : "—"}</p>
+                </div>
               </div>
             </div>
           </div>
-
-        
         </div>
 
-        <div className="sticky bottom-0 bg-gray-50 px-6 py-4 border-t flex justify-between">
-          <button
-            onClick={() => {
-              fetchStudents();
-              setShowStudentData(true);
-            }}
-            disabled={loadingStudents}
-            className={`px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition ${
-              loadingStudents ? "opacity-50 cursor-not-allowed" : ""
-            }`}
-          >
-            {loadingStudents ? "Loading Students..." : "View Student Data"}
-          </button>
-
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition"
-          >
-            Close
-          </button>
+        {/* Footer */}
+        <div className="sticky bottom-0 bg-gray-50/80 px-3 py-2 border-t border-gray-100">
+          <div className="flex justify-end">
+            <button
+              onClick={onClose}
+              className="px-3 py-1.5 bg-white text-gray-700 border border-gray-200 font-medium hover:bg-gray-50 hover:border-gray-300 transition-all duration-200 shadow-sm text-sm"
+            >
+              Close
+            </button>
+          </div>
         </div>
 
         {/* Student Data Modal */}

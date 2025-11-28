@@ -1,11 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { collection, getDocs, doc, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase";
-import ConnectionStatus from '../ConnectionStatus';
 import InvoiceModal from "./InvoiceModal";
 import { saveAs } from "file-saver";
 import * as XLSX from "xlsx";
-import { safeFirebaseQuery } from "../../utils/firebaseUtils";
 
 // Statistics Cards Component
 const StatisticsCards = ({ stats, formatIndianCurrency }) => {
@@ -439,27 +437,12 @@ const ContractInvoicesTab = () => {
     setStats(stats);
   }, []);
 
-  const fetchInvoices = useCallback(async (retryCount = 0) => {
-    const maxRetries = 3;
-    const baseDelay = 1000; // 1 second
-
+  const fetchInvoices = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
 
-      // Use safeFirebaseQuery for rate limiting and connection handling
-      const snapshot = await safeFirebaseQuery(
-        async () => {
-          const contractsRef = collection(db, "ContractInvoices");
-          return await getDocs(contractsRef);
-        },
-        {
-          maxRetries,
-          baseDelay,
-          retryOnNetworkError: true,
-          showConnectionError: true
-        }
-      );
+      const snapshot = await getDocs(collection(db, "ContractInvoices"));
 
       if (snapshot.docs.length > 0) {
         const data = snapshot.docs.map((doc) => ({
@@ -482,28 +465,8 @@ const ContractInvoicesTab = () => {
         setFilteredInvoices([]);
         calculateStats([]);
       }
-    } catch (error) {
-      console.error(`Error fetching invoices (attempt ${retryCount + 1}):`, error);
-
-      // Check if it's a network error or temporary Firebase error that should be retried
-      const isRetryableError = error.code === 'unavailable' ||
-                              error.code === 'deadline-exceeded' ||
-                              error.code === 'resource-exhausted' ||
-                              error.message?.includes('network') ||
-                              error.message?.includes('timeout');
-
-      if (isRetryableError && retryCount < maxRetries) {
-        const delay = baseDelay * Math.pow(2, retryCount); // Exponential backoff
-        console.log(`Retrying in ${delay}ms...`);
-
-        setTimeout(() => {
-          fetchInvoices(retryCount + 1);
-        }, delay);
-        return;
-      }
-
-      // If max retries reached or non-retryable error, show error
-      setError(`Failed to load invoices: ${error.message}. Please check your connection and try again.`);
+    } catch {
+      setError("Failed to load invoices. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -1235,7 +1198,7 @@ const ContractInvoicesTab = () => {
       <div className="fixed inset-0 bg-transparent backdrop-blur-md bg-opacity-50 flex items-center justify-center z-54 p-3">
         <div className="bg-white rounded-lg shadow-2xl w-full max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
           {/* Fixed Header */}
-          <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-3 py-2 rounded-t-lg flex-shrink-0">
+          <div className="bg-linear-to-r from-blue-600 to-blue-700 px-3 py-2 rounded-t-lg shrink-0">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-sm font-bold text-white">Payment History</h2>
@@ -1399,7 +1362,7 @@ const ContractInvoicesTab = () => {
           </div>
 
           {/* Fixed Footer */}
-          <div className="px-3 py-2 bg-gray-50 rounded-b-lg flex justify-end flex-shrink-0">
+          <div className="px-3 py-2 bg-gray-50 rounded-b-lg flex justify-end shrink-0">
             <button
               onClick={onClose}
               className="px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white rounded text-xs font-medium transition-colors"
@@ -1560,7 +1523,7 @@ const ContractInvoicesTab = () => {
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-54 p-4" onClick={onClose}>
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg transform transition-all duration-300 scale-100 animate-in fade-in-0 zoom-in-95" onClick={(e) => e.stopPropagation()}>
           {/* Header */}
-          <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 px-4 py-3 rounded-t-2xl">
+          <div className="bg-linear-to-r from-blue-600 via-blue-700 to-indigo-700 px-4 py-3 rounded-t-2xl">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
@@ -1587,7 +1550,7 @@ const ContractInvoicesTab = () => {
           {/* Content */}
           <div className="px-4 py-4 space-y-3 max-h-[60vh] overflow-y-auto">
             {/* Invoice Summary Card */}
-            <div className="bg-gradient-to-br from-gray-50 to-blue-50 rounded-lg p-3 border border-gray-100">
+            <div className="bg-linear-to-br from-gray-50 to-blue-50 rounded-lg p-3 border border-gray-100">
               <div className="grid grid-cols-2 gap-3 text-xs">
                 <div className="space-y-0.5">
                   <label className="text-gray-500 text-xs font-medium uppercase tracking-wide">Invoice Number</label>
@@ -1610,7 +1573,7 @@ const ContractInvoicesTab = () => {
 
             {/* Already Received Alert */}
             {invoice.receivedAmount > 0 && (
-              <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-2">
+              <div className="bg-linear-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-2">
                 <div className="flex items-center space-x-2">
                   <div className="w-5 h-5 bg-green-100 rounded-md flex items-center justify-center">
                     <svg className="w-3 h-3 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1806,7 +1769,7 @@ const ContractInvoicesTab = () => {
 
             {/* TDS Calculation Display */}
             {tdsPercentage > 0 && amount && (
-              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-3">
+              <div className="bg-linear-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-3">
                 <div className="flex items-center space-x-1 mb-2">
                   <div className="w-4 h-4 bg-blue-100 rounded-md flex items-center justify-center">
                     <svg className="w-2.5 h-2.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1867,7 +1830,7 @@ const ContractInvoicesTab = () => {
               <button
                 onClick={handleSubmit}
                 disabled={!amount || amount <= 0 || !paymentDate || (tdsPercentage > 0 && Math.abs(tdsBreakdown.totalBilled - dueAmount) > 0.01)}
-                className="flex-1 px-3 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg text-xs font-semibold transition-all duration-200 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-sm transform hover:-translate-y-0.5 disabled:transform-none"
+                className="flex-1 px-3 py-2 bg-linear-to-r from-blue-600 to-indigo-600 text-white rounded-lg text-xs font-semibold transition-all duration-200 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-sm transform hover:-translate-y-0.5 disabled:transform-none"
               >
                 <div className="flex items-center justify-center space-x-1">
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2196,12 +2159,32 @@ const ContractInvoicesTab = () => {
               </div>
 
               <button
+                onClick={() => fetchInvoices()}
+                className="inline-flex items-center justify-center px-2 py-1 border border-gray-300 rounded text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+              >
+                <svg
+                  className="w-2.5 h-2.5 mr-1"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                  />
+                </svg>
+                Refresh
+              </button>
+
+              <button
                 onClick={exportToExcel}
                 disabled={
                   exportLoading ||
                   (filteredInvoices.length === 0 && invoices.length === 0)
                 }
-                className="inline-flex items-center justify-center px-2 py-1 bg-gradient-to-r from-green-600 to-green-700 text-white rounded hover:from-green-700 hover:to-green-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 hover:scale-105 shadow-sm text-xs font-medium"
+                className="inline-flex items-center justify-center px-2 py-1 bg-linear-to-r from-green-600 to-green-700 text-white rounded hover:from-green-700 hover:to-green-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 hover:scale-105 shadow-sm text-xs font-medium"
               >
                 {exportLoading ? (
                   <>
@@ -2308,7 +2291,7 @@ const ContractInvoicesTab = () => {
         ) : (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
             {/* Table Header */}
-            <div className="px-2.5 py-1.5 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
+            <div className="px-2.5 py-1.5 border-b border-gray-200 bg-linear-to-r from-gray-50 to-white">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900">Invoice Management</h3>
@@ -2364,11 +2347,11 @@ const ContractInvoicesTab = () => {
                 return (
                   <div
                     key={invoice.id}
-                    className="p-3 border-b border-gray-100 last:border-b-0 hover:bg-gradient-to-r hover:from-blue-50/30 hover:to-indigo-50/30 transition-all duration-200"
+                    className="p-3 border-b border-gray-100 last:border-b-0 hover:bg-linear-to-r hover:from-blue-50/30 hover:to-indigo-50/30 transition-all duration-200"
                   >
                     <div className="flex justify-between items-start mb-2">
                       <div className="flex items-center space-x-2">
-                        <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center shadow-sm">
+                        <div className="w-8 h-8 bg-linear-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center shadow-sm">
                           <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                           </svg>
@@ -2443,7 +2426,7 @@ const ContractInvoicesTab = () => {
                             e.stopPropagation();
                             setPaymentModal({ isOpen: true, invoice });
                           }}
-                          className="flex-1 inline-flex items-center justify-center px-2 py-1.5 border border-transparent rounded text-xs font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200 shadow-sm hover:shadow-md transform hover:-translate-y-0.5"
+                          className="flex-1 inline-flex items-center justify-center px-2 py-1.5 border border-transparent rounded text-xs font-medium text-white bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200 shadow-sm hover:shadow-md transform hover:-translate-y-0.5"
                         >
                           <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2z" />
@@ -2451,7 +2434,7 @@ const ContractInvoicesTab = () => {
                           Receive
                         </button>
                       ) : isFullyPaid ? (
-                        <div className="flex-1 inline-flex items-center justify-center px-2 py-1.5 rounded text-xs font-medium bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-sm">
+                        <div className="flex-1 inline-flex items-center justify-center px-2 py-1.5 rounded text-xs font-medium bg-linear-to-r from-green-500 to-emerald-500 text-white shadow-sm">
                           <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                           </svg>
@@ -2465,7 +2448,7 @@ const ContractInvoicesTab = () => {
                             e.stopPropagation();
                             handleCancelInvoice(invoice);
                           }}
-                          className="flex-1 inline-flex items-center justify-center px-2 py-1.5 border border-transparent rounded text-xs font-medium text-white bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-600 hover:to-rose-600 focus:outline-none transition-all duration-200 shadow-sm hover:shadow-md"
+                          className="flex-1 inline-flex items-center justify-center px-2 py-1.5 border border-transparent rounded text-xs font-medium text-white bg-linear-to-r from-red-500 to-rose-500 hover:from-red-600 hover:to-rose-600 focus:outline-none transition-all duration-200 shadow-sm hover:shadow-md"
                         >
                           <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -2478,7 +2461,7 @@ const ContractInvoicesTab = () => {
                             e.stopPropagation();
                             handleUndoPayments(invoice);
                           }}
-                          className="flex-1 inline-flex items-center justify-center px-2 py-1.5 border border-transparent rounded text-xs font-medium text-white bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 focus:outline-none transition-all duration-200 shadow-sm hover:shadow-md"
+                          className="flex-1 inline-flex items-center justify-center px-2 py-1.5 border border-transparent rounded text-xs font-medium text-white bg-linear-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 focus:outline-none transition-all duration-200 shadow-sm hover:shadow-md"
                         >
                           <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
@@ -2486,7 +2469,7 @@ const ContractInvoicesTab = () => {
                           Undo
                         </button>
                       ) : invoice.approvalStatus === "cancelled" ? (
-                        <div className="flex-1 inline-flex items-center justify-center px-2 py-1.5 rounded text-xs font-medium bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-sm">
+                        <div className="flex-1 inline-flex items-center justify-center px-2 py-1.5 rounded text-xs font-medium bg-linear-to-r from-red-500 to-rose-500 text-white shadow-sm">
                           <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                           </svg>
@@ -2507,7 +2490,7 @@ const ContractInvoicesTab = () => {
                             e.stopPropagation();
                             setHistoryModal({ isOpen: true, invoice });
                           }}
-                          className="flex-1 inline-flex items-center justify-center px-2 py-1.5 border border-transparent rounded text-xs font-medium text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-all duration-200 shadow-sm hover:shadow-md"
+                          className="flex-1 inline-flex items-center justify-center px-2 py-1.5 border border-transparent rounded text-xs font-medium text-white bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-all duration-200 shadow-sm hover:shadow-md"
                         >
                           <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -2607,7 +2590,7 @@ const ContractInvoicesTab = () => {
                     return (
                       <tr
                         key={invoice.id}
-                        className={`group hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-200 ease-in-out cursor-pointer ${
+                        className={`group hover:bg-linear-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-200 ease-in-out cursor-pointer ${
                           invoice.approvalStatus === "cancelled" ? 'bg-red-50/30 border-l-4 border-l-red-400' : ''
                         } ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}
                         onClick={() => handleViewInvoice(invoice)}
@@ -2615,7 +2598,7 @@ const ContractInvoicesTab = () => {
                         {/* Invoice Details */}
                         <td className="px-3 py-2 whitespace-nowrap">
                           <div className="flex items-center">
-                            <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center shadow-sm">
+                            <div className="shrink-0 w-8 h-8 bg-linear-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center shadow-sm">
                               <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                               </svg>
@@ -2666,21 +2649,21 @@ const ContractInvoicesTab = () => {
                         {/* Approval Status */}
                         <td className="px-3 py-2 whitespace-nowrap">
                           {invoice.approvalStatus === "cancelled" ? (
-                            <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-sm">
+                            <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-linear-to-r from-red-500 to-rose-500 text-white shadow-sm">
                               <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                               </svg>
                               Cancelled
                             </div>
                           ) : invoice.approved || receivedAmount > 0 ? (
-                            <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-sm">
+                            <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-linear-to-r from-green-500 to-emerald-500 text-white shadow-sm">
                               <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                               </svg>
                               Approved
                             </div>
                           ) : (
-                            <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-sm">
+                            <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-linear-to-r from-blue-500 to-indigo-500 text-white shadow-sm">
                               <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0 1 1 0 012 0zm-1 3a1 1 0 00-1 1v4a1 1 0 102 0V9a1 1 0 00-1-1z" clipRule="evenodd" />
                               </svg>
@@ -2718,7 +2701,7 @@ const ContractInvoicesTab = () => {
                                   e.stopPropagation();
                                   setPaymentModal({ isOpen: true, invoice });
                                 }}
-                                className="inline-flex items-center px-2 py-1 border border-transparent rounded text-xs font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200 shadow-sm hover:shadow-md transform hover:-translate-y-0.5"
+                                className="inline-flex items-center px-2 py-1 border border-transparent rounded text-xs font-medium text-white bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200 shadow-sm hover:shadow-md transform hover:-translate-y-0.5"
                                 title="Receive payment"
                               >
                                 <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2727,7 +2710,7 @@ const ContractInvoicesTab = () => {
                                 Receive
                               </button>
                             ) : isFullyPaid ? (
-                              <div className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-sm">
+                              <div className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-linear-to-r from-green-500 to-emerald-500 text-white shadow-sm">
                                 <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                                 </svg>
@@ -2741,7 +2724,7 @@ const ContractInvoicesTab = () => {
                                   e.stopPropagation();
                                   handleCancelInvoice(invoice);
                                 }}
-                                className="inline-flex items-center px-2 py-1 border border-transparent rounded text-xs font-medium text-white bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-600 hover:to-rose-600 focus:outline-none transition-all duration-200 shadow-sm hover:shadow-md"
+                                className="inline-flex items-center px-2 py-1 border border-transparent rounded text-xs font-medium text-white bg-linear-to-r from-red-500 to-rose-500 hover:from-red-600 hover:to-rose-600 focus:outline-none transition-all duration-200 shadow-sm hover:shadow-md"
                                 title="Cancel invoice"
                               >
                                 <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2755,7 +2738,7 @@ const ContractInvoicesTab = () => {
                                   e.stopPropagation();
                                   handleUndoPayments(invoice);
                                 }}
-                                className="inline-flex items-center px-2 py-1 border border-transparent rounded text-xs font-medium text-white bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 focus:outline-none transition-all duration-200 shadow-sm hover:shadow-md"
+                                className="inline-flex items-center px-2 py-1 border border-transparent rounded text-xs font-medium text-white bg-linear-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 focus:outline-none transition-all duration-200 shadow-sm hover:shadow-md"
                                 title="Undo all payments"
                               >
                                 <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2764,7 +2747,7 @@ const ContractInvoicesTab = () => {
                                 Undo
                               </button>
                             ) : invoice.approvalStatus === "cancelled" ? (
-                              <div className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-sm">
+                              <div className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-linear-to-r from-red-500 to-rose-500 text-white shadow-sm">
                                 <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                                 </svg>
@@ -2785,7 +2768,7 @@ const ContractInvoicesTab = () => {
                                   e.stopPropagation();
                                   setHistoryModal({ isOpen: true, invoice });
                                 }}
-                                className="inline-flex items-center px-2 py-1 border border-transparent rounded text-xs font-medium text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-all duration-200 shadow-sm hover:shadow-md"
+                                className="inline-flex items-center px-2 py-1 border border-transparent rounded text-xs font-medium text-white bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-all duration-200 shadow-sm hover:shadow-md"
                                 title="View payment history"
                               >
                                 <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2845,8 +2828,6 @@ const ContractInvoicesTab = () => {
           onClose={() => setHistoryModal({ isOpen: false, invoice: null })}
         />
       )}
-
-      <ConnectionStatus onRetry={fetchInvoices} />
     </div>
   );
 };

@@ -2,12 +2,12 @@ import React, { useState, useMemo } from 'react';
 import { XIcon, DownloadIcon } from '@heroicons/react/outline';
 import * as XLSX from 'xlsx';
 
-const StudentDataView = ({ students, onClose, companyName, collegeName }) => {
+const StudentDataView = ({ students, onClose, companyName, collegeName, unmatchedStudents = [] }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, _setStatusFilter] = useState('all');
 
-  // Fixed column mapping - Only Excel columns we want to show
-  const columnMapping = [
+  // Fixed column mapping with proper field mapping
+  const columnMapping = useMemo(() => [
     { displayName: 'SR NO', fieldName: 'srNo', isSrNo: true },
     { displayName: 'STUDENT NAME', fieldName: 'studentName' },
     { displayName: 'ENROLLMENT NUMBER', fieldName: 'enrollmentNo' },
@@ -21,28 +21,63 @@ const StudentDataView = ({ students, onClose, companyName, collegeName }) => {
     { displayName: 'CGPA', fieldName: 'cgpa' },
     { displayName: 'ACTIVE BACKLOGS', fieldName: 'activeBacklogs' },
     { displayName: 'GENDER', fieldName: 'gender' },
-    { displayName: 'STATUS', fieldName: 'status' },
     { displayName: 'COLLEGE', fieldName: 'college' },
-    { displayName: 'UPLOAD DATE', fieldName: 'uploadDate' }
-  ];
+    { displayName: 'UPLOAD DATE', fieldName: 'uploadedAt' },
+    { displayName: 'MATCH STATUS', fieldName: 'isMatched' }
+  ], []);
+
+  // Normalize student data - map different field names to consistent ones
+  const normalizedStudents = useMemo(() => {
+    return students.map((student) => {
+      // Check if student is unmatched
+      const isUnmatched = unmatchedStudents.some(unmatched => 
+        unmatched.studentName?.toLowerCase().trim() === student.studentName?.toLowerCase().trim() ||
+        unmatched.email?.toLowerCase().trim() === student.email?.toLowerCase().trim()
+      );
+      
+      return {
+        // Direct mappings
+        studentName: student.studentName || student.name || student['STUDENT NAME'] || 'N/A',
+        enrollmentNo: student.enrollmentNo || student.enrollmentNumber || student['ENROLLMENT NUMBER'] || student.enrollment || 'N/A',
+        email: student.email || student['EMAIL'] || student.emailId || 'N/A',
+        phone: student.phone || student.phoneNumber || student.mobile || student['PHONE NUMBER'] || 'N/A',
+        course: student.course || student['COURSE'] || student.degree || 'N/A',
+        specialization: student.specialization || student['SPECIALIZATION'] || student.branch || 'N/A',
+        currentYear: student.currentYear || student['CURRENT YEAR'] || student.year || 'N/A',
+        tenthMarks: student.tenthMarks || student['10TH MARKS %'] || student.tenthPercentage || 'N/A',
+        twelfthMarks: student.twelfthMarks || student['12TH MARKS %'] || student.twelfthPercentage || 'N/A',
+        cgpa: student.cgpa || student.CGPA || student.gpa || 'N/A',
+        activeBacklogs: student.activeBacklogs || student['ACTIVE BACKLOGS'] || student.backlogs || '0',
+        gender: student.gender || student['GENDER'] || student.sex || 'N/A',
+        status: student.status || student.STATUS || 'submitted',
+        college: student.college || student.collegeName || student['COLLEGE'] || collegeName || 'N/A',
+        uploadedAt: student.uploadedAt || student.uploadDate || student.uploadedDate || 'N/A',
+        isMatched: !isUnmatched,
+        
+        // Keep original data for debugging
+        _original: student
+      };
+    });
+  }, [students, collegeName, unmatchedStudents]);
 
   // Get only columns that have data in students
   const displayColumns = useMemo(() => {
     return columnMapping.filter(col => {
       if (col.isSrNo) return true; // Always show SR NO
+      if (col.fieldName === 'isMatched') return true; // Always show match status
+      // Removed: if (col.isActions) return true; // Always show actions
       
       // Check if any student has this field with data
-      return students.some(student => 
-        student[col.fieldName] !== null && 
-        student[col.fieldName] !== undefined && 
-        student[col.fieldName] !== ''
-      );
+      return normalizedStudents.some(student => {
+        const value = student[col.fieldName];
+        return value !== null && value !== undefined && value !== '' && value !== 'N/A';
+      });
     });
-  }, [students]);
+  }, [normalizedStudents, columnMapping]);
 
   // Filter students
   const filteredStudents = useMemo(() => {
-    let filtered = students.filter(student => {
+    let filtered = normalizedStudents.filter(student => {
       const matchesSearch = Object.values(student).some(value => 
         String(value || '').toLowerCase().includes(searchTerm.toLowerCase())
       );
@@ -52,7 +87,7 @@ const StudentDataView = ({ students, onClose, companyName, collegeName }) => {
     });
 
     return filtered;
-  }, [students, searchTerm, statusFilter]);
+  }, [normalizedStudents, searchTerm, statusFilter]);
 
   // Export to Excel function
   const exportToExcel = () => {
@@ -63,6 +98,8 @@ const StudentDataView = ({ students, onClose, companyName, collegeName }) => {
       displayColumns.forEach(col => {
         if (col.isSrNo) {
           row[col.displayName] = index + 1;
+        } else if (col.fieldName === 'isMatched') {
+          row[col.displayName] = student.isMatched ? 'Matched' : 'Not Found in Training Data';
         } else {
           row[col.displayName] = student[col.fieldName];
         }
@@ -72,17 +109,31 @@ const StudentDataView = ({ students, onClose, companyName, collegeName }) => {
 
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Students');
-    XLSX.writeFile(workbook, `${companyName}_${collegeName}_students.xlsx`);
+    XLSX.writeFile(workbook, `${companyName}_students.xlsx`);
   };
 
   // Format cell value for display
   const formatCellValue = (value, fieldName) => {
-    if (value === null || value === undefined || value === '') return 'N/A';
-    
+    if (value === null || value === undefined || value === '' || value === 'N/A') {
+      return '-';
+    }
+
+    if (fieldName === 'isMatched') {
+      return value ? (
+        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+          ✓ Matched
+        </span>
+      ) : (
+        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+          ✗ Not Found
+        </span>
+      );
+    }
+
     if (fieldName === 'status') {
       return (
         <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-          value === 'shortlisted' 
+          value === 'shortlisted'
             ? 'bg-green-100 text-green-800'
             : value === 'rejected'
             ? 'bg-red-100 text-red-800'
@@ -92,37 +143,86 @@ const StudentDataView = ({ students, onClose, companyName, collegeName }) => {
         </span>
       );
     }
-    
-    if (fieldName === 'uploadDate' && typeof value === 'string') {
-      // Format date to readable format
+
+    // Handle uploadedAt which may be a Firestore Timestamp object
+    if (fieldName === 'uploadedAt') {
       try {
-        const date = new Date(value);
-        return date.toLocaleDateString('en-IN', {
-          day: '2-digit',
-          month: 'short',
-          year: 'numeric'
-        });
+        let dateObj = null;
+
+        // Firestore Timestamp has toDate()
+        if (value && typeof value === 'object') {
+          if (typeof value.toDate === 'function') {
+            dateObj = value.toDate();
+          } else if ('seconds' in value) {
+            // { seconds, nanoseconds }
+            dateObj = new Date(value.seconds * 1000 + (value.nanoseconds || 0) / 1e6);
+          }
+        } else if (typeof value === 'number') {
+          // If number, try to guess milliseconds vs seconds
+          dateObj = value > 1e12 ? new Date(value) : new Date(value * 1000);
+        } else {
+          dateObj = new Date(String(value));
+        }
+
+        if (dateObj && !isNaN(dateObj.getTime())) {
+          return dateObj.toLocaleDateString('en-IN', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric'
+          });
+        }
+
+        return String(value);
       } catch {
-        return value;
+        return String(value);
       }
     }
-    
+
+    // If some other object got through, stringify it to avoid React error
+    if (typeof value === 'object') {
+      try {
+        return JSON.stringify(value);
+      } catch {
+        return String(value);
+      }
+    }
+
     return value;
   };
+
+  // Get row background color based on match status
+  const getRowClassName = (student) => {
+    return student.isMatched ? '' : 'bg-red-50 border-l-4 border-red-400';
+  };
+
+  // Count matched vs unmatched
+  const matchStats = useMemo(() => {
+    const matched = normalizedStudents.filter(s => s.isMatched).length;
+    const unmatched = normalizedStudents.filter(s => !s.isMatched).length;
+    return { matched, unmatched, total: normalizedStudents.length };
+  }, [normalizedStudents]);
 
   return (
     <div className="fixed inset-0 flex items-center justify-center z-60 bg-black bg-opacity-50">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-95vw max-h-[95vh] overflow-hidden mx-4">
         
         {/* Header */}
-        <div className="bg-gradient-to-r from-green-600 to-green-500 text-white px-6 py-4 flex justify-between items-center sticky top-0">
+        <div className="bg-linear-to-r from-blue-600 to-indigo-700 text-white px-6 py-4 flex justify-between items-center sticky top-0">
           <div>
             <h2 className="text-xl font-semibold">Student Data</h2>
             <p className="text-green-100 text-sm">
               {companyName && `Company: ${companyName}`} 
               {collegeName && ` | College: ${collegeName}`}
-              {` | Students: ${filteredStudents.length}/${students.length} | Columns: ${displayColumns.length}`}
+              {` | Students: ${filteredStudents.length}/${normalizedStudents.length} | Columns: ${displayColumns.length}`}
             </p>
+            {/* Match Statistics */}
+            <div className={`mt-1 px-2 py-1 rounded text-xs font-medium ${
+              matchStats.unmatched === 0 
+                ? 'bg-green-500 text-white' 
+                : 'bg-red-500 text-white'
+            }`}>
+              📊 Match Status: {matchStats.matched} matched, {matchStats.unmatched} not found in training Data
+            </div>
           </div>
           <button 
             onClick={onClose}
@@ -146,55 +246,30 @@ const StudentDataView = ({ students, onClose, companyName, collegeName }) => {
               />
             </div>
 
-            {/* Status Filter */}
-            <div>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="all">All Status</option>
-                <option value="submitted">Submitted</option>
-                <option value="shortlisted">Shortlisted</option>
-                <option value="rejected">Rejected</option>
-              </select>
-            </div>
+          
 
-            {/* Export Button */}
-            <div>
-              <button
-                onClick={exportToExcel}
-                disabled={filteredStudents.length === 0}
-                className={`w-full px-3 py-2 rounded-md transition flex items-center justify-center ${
-                  filteredStudents.length === 0 
-                    ? 'bg-gray-400 cursor-not-allowed' 
-                    : 'bg-green-600 hover:bg-green-700 text-white'
-                }`}
-              >
-                <DownloadIcon className="h-4 w-4 mr-2" />
-                Export
-              </button>
-            </div>
+          
           </div>
 
-          {/* Debug Info - Remove this in production */}
-          <div className="mt-2 p-2 bg-yellow-50 rounded border border-yellow-200">
-            <p className="text-xs text-yellow-700">
-              <strong>Debug Info:</strong> {students.length} students loaded | 
-              First student fields: {students[0] ? Object.keys(students[0]).join(', ') : 'No data'}
+          {/* Data Structure Info */}
+          <div className="mt-2 p-2 bg-blue-50 rounded border border-blue-200">
+            <p className="text-xs text-blue-700">
+              <strong>Data Info:</strong> {normalizedStudents.length} students normalized | 
+              Match Status: {matchStats.matched} matched, {matchStats.unmatched} not found | 
+              Red rows indicate students not found in training Data
             </p>
           </div>
         </div>
 
-        {/* Students Table - FIXED COLUMN NAMES */}
+        {/* Students Table */}
         <div className="overflow-x-auto overflow-y-auto max-h-[60vh]">
-          {displayColumns.length > 0 && students.length > 0 ? (
+          {displayColumns.length > 0 && normalizedStudents.length > 0 ? (
             <table className="w-full min-w-[1200px]">
               <thead className="bg-gray-50 sticky top-0">
                 <tr>
-                  {displayColumns.map((col, index) => (
+                  {displayColumns.map((col, _index) => (
                     <th 
-                      key={index} 
+                      key={_index} 
                       className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border bg-gray-100"
                     >
                       {col.displayName}
@@ -203,17 +278,23 @@ const StudentDataView = ({ students, onClose, companyName, collegeName }) => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredStudents.map((student, index) => (
-                  <tr key={index} className="hover:bg-gray-50">
+                {filteredStudents.map((student, _index) => (
+                  <tr 
+                    key={_index} 
+                    className={`hover:bg-gray-50 ${getRowClassName(student)}`}
+                    title={!student.isMatched ? "Student not found in training Data" : ""}
+                  >
                     {displayColumns.map((col, colIndex) => (
                       <td 
                         key={colIndex} 
                         className={`px-4 py-3 whitespace-nowrap text-sm border ${
                           col.isSrNo ? 'text-center font-medium bg-gray-50' : ''
-                        }`}
+                        } ${!student.isMatched && colIndex > 0 ? 'text-red-700 font-medium' : ''}`}
                       >
                         {col.isSrNo 
-                          ? index + 1
+                          ? _index + 1
+                          : col.isActions
+                          ? null
                           : formatCellValue(student[col.fieldName], col.fieldName)
                         }
                       </td>
@@ -224,7 +305,7 @@ const StudentDataView = ({ students, onClose, companyName, collegeName }) => {
             </table>
           ) : (
             <div className="p-8 text-center text-gray-500">
-              {students.length === 0 ? 'No student data available' : 'No students found matching your filters'}
+              {normalizedStudents.length === 0 ? 'No student data available' : 'No students found matching your filters'}
             </div>
           )}
         </div>
@@ -232,17 +313,18 @@ const StudentDataView = ({ students, onClose, companyName, collegeName }) => {
         {/* Footer */}
         <div className="bg-gray-50 px-6 py-4 border-t flex justify-between items-center">
           <div className="text-sm text-gray-600">
-            Showing {filteredStudents.length} of {students.length} students
+            Showing {filteredStudents.length} of {normalizedStudents.length} students | 
+            <span className={`ml-2 font-medium ${
+              matchStats.unmatched === 0 ? 'text-green-600' : 'text-red-600'
+            }`}>
+              {matchStats.matched} matched, {matchStats.unmatched} not found
+            </span>
           </div>
           <div className="flex space-x-3">
             <button
               onClick={exportToExcel}
               disabled={filteredStudents.length === 0}
-              className={`px-4 py-2 rounded-md transition flex items-center ${
-                filteredStudents.length === 0 
-                  ? 'bg-gray-400 cursor-not-allowed' 
-                  : 'bg-green-600 hover:bg-green-700 text-white'
-              }`}
+              className="px-6 py-2.5 bg-linear-to-r from-blue-600 to-indigo-700 text-white font-medium rounded-lg hover:from-blue-700 hover:to-indigo-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center gap-2"
             >
               <DownloadIcon className="h-4 w-4 mr-2" />
               Export Excel

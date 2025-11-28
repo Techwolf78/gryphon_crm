@@ -57,8 +57,8 @@ function FiltersSection({
             onClick={toggleAllColleges}
             className={`inline-flex items-center px-2 py-1 rounded-lg text-xs font-semibold transition-all border-2 shadow-sm hover:shadow-md ${
               Object.keys(filteredGroupedData).every(college => expandedPhases[college])
-                ? 'bg-gradient-to-r from-red-50 to-orange-50 border-red-200 text-red-700 hover:from-red-100 hover:to-orange-100 hover:border-red-300'
-                : 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-200 text-green-700 hover:from-green-100 hover:to-emerald-100 hover:border-green-300'
+                ? 'bg-linear-to-r from-red-50 to-orange-50 border-red-200 text-red-700 hover:from-red-100 hover:to-orange-100 hover:border-red-300'
+                : 'bg-linear-to-r from-green-50 to-emerald-50 border-green-200 text-green-700 hover:from-green-100 hover:to-emerald-100 hover:border-green-300'
             }`}
           >
             {Object.keys(filteredGroupedData).every(college => expandedPhases[college]) ? (

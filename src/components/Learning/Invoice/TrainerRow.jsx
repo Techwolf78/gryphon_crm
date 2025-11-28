@@ -80,7 +80,7 @@ function TrainerRow({
   const getStatusInfo = () => {
     if (!invoiceData) {
       return {
-        label: "Not Generated",
+        label: "Pending",
         bg: "bg-gray-50",
         text: "text-gray-700",
         border: "border-gray-200",
@@ -143,11 +143,6 @@ function TrainerRow({
               {item.trainerName}
             </div>
             <div className="text-xs text-gray-600 truncate">ID: {item.trainerId}</div>
-            <div className="inline-flex items-center mt-1">
-              <span className="bg-blue-100 text-blue-700 text-xs font-medium px-2 py-0.5 rounded truncate">
-                {item.phase}
-              </span>
-            </div>
           </div>
         </div>
       </td>
@@ -193,11 +188,50 @@ function TrainerRow({
         </div>
       </td>
       <td className="px-3 py-3">
-        <div className="space-y-2">
-          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${statusInfo.bg} ${statusInfo.text} border ${statusInfo.border} shadow-sm`}>
-            <StatusIcon className="mr-1.5 h-3.5 w-3.5" />
+        <div className="space-y-1">
+          {invoiceData?.netPayment ? (
+            <div className="text-sm font-semibold text-green-600">
+              ₹{invoiceData.netPayment.toLocaleString('en-IN')}
+            </div>
+          ) : (
+            <div className="text-sm font-semibold text-green-600">
+              {(() => {
+                // Calculate net payment for pending trainers using default values
+                const trainingFees = Math.round((item.perHourCost || 0) * (item.totalCollegeHours || 0));
+                const gstAmount = 0; // Default to NA (no GST)
+                const taxableAmount = trainingFees + gstAmount;
+                const tdsAmount = Math.round((taxableAmount * 0.1)); // Default 10% TDS
+                const otherExpenses = (item.totalConveyance || 0) + (item.totalFood || 0) + (item.totalLodging || 0);
+                const netPayment = Math.round(taxableAmount - tdsAmount + otherExpenses);
+                return `₹${netPayment.toLocaleString('en-IN')}`;
+              })()}
+            </div>
+          )}
+        </div>
+      </td>
+      <td className="px-3 py-3">
+        <div className="space-y-1">
+          <span className={`inline-flex items-center px-1 py-0.5 rounded-full text-[10px] font-medium ${statusInfo.bg} ${statusInfo.text} border ${statusInfo.border} shadow-sm`}>
+            <StatusIcon className="mr-1 h-3 w-3" />
             {statusInfo.label}
           </span>
+          
+          {/* Stack additional info based on status */}
+          {invoiceData && (
+            <>
+              {(() => {
+                const createdAt = invoiceData.createdAt?.toDate?.() || invoiceData.createdAt;
+                return createdAt && !isNaN(new Date(createdAt).getTime()) && invoiceData.status !== "rejected" && (
+                  <div className="text-xs text-gray-500">
+                    Generated: {(() => {
+                      const date = new Date(createdAt);
+                      return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()}`;
+                    })()}
+                  </div>
+                );
+              })()}
+            </>
+          )}
           
           {/* Show rejection remarks directly below status when rejected */}
           {invoiceData?.status === "rejected" && invoiceData?.rejectionRemarks && (
@@ -313,7 +347,7 @@ function TrainerRow({
                       {invoiceData.remarks.text}
                     </p>
                     <span className="text-gray-500 text-xs mt-1 block">
-                      Added on {new Date(invoiceData.remarks.addedAt).toLocaleDateString()}
+                      Added on {new Date(invoiceData.remarks.addedAt?.toDate?.() || invoiceData.remarks.addedAt).toLocaleDateString()}
                     </span>
                   </div>
                 </div>
@@ -326,9 +360,9 @@ function TrainerRow({
               <div className="flex justify-center">
                 <button
                   onClick={() => handleGenerateInvoice(item)}
-                  className="w-full inline-flex items-center justify-center px-4 py-3 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all shadow-sm hover:shadow-md border border-blue-600"
+                  className="w-full inline-flex items-center justify-center px-2 py-1.5 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all shadow-sm hover:shadow-md border border-blue-600"
                 >
-                  <FiFileText className="w-5 h-5 mr-2" />
+                  <FiFileText className="w-4 h-4 mr-1" />
                   Generate Invoice
                 </button>
               </div>
@@ -336,12 +370,12 @@ function TrainerRow({
           ) : (
             <>
               <div className="text-center">
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-1">
-                  <div className="text-xs text-amber-700 flex items-center justify-center">
-                    <FiClock className="mr-1" />
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-0.5 max-w-32 mx-auto">
+                  <div className="text-[10px] text-amber-700 flex items-center justify-center">
+                    <FiClock className="mr-1 text-[10px]" />
                     <span className="font-medium">Available on</span>
                   </div>
-                  <div className="text-sm font-semibold text-amber-800">
+                  <div className="text-xs font-semibold text-amber-800">
                     {item.latestEndDate
                       ? formatDate(
                           new Date(

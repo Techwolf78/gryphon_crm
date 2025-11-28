@@ -1,0 +1,360 @@
+{
+  "tour": {
+    "title": "Company Introduction & Tour",
+    "description": "Welcome to our organization! This onboarding will introduce you to our company, help you understand our structure, departmental functions, and guide you through getting started with our platform.",
+    "steps": [
+      {
+        "title": "Company Overview",
+        "content": "Welcome to our organization! We are a comprehensive education and training solutions provider, dedicated to connecting learning institutions with industry needs and fostering career development through innovative training programs and placement services. Founded with a vision to bridge the education-employment gap, we have grown into a trusted partner for both educational institutions and corporate clients. Our commitment to excellence, innovation, and student success drives everything we do. We pride ourselves on our comprehensive approach that covers the entire student journey - from initial training needs assessment through successful career placement. Our experienced team combines deep industry knowledge with cutting-edge technology to deliver exceptional results for our partners and students alike."
+      },
+      {
+        "title": "Company Introduction Video",
+        "content": "Watch our company introduction video to get a visual overview of our organization, mission, and the impact we create in the education and employment landscape.",
+        "video": "<iframe src=\"https://www.linkedin.com/embed/feed/update/urn:li:ugcPost:7391110539738791937?compact=1\" height=\"399\" width=\"504\" frameborder=\"0\" allowfullscreen=\"\" title=\"Embedded post\"></iframe>"
+      },
+      {
+        "title": "Our Values & Culture",
+        "content": "Our core values guide every decision we make: Excellence in service delivery, Innovation in training methodologies, Integrity in all our relationships, Collaboration across departments and partners, and Commitment to student success. We foster a culture of continuous learning, open communication, and mutual respect. Our diverse team brings together educators, industry experts, and technology specialists who share a common goal of making a meaningful impact in the education and employment landscape."
+      },
+      {
+        "title": "Our Mission",
+        "content": "To bridge the gap between education and industry by providing quality training programs, efficient lead management, and successful career placements for students."
+      },
+      {
+        "title": "Platform Overview",
+        "content": "Our CRM system integrates Sales, Learning & Development, Placement, HR, Finance, and Administration modules to provide a seamless experience for managing training programs and business operations."
+      },
+      {
+        "title": "Department Structure",
+        "content": "Our organization is structured into specialized departments, each playing a crucial role in our mission to connect education with industry needs. Here's an overview of our key departments and their primary functions:",
+        "departments": [
+          {
+            "id": "admin",
+            "name": "Admin",
+            "description": "System administration and user management",
+            "icon": "admin"
+          },
+          {
+            "id": "sales",
+            "name": "Sales",
+            "description": "Lead management and business development",
+            "icon": "sales"
+          },
+          {
+            "id": "learning-development",
+            "name": "Learning & Development",
+            "description": "Training program management and delivery",
+            "icon": "learning"
+          },
+          {
+            "id": "placement",
+            "name": "Placement",
+            "description": "Student placement and career services",
+            "icon": "placement"
+          },
+          {
+            "id": "marketing",
+            "name": "Digital Marketing",
+            "description": "Digital marketing and brand management",
+            "icon": "marketing"
+          },
+          {
+            "id": "ca",
+            "name": "Chartered Accountant",
+            "description": "Financial accounting and compliance",
+            "icon": "finance"
+          },
+          {
+            "id": "hr",
+            "name": "Human Resources",
+            "description": "Human resource management and operations",
+            "icon": "hr"
+          },
+          {
+            "id": "purchase",
+            "name": "Purchase",
+            "description": "Procurement and vendor management",
+            "icon": "purchase"
+          }
+        ]
+      },
+      {
+        "title": "Your Role",
+        "content": "Based on your department, you will have access to specific tools and dashboards. This onboarding will introduce you to your department's functions and key performance indicators."
+      }
+    ]
+  },
+  "departments": [
+    {
+      "id": "admin",
+      "name": "Admin",
+      "description": "System administration and user management",
+      "content": {
+        "overview": "The Admin department handles system-wide user management, audit logging, login analytics, and overall CRM administration. Responsible for creating new users, managing roles, monitoring system activity, and maintaining data integrity.",
+        "tools": "Firebase Admin SDK, User Management Console, Audit Logs Viewer, Login Analytics Dashboard, Role-based Access Control (RBAC)",
+        "processes": "User onboarding, role assignment, audit trail monitoring, system health checks, data backup and recovery, security policy enforcement",
+        "kpis": "User activity rates, system uptime, login success rates, audit compliance, response time to user issues",
+        "contacts": "System Admin: admin@gryphon.com, Support: support@gryphon.com"
+      }
+    },
+    {
+      "id": "sales",
+      "name": "Sales",
+      "description": "Lead management and business development",
+      "content": {
+        "overview": "The Sales department manages the entire sales pipeline from lead generation to deal closure. Handles college partnerships, training program sales, lead qualification, follow-ups, and conversion tracking.",
+        "tools": "Lead Management System, Follow-up Alerts, Training Forms, College Database, Sales Analytics Dashboard, CRM Pipeline View",
+        "processes": "Lead qualification (Hot/Warm/Cold), follow-up scheduling, training proposal creation, deal closure, revenue tracking, customer relationship management",
+        "kpis": "Lead conversion rates, deal closure time, revenue targets, customer satisfaction scores, pipeline velocity",
+        "contacts": "Sales Manager: sales@gryphon.com, Business Development: bd@gryphon.com"
+      }
+    },
+    {
+      "id": "learning-development",
+      "name": "Learning & Development (L&D)",
+      "description": "Training program management and delivery",
+      "content": {
+        "overview": "L&D manages corporate training programs, trainer coordination, student data management, and training quality assurance. Oversees training initiation, delivery, invoicing, and performance tracking.",
+        "tools": "Training Management System, Student Database, Trainer Portal, JD Merge Tool, Contract Invoice Generator, Budget Dashboard",
+        "processes": "Training program design, trainer assignment, student enrollment, training delivery monitoring, quality assessment, invoice generation, budget management",
+        "kpis": "Training completion rates, student satisfaction, trainer performance, budget utilization, program ROI",
+        "contacts": "L&D Manager: ld@gryphon.com, Training Coordinator: training@gryphon.com"
+      }
+    },
+    {
+      "id": "placement",
+      "name": "Placement",
+      "description": "Student placement and career services",
+      "content": {
+        "overview": "The Placement department is the bridge between education and employment, serving as the critical final step in our students' career journey. We specialize in connecting talented graduates with leading companies across industries, ensuring successful career launches and long-term professional growth. Our comprehensive placement services include personalized career counseling, resume optimization, interview preparation, job matching algorithms, and ongoing employer relationship management. We organize campus recruitment drives, maintain extensive employer networks, and track placement success metrics to continuously improve our services. Our team of experienced placement officers and career counselors work tirelessly to understand both student aspirations and employer requirements, creating perfect matches that benefit all stakeholders.",
+        "tools": "Advanced Student Placement Portal with AI-powered job matching, Professional Resume Builder with industry templates, Interactive Interview Scheduler with video practice modules, Comprehensive Employer Database with 5000+ companies, Placement Analytics Dashboard with real-time tracking, JD Upload System for seamless job posting, Career Assessment Tools, Mock Interview Platform, Alumni Network Portal, Industry Trend Analyzer",
+        "processes": "Comprehensive student profiling and career assessment, Personalized career counseling sessions, Resume and LinkedIn profile optimization, Intensive interview preparation workshops, One-on-one mock interview sessions, Advanced job matching using AI algorithms, Campus recruitment drive coordination, Employer relationship management, Placement tracking and success monitoring, Post-placement support and career guidance, Alumni engagement and networking events, Industry trend analysis and skill gap identification, Continuous feedback collection and service improvement",
+        "kpis": "Placement success rates (target: 95%+), Average salary packages and growth trends, Employer satisfaction scores (target: 4.5/5), Student feedback and satisfaction ratings, Time-to-placement metrics, Quality of job matches, Alumni career progression tracking, Industry partnership expansion, Campus recruitment drive effectiveness, Return on investment for placement activities",
+        "contacts": "Placement Officer: placement@gryphon.com, Career Counselor: careers@gryphon.com, Industry Relations Manager: industry@gryphon.com",
+        "key_responsibilities": "Building and maintaining relationships with top-tier companies, Organizing recruitment drives and job fairs, Providing career guidance and skill development workshops, Managing placement data and analytics, Coordinating with training departments for skill alignment, Ensuring compliance with placement policies, Managing alumni relations and success stories",
+        "success_stories": "Over 10,000 successful placements in Fortune 500 companies, Average salary growth of 35% within first year, 92% student satisfaction rate, Partnerships with 200+ leading corporations, Consistent placement rates above industry standards"
+      }
+    },
+    {
+      "id": "marketing",
+      "name": "Digital Marketing (DM)",
+      "description": "Digital marketing and brand management",
+      "content": {
+        "overview": "DM handles online marketing campaigns, social media management, content creation, and digital brand presence. Manages marketing automation, lead generation campaigns, and marketing analytics.",
+        "tools": "Social Media Management Tools, Marketing Automation Platform, Content Management System, Analytics Dashboard, Campaign Tracker",
+        "processes": "Campaign planning, content creation, social media posting, lead nurturing, performance analysis, brand monitoring, ROI measurement",
+        "kpis": "Campaign ROI, lead generation volume, engagement rates, conversion rates, brand awareness metrics",
+        "contacts": "Marketing Manager: marketing@gryphon.com, Content Creator: content@gryphon.com"
+      }
+    },
+    {
+      "id": "ca",
+      "name": "Chartered Accountant (CA)",
+      "description": "Financial accounting and compliance",
+      "content": {
+        "overview": "CA department manages financial accounting, tax compliance, audit preparation, and financial reporting. Handles invoicing, expense tracking, and financial compliance requirements.",
+        "tools": "Accounting Software, Tax Compliance System, Invoice Generator, Financial Reporting Tools, Audit Preparation Suite",
+        "processes": "Financial record keeping, tax filing, audit coordination, invoice processing, expense approval, financial statement preparation, compliance monitoring",
+        "kpis": "Financial accuracy, tax compliance rate, audit readiness, invoice processing time, budget variance",
+        "contacts": "CA Manager: ca@gryphon.com, Finance Officer: finance@gryphon.com"
+      }
+    },
+    {
+      "id": "hr",
+      "name": "Human Resources (HR)",
+      "description": "Human resource management and operations",
+      "content": {
+        "overview": "HR manages employee relations, trainer payments, contract management, and departmental budgeting. Handles payroll, benefits, and HR operations across all departments.",
+        "tools": "HRMS System, Payroll Software, Contract Management Portal, Budget Dashboard, Employee Database, Invoice Tracking",
+        "processes": "Employee onboarding, payroll processing, contract management, budget allocation, trainer bill processing, performance management, employee relations",
+        "kpis": "Employee satisfaction, payroll accuracy, contract compliance, budget utilization, trainer payment timeliness",
+        "contacts": "HR Manager: hr@gryphon.com, Payroll Officer: payroll@gryphon.com"
+      }
+    },
+    {
+      "id": "purchase",
+      "name": "Purchase",
+      "description": "Procurement and vendor management",
+      "content": {
+        "overview": "Purchase department handles procurement, vendor relationships, purchase orders, and inventory management. Manages supplier contracts, purchase approvals, and cost optimization.",
+        "tools": "Purchase Order System, Vendor Portal, Inventory Management, Contract Database, Approval Workflow, Budget Tracking",
+        "processes": "Vendor selection, purchase requisition, order processing, delivery tracking, invoice verification, vendor performance evaluation, cost analysis",
+        "kpis": "Purchase order processing time, vendor performance ratings, cost savings, inventory turnover, contract compliance",
+        "contacts": "Purchase Manager: purchase@gryphon.com, Procurement Officer: procurement@gryphon.com"
+      }
+    }
+  ],
+  "quizzes": {
+    "admin": [
+      {
+        "question": "What is the primary responsibility of the Admin department?",
+        "options": ["User Management", "Sales Generation", "Training Delivery", "Financial Accounting"],
+        "correct": 0
+      },
+      {
+        "question": "Which tool is used for monitoring system activity?",
+        "options": ["Audit Logs Viewer", "Lead Management System", "Training Portal", "Purchase Order System"],
+        "correct": 0
+      },
+      {
+        "question": "What KPI measures system reliability?",
+        "options": ["System Uptime", "Lead Conversion Rate", "Training Completion", "Purchase Processing Time"],
+        "correct": 0
+      }
+    ],
+    "sales": [
+      {
+        "question": "What are the three main lead categories in the sales pipeline?",
+        "options": ["Hot, Warm, Cold", "New, Old, Stale", "Big, Medium, Small", "Local, National, International"],
+        "correct": 0
+      },
+      {
+        "question": "Which tool helps track follow-up activities?",
+        "options": ["Follow-up Alerts", "Budget Dashboard", "Audit Logs", "Contract Invoices"],
+        "correct": 0
+      },
+      {
+        "question": "What is a key sales KPI?",
+        "options": ["Lead Conversion Rates", "System Uptime", "Training Completion", "Invoice Accuracy"],
+        "correct": 0
+      }
+    ],
+    "learning-development": [
+      {
+        "question": "What is the main focus of L&D department?",
+        "options": ["Training Program Management", "Financial Accounting", "Lead Generation", "Vendor Procurement"],
+        "correct": 0
+      },
+      {
+        "question": "Which tool manages training quality?",
+        "options": ["JD Merge Tool", "Purchase Order System", "Audit Logs", "Lead Filters"],
+        "correct": 0
+      },
+      {
+        "question": "What measures training program success?",
+        "options": ["Training Completion Rates", "System Uptime", "Lead Volume", "Invoice Processing Time"],
+        "correct": 0
+      }
+    ],
+    "placement": [
+      {
+        "question": "What service does Placement department provide?",
+        "options": ["Student Job Placement", "Financial Auditing", "Training Delivery", "Purchase Management"],
+        "correct": 0
+      },
+      {
+        "question": "Which tool helps with resume building?",
+        "options": ["Resume Builder", "Budget Dashboard", "Contract Invoices", "Audit Viewer"],
+        "correct": 0
+      },
+      {
+        "question": "What is a key placement KPI?",
+        "options": ["Placement Rates", "Campaign ROI", "Training Completion", "System Uptime"],
+        "correct": 0
+      },
+      {
+        "question": "What is the primary goal of campus recruitment drives?",
+        "options": ["Connect students with job opportunities", "Sell training programs", "Collect student data", "Conduct surveys"],
+        "correct": 0
+      },
+      {
+        "question": "Which activity helps students prepare for interviews?",
+        "options": ["Mock interview sessions", "Resume writing", "Job posting", "Employer networking"],
+        "correct": 0
+      },
+      {
+        "question": "What does the placement team track for success measurement?",
+        "options": ["Time-to-placement metrics", "Training completion", "System uptime", "Invoice processing"],
+        "correct": 0
+      },
+      {
+        "question": "Which tool uses AI for job matching?",
+        "options": ["Student Placement Portal", "Resume Builder", "Interview Scheduler", "Employer Database"],
+        "correct": 0
+      },
+      {
+        "question": "What is a key responsibility in employer relationship management?",
+        "options": ["Maintaining partnerships with companies", "Processing payments", "Creating training content", "Managing inventory"],
+        "correct": 0
+      },
+      {
+        "question": "Which metric measures placement team effectiveness?",
+        "options": ["Average salary packages", "System response time", "Training attendance", "Budget utilization"],
+        "correct": 0
+      },
+      {
+        "question": "What service continues after successful placement?",
+        "options": ["Career guidance and support", "Training delivery", "Financial auditing", "Vendor management"],
+        "correct": 0
+      }
+    ],
+    "marketing": [
+      {
+        "question": "What is the primary goal of Digital Marketing?",
+        "options": ["Brand Awareness & Lead Generation", "Financial Compliance", "Employee Management", "Inventory Control"],
+        "correct": 0
+      },
+      {
+        "question": "Which tool manages social media campaigns?",
+        "options": ["Social Media Management Tools", "Purchase Order System", "Training Portal", "Audit Logs"],
+        "correct": 0
+      },
+      {
+        "question": "What measures marketing campaign success?",
+        "options": ["Campaign ROI", "System Uptime", "Training Completion", "Invoice Accuracy"],
+        "correct": 0
+      }
+    ],
+    "ca": [
+      {
+        "question": "What is the main responsibility of CA department?",
+        "options": ["Financial Accounting & Compliance", "Lead Management", "Training Delivery", "Vendor Relations"],
+        "correct": 0
+      },
+      {
+        "question": "Which tool handles tax compliance?",
+        "options": ["Tax Compliance System", "Lead Filters", "Training Portal", "Purchase Orders"],
+        "correct": 0
+      },
+      {
+        "question": "What ensures financial accuracy?",
+        "options": ["Financial Accuracy KPI", "Lead Conversion", "Training Completion", "System Uptime"],
+        "correct": 0
+      }
+    ],
+    "hr": [
+      {
+        "question": "What does HR department primarily manage?",
+        "options": ["Employee Relations & Payroll", "Sales Pipeline", "Digital Campaigns", "Financial Audits"],
+        "correct": 0
+      },
+      {
+        "question": "Which tool processes trainer payments?",
+        "options": ["Payroll Software", "Lead Management", "Marketing Automation", "Purchase Orders"],
+        "correct": 0
+      },
+      {
+        "question": "What measures HR effectiveness?",
+        "options": ["Employee Satisfaction", "Campaign ROI", "Training Completion", "System Uptime"],
+        "correct": 0
+      }
+    ],
+    "purchase": [
+      {
+        "question": "What is the core function of Purchase department?",
+        "options": ["Procurement & Vendor Management", "Lead Generation", "Training Programs", "Financial Reporting"],
+        "correct": 0
+      },
+      {
+        "question": "Which tool manages purchase orders?",
+        "options": ["Purchase Order System", "Audit Logs", "Training Portal", "Lead Filters"],
+        "correct": 0
+      },
+      {
+        "question": "What optimizes procurement costs?",
+        "options": ["Cost Savings KPI", "Lead Conversion", "Training ROI", "System Uptime"],
+        "correct": 0
+      }
+    ]
+  }
+}

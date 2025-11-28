@@ -565,9 +565,9 @@ const JDBatchTable = ({
 
       {/* Duplicate prompt banner inside the table component */}
       {validationResult.duplicates && validationResult.duplicates.length > 0 && (
-        <div className="rounded bg-red-50 border border-red-200 p-3">
+        <div className="bg-red-50 border border-red-200 rounded-xl p-3 shadow-sm">
           <div className="flex items-center justify-between">
-            <div className="text-xs text-red-800">
+            <div className="text-sm text-red-800">
               Duplicate trainer assignments detected. Rows with conflicts are
               highlighted in the table below.
             </div>
@@ -593,7 +593,7 @@ const JDBatchTable = ({
                     }, 120);
                   }
                 }}
-                className="px-3 py-1.5 bg-red-600 text-white rounded hover:bg-red-700"
+                className="px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors"
               >
                 Show duplicates
               </button>
@@ -604,12 +604,12 @@ const JDBatchTable = ({
 
       {table1Data && table1Data.length > 0 ? (
         table1Data.map((row, rowIndex) => (
-          <div key={rowIndex} className="border rounded-lg p-4 bg-white shadow-sm">
-            <div className="space-y-4">
+          <div key={rowIndex} className="border border-gray-200 rounded-xl p-3 bg-white shadow-sm">
+            <div className="space-y-3">
               {row.batches && row.batches.map((batch, batchIndex) => (
-                <div key={batchIndex} className="border rounded-lg p-4 bg-gray-50">
+                <div key={batchIndex} className="border border-gray-200 rounded-xl p-3 bg-gray-50 shadow-sm">
                   <div className="flex items-center justify-between mb-3">
-                    <h5 className="font-medium text-gray-900">
+                    <h5 className="text-base font-semibold text-gray-900">
                       Batch {rowIndex + 1} - {batch.batchCode}
                     </h5>
                     <div className="flex items-center space-x-4">
@@ -620,7 +620,7 @@ const JDBatchTable = ({
                           min="0"
                           value={batch.batchPerStdCount || ""}
                           onChange={(e) => handleBatchChange(rowIndex, batchIndex, "batchPerStdCount", e.target.value)}
-                          className="ml-2 w-16 rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs py-1 px-2"
+                          className="ml-2 w-16 rounded-xl border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-sm py-1 px-2"
                           placeholder="0"
                         />
                       </div>
@@ -633,28 +633,28 @@ const JDBatchTable = ({
                   {/* Trainers Section */}
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <h6 className="text-sm font-medium text-gray-700">Trainers</h6>
+                      <h6 className="text-base font-medium text-gray-700">Trainers</h6>
                       <button
                         onClick={() => addTrainer(rowIndex, batchIndex)}
                         disabled={!batch.batchPerStdCount || Number(batch.batchPerStdCount) <= 0}
-                        className={`text-xs flex items-center font-medium transition-colors ${
+                        className={`text-sm flex items-center font-medium transition-colors px-3 py-2 rounded-xl ${
                           (!batch.batchPerStdCount || Number(batch.batchPerStdCount) <= 0)
-                            ? "text-gray-400 cursor-not-allowed"
-                            : "text-blue-600 hover:text-blue-800 cursor-pointer"
+                            ? "text-gray-400 cursor-not-allowed bg-gray-100"
+                            : "text-blue-600 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         }`}
                         type="button"
                       >
-                        <FiPlus className="mr-1" size={12} />
+                        <FiPlus className="mr-2" size={16} />
                         Add Trainer
                       </button>
                     </div>
 
                     {(!batch.trainers || batch.trainers.length === 0) ? (
-                      <div className="text-center py-4 bg-gray-100 rounded text-sm text-gray-500">
+                      <div className="text-center py-6 bg-gray-100 rounded-xl text-sm text-gray-500">
                         No trainers assigned
                       </div>
                     ) : (
-                      <div className="space-y-3">
+                      <div className="space-y-2">
                         {batch.trainers.map((trainer, trainerIdx) => {
                           const trainerOptions = trainers.map((tr) => ({
                             value: tr.trainerId,
@@ -671,14 +671,14 @@ const JDBatchTable = ({
                           const isDuplicate = validationResult.duplicates && validationResult.duplicates.includes(duplicateKey);
 
                           return (
-                            <div key={trainerIdx} className={`border rounded p-3 ${isDuplicate ? "bg-red-50 border-red-200" : "bg-white"}`} id={`trainer-${duplicateKey}`}>
+                            <div key={trainerIdx} className={`border rounded-xl p-3 shadow-sm ${isDuplicate ? "bg-red-50 border-red-200" : "bg-white border-gray-200"}`} id={`trainer-${duplicateKey}`}>
                               {isDuplicate && (
-                                <div className="mb-2 p-2 bg-red-100 border border-red-300 rounded text-xs text-red-800 flex items-center">
-                                  <FiAlertCircle className="mr-1" size={12} />
+                                <div className="mb-2 p-2 bg-red-100 border border-red-300 rounded-xl text-sm text-red-800 flex items-center">
+                                  <FiAlertCircle className="mr-2" size={16} />
                                   Duplicate assignment detected
                                 </div>
                               )}
-                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-2">
                                 {/* Trainer Selection */}
                                 <div>
                                   <label className="block text-xs font-medium text-gray-600 mb-1">
@@ -716,7 +716,7 @@ const JDBatchTable = ({
                                   <select
                                     value={trainer.dayDuration || ""}
                                     onChange={(e) => handleTrainerField(rowIndex, batchIndex, trainerIdx, "dayDuration", e.target.value)}
-                                    className="w-full rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs py-1 px-2"
+                                    className="w-full rounded-xl border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-sm py-2 px-3"
                                   >
                                     <option value="">Select Duration</option>
                                     {DAY_DURATION_OPTIONS.map((option) => (
@@ -734,28 +734,28 @@ const JDBatchTable = ({
                                     type="date"
                                     value={trainer.startDate || ""}
                                     onChange={(e) => handleTrainerField(rowIndex, batchIndex, trainerIdx, "startDate", e.target.value)}
-                                    className="w-full rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs py-1 px-2"
+                                    className="w-full rounded-xl border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-sm py-2 px-3"
                                   />
                                 </div>
 
                                 {/* End Date */}
                                 <div>
-                                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                                  <label className="block text-sm font-medium text-gray-600 mb-2">
                                     End Date
                                   </label>
                                   <input
                                     type="date"
                                     value={trainer.endDate || ""}
                                     onChange={(e) => handleTrainerField(rowIndex, batchIndex, trainerIdx, "endDate", e.target.value)}
-                                    className="w-full rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs py-1 px-2"
+                                    className="w-full rounded-xl border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-sm py-2 px-3"
                                   />
                                 </div>
                               </div>
 
                               {/* Hours and Cost */}
-                              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
                                 <div>
-                                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                                  <label className="block text-sm font-medium text-gray-600 mb-2">
                                     Total Hours
                                   </label>
                                   <input
@@ -764,13 +764,13 @@ const JDBatchTable = ({
                                     step="0.5"
                                     value={trainer.assignedHours || ""}
                                     onChange={(e) => handleTotalHoursChange(rowIndex, batchIndex, trainerIdx, e.target.value)}
-                                    className="w-full rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs py-1 px-2"
+                                    className="w-full rounded-xl border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-sm py-2 px-3"
                                     placeholder="0"
                                   />
                                 </div>
 
                                 <div>
-                                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                                  <label className="block text-sm font-medium text-gray-600 mb-2">
                                     Per Hour Cost (₹)
                                   </label>
                                   <input
@@ -778,16 +778,16 @@ const JDBatchTable = ({
                                     min="0"
                                     value={trainer.perHourCost || ""}
                                     onChange={(e) => handleTrainerField(rowIndex, batchIndex, trainerIdx, "perHourCost", parseFloat(e.target.value) || 0)}
-                                    className="w-full rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs py-1 px-2"
+                                    className="w-full rounded-xl border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-sm py-2 px-3"
                                     placeholder="0"
                                   />
                                 </div>
 
                                 <div>
-                                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                                  <label className="block text-sm font-medium text-gray-600 mb-2">
                                     Total Cost (₹)
                                   </label>
-                                  <div className="w-full rounded border border-gray-200 bg-gray-50 text-xs py-1 px-2 text-gray-700 font-medium">
+                                  <div className="w-full rounded-xl border border-gray-200 bg-gray-50 text-sm py-2 px-3 text-gray-700 font-medium">
                                     {formatIndianNumber(Math.round((Number(trainer.assignedHours) || 0) * (Number(trainer.perHourCost) || 0)))}
                                   </div>
                                 </div>
@@ -795,7 +795,7 @@ const JDBatchTable = ({
 
                               {/* Daily Hours Toggle */}
                               {trainer.assignedHours && Number(trainer.assignedHours) > 0 && (
-                                <div className="mb-3">
+                                <div className="mb-2">
                                   <button
                                     type="button"
                                     onClick={() => {
@@ -809,11 +809,11 @@ const JDBatchTable = ({
                                   </button>
 
                                   {trainer.showDailyHours && trainer.dailyHours && trainer.dailyHours.length > 0 && (
-                                    <div className="mt-2 p-2 bg-blue-50 rounded text-xs">
-                                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-1">
+                                    <div className="mt-3 p-3 bg-blue-50 rounded-xl text-sm">
+                                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
                                         {getDateList(trainer.startDate, trainer.endDate, excludeDays, trainer.excludedDates || []).map((date, dayIndex) => (
-                                          <div key={dayIndex} className="flex items-center justify-between bg-white p-1 rounded">
-                                            <span className="text-gray-600">
+                                          <div key={dayIndex} className="flex items-center justify-between bg-white p-2 rounded-xl">
+                                            <span className="text-gray-600 text-xs">
                                               {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                             </span>
                                             <input
@@ -822,7 +822,7 @@ const JDBatchTable = ({
                                               step="0.5"
                                               value={trainer.dailyHours[dayIndex] || ""}
                                               onChange={(e) => handleDailyHoursChange(rowIndex, batchIndex, trainerIdx, dayIndex, e.target.value)}
-                                              className="w-12 text-xs border border-gray-200 rounded px-1"
+                                              className="w-12 text-xs border border-gray-200 rounded-lg px-1"
                                             />
                                           </div>
                                         ))}
@@ -833,7 +833,7 @@ const JDBatchTable = ({
                               )}
 
                               {/* Expenses */}
-                              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
                                 <div>
                                   <label className="block text-xs font-medium text-gray-600 mb-1">
                                     Conveyance (₹)
@@ -846,25 +846,25 @@ const JDBatchTable = ({
                                       step="0.5"
                                       value={trainer.conveyance || ""}
                                       onChange={(e) => handleTrainerField(rowIndex, batchIndex, trainerIdx, "conveyance", e.target.value === "" ? "" : parseFloat(e.target.value) || 0)}
-                                      className="w-full pl-6 rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs py-1 px-2"
+                                      className="w-full pl-8 rounded-xl border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-sm py-2 px-3"
                                       placeholder="0"
                                     />
                                   </div>
                                 </div>
 
                                 <div>
-                                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                                  <label className="block text-sm font-medium text-gray-600 mb-2">
                                     Food/Day (₹)
                                   </label>
                                   <div className="relative">
-                                    <FaRupeeSign className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 w-3 h-3" />
+                                    <FaRupeeSign className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                                     <input
                                       type="number"
                                       min="0"
                                       step="0.5"
                                       value={trainer.food || ""}
                                       onChange={(e) => handleTrainerField(rowIndex, batchIndex, trainerIdx, "food", e.target.value === "" ? "" : parseFloat(e.target.value) || 0)}
-                                      className="w-full pl-6 rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs py-1 px-2"
+                                      className="w-full pl-8 rounded-xl border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-sm py-2 px-3"
                                       placeholder="0"
                                     />
                                   </div>
@@ -880,19 +880,19 @@ const JDBatchTable = ({
                                     Lodging/Day (₹)
                                   </label>
                                   <div className="relative">
-                                    <FaRupeeSign className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 w-3 h-3" />
+                                    <FaRupeeSign className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                                     <input
                                       type="number"
                                       min="0"
                                       step="0.5"
                                       value={trainer.lodging || ""}
                                       onChange={(e) => handleTrainerField(rowIndex, batchIndex, trainerIdx, "lodging", e.target.value === "" ? "" : parseFloat(e.target.value) || 0)}
-                                      className="w-full pl-6 rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-xs py-1 px-2"
+                                      className="w-full pl-8 rounded-xl border-gray-300 focus:border-blue-500 focus:ring-blue-500 text-sm py-2 px-3"
                                       placeholder="0"
                                     />
                                   </div>
                                   {trainer.lodging && getTrainingDays(trainer.startDate, trainer.endDate, excludeDays) > 0 && (
-                                    <div className="text-[9px] text-gray-500 mt-1">
+                                    <div className="text-xs text-gray-500 mt-1">
                                       {formatIndianNumber(trainer.lodging)} × {getTrainingDays(trainer.startDate, trainer.endDate, excludeDays)} = {formatIndianNumber((Number(trainer.lodging) || 0) * getTrainingDays(trainer.startDate, trainer.endDate, excludeDays))}
                                     </div>
                                   )}
@@ -900,7 +900,7 @@ const JDBatchTable = ({
                               </div>
 
                               {/* Total Cost Summary */}
-                              <div className="flex items-center justify-between p-2 bg-gray-50 rounded text-xs">
+                              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl text-sm">
                                 <span className="font-medium text-gray-700">Total Expenses:</span>
                                 <span className="font-semibold text-green-600">
                                   ₹{formatIndianNumber(Math.round(
@@ -917,9 +917,9 @@ const JDBatchTable = ({
                                 <button
                                   type="button"
                                   onClick={() => removeTrainer(rowIndex, batchIndex, trainerIdx)}
-                                  className="text-xs text-red-600 hover:text-red-800 flex items-center"
+                                  className="text-sm text-red-600 hover:text-red-800 flex items-center px-3 py-2 rounded-xl hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors"
                                 >
-                                  <FiTrash2 className="mr-1" size={12} />
+                                  <FiTrash2 className="mr-2" size={16} />
                                   Remove Trainer
                                 </button>
                               </div>
@@ -935,7 +935,7 @@ const JDBatchTable = ({
           </div>
         ))
       ) : (
-        <div className="text-center py-8 bg-gray-100 rounded text-sm text-gray-500">
+        <div className="text-center py-8 bg-gray-100 rounded-xl text-sm text-gray-500">
           No batch data available. Please check operations configuration.
         </div>
       )}

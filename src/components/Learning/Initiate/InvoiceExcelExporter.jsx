@@ -55,25 +55,31 @@ const InvoiceExcelExporter = ({ db, filteredData, exporting, setExporting }) => 
         Object.keys(filteredData[college]).forEach((phase) => {
           console.log(`📝 Processing phase: ${phase} (${filteredData[college][phase].length} trainers)`);
           filteredData[college][phase].forEach((trainer) => {
-            if (trainer.hasExistingInvoice) {
-              exportInvoices.push({
-                trainerId: trainer.trainerId,
-                collegeName: trainer.collegeName,
-                phase: trainer.phase,
-                trainerName: trainer.trainerName,
-                projectCode: trainer.projectCode,
-                domain: trainer.domain,
-                hasExistingInvoice: trainer.hasExistingInvoice,
-              });
-            }
+            exportInvoices.push({
+              trainerId: trainer.trainerId,
+              collegeName: trainer.collegeName,
+              phase: trainer.phase,
+              trainerName: trainer.trainerName,
+              projectCode: trainer.projectCode,
+              domain: trainer.domain,
+              hasExistingInvoice: trainer.hasExistingInvoice,
+              earliestStartDate: trainer.earliestStartDate,
+              latestEndDate: trainer.latestEndDate,
+              totalCollegeHours: trainer.totalCollegeHours,
+              perHourCost: trainer.perHourCost,
+              totalConveyance: trainer.totalConveyance,
+              totalFood: trainer.totalFood,
+              totalLodging: trainer.totalLodging,
+              activeDates: trainer.activeDates,
+            });
           });
         });
       });
 
-      console.log(`📋 Found ${exportInvoices.length} invoices to export`);
+      console.log(`📋 Found ${exportInvoices.length} trainers to export`);
 
       if (exportInvoices.length === 0) {
-        alert("⚠️ No invoices found in the current view. Make sure trainers have existing invoices.");
+        alert("⚠️ No trainers found in the current view.");
         setExporting(false);
         return;
       }
@@ -133,13 +139,35 @@ const InvoiceExcelExporter = ({ db, filteredData, exporting, setExporting }) => 
           }
 
           const querySnapshot = await getDocs(q);
+          let invoice;
           if (querySnapshot.empty) {
-            console.warn(`No invoice found for trainer ${invoiceInfo.trainerId} at ${invoiceInfo.collegeName} (${invoiceInfo.phase})`);
-            continue;
+            console.warn(`No invoice found for trainer ${invoiceInfo.trainerId} at ${invoiceInfo.collegeName} (${invoiceInfo.phase}), using trainer data`);
+            // Use trainer data for invoice fields
+            invoice = {
+              billNumber: "Not Generated",
+              trainerName: invoiceInfo.trainerName,
+              trainerId: invoiceInfo.trainerId,
+              collegeName: invoiceInfo.collegeName,
+              phase: invoiceInfo.phase,
+              projectCode: invoiceInfo.projectCode,
+              domain: invoiceInfo.domain,
+              startDate: invoiceInfo.earliestStartDate,
+              endDate: invoiceInfo.latestEndDate,
+              totalHours: invoiceInfo.totalCollegeHours,
+              trainingRate: invoiceInfo.perHourCost,
+              trainingFees: invoiceInfo.totalCollegeHours * invoiceInfo.perHourCost,
+              tds: 0,
+              adhocAdjustment: 0,
+              conveyance: invoiceInfo.totalConveyance,
+              food: invoiceInfo.totalFood,
+              lodging: invoiceInfo.totalLodging,
+              totalAmount: invoiceInfo.totalCollegeHours * invoiceInfo.perHourCost + invoiceInfo.totalConveyance + invoiceInfo.totalFood + invoiceInfo.totalLodging,
+              netPayment: invoiceInfo.totalCollegeHours * invoiceInfo.perHourCost + invoiceInfo.totalConveyance + invoiceInfo.totalFood + invoiceInfo.totalLodging,
+            };
+          } else {
+            const invoiceDoc = querySnapshot.docs[0];
+            invoice = { id: invoiceDoc.id, ...invoiceDoc.data() };
           }
-
-          const invoiceDoc = querySnapshot.docs[0];
-          const invoice = { id: invoiceDoc.id, ...invoiceDoc.data() };
 
           console.log(`Found invoice for ${invoiceInfo.trainerName}:`, {
             billNumber: invoice.billNumber,
@@ -150,15 +178,19 @@ const InvoiceExcelExporter = ({ db, filteredData, exporting, setExporting }) => 
 
           // For training dates, try multiple approaches
           let assignmentDates = [];
-          try {
-            const assignmentsQuery = query(
-              collection(db, "trainerAssignments"),
-              where("trainerName", "==", invoice.trainerName || "")
-            );
-            const assignmentsSnapshot = await getDocs(assignmentsQuery);
-            assignmentDates = assignmentsSnapshot.docs.map((doc) => doc.data().date);
-          } catch (assignmentError) {
-            console.warn("Could not fetch assignment dates:", assignmentError);
+          if (invoiceInfo.activeDates && Array.isArray(invoiceInfo.activeDates)) {
+            assignmentDates = invoiceInfo.activeDates;
+          } else {
+            try {
+              const assignmentsQuery = query(
+                collection(db, "trainerAssignments"),
+                where("trainerName", "==", invoice.trainerName || "")
+              );
+              const assignmentsSnapshot = await getDocs(assignmentsQuery);
+              assignmentDates = assignmentsSnapshot.docs.map((doc) => doc.data().date);
+            } catch (assignmentError) {
+              console.warn("Could not fetch assignment dates:", assignmentError);
+            }
           }
 
           // If no assignment dates, use invoice dates
@@ -210,7 +242,7 @@ const InvoiceExcelExporter = ({ db, filteredData, exporting, setExporting }) => 
       }
 
       if (processedCount === 0) {
-        alert("⚠️ No invoices found in the current view.");
+        alert("⚠️ No trainers processed in the current view.");
         setExporting(false);
         return;
       }
