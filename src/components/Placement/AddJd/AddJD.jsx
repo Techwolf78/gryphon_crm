@@ -405,7 +405,7 @@ const templateParams = {
       .map(round => `<li>${round}</li>`)
       .join(''),
       
-    upload_link: `http://localhost:5173/upload-student-data?college=${encodeURIComponent(
+    upload_link: `${window.location.origin}/upload-student-data?college=${encodeURIComponent(
         college
     )}&company=${encodeURIComponent(
         formData.companyName
