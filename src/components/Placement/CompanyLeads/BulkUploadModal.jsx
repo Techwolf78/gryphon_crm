@@ -41,7 +41,7 @@ function BulkUploadModal({ show, onClose, allUsers = null, currentUser = null })
   // Set default assignee to current user when modal opens
   useEffect(() => {
     if (show && currentUser) {
-      setSelectedAssignee(currentUser.uid || currentUser.id || '');
+      setSelectedAssignee('');
     }
   }, [show, currentUser]);
 
@@ -83,7 +83,7 @@ function BulkUploadModal({ show, onClose, allUsers = null, currentUser = null })
       console.log("🚀 Starting Excel upload process...");
 
       // Determine assignee ID
-      const finalAssigneeId = selectedAssignee || null;
+      const finalAssigneeId = selectedAssignee && selectedAssignee !== 'unassigned' ? selectedAssignee : null;
       if (finalAssigneeId) {
         console.log("👤 Leads will be assigned to user:", finalAssigneeId);
       }
@@ -95,14 +95,14 @@ function BulkUploadModal({ show, onClose, allUsers = null, currentUser = null })
 
       console.log("🎊 Upload completed successfully!");
       console.log(`📈 Summary: ${result.totalCompanies} companies uploaded in ${result.totalBatches} batches`);
-      console.log(`🧠 Smart batching: ${result.batchesUpdated || 0} batches updated, ${result.batchesCreated || result.totalBatches} batches created`);
+      console.log(`🧠 Smart batching: ${result.batchesUpdated || 0} batches updated, ${result.batchesCreated || 0} batches created`);
 
       setProgress(100);
-      alert(`Successfully uploaded ${result.totalCompanies} companies!\n\nSmart batching results:\n• ${result.batchesUpdated || 0} existing batches updated\n• ${result.batchesCreated || result.totalBatches} new batches created\n• Total batches: ${result.totalBatches}${finalAssigneeId ? '\n• Leads have been assigned to the selected user.' : ''}`);
+      alert(`Successfully uploaded ${result.totalCompanies} companies!\n\nSmart batching results:\n• ${result.batchesUpdated || 0} existing batches updated\n• ${result.batchesCreated || 0} new batches created\n• Total batches: ${result.totalBatches}${finalAssigneeId ? '\n• Leads have been assigned to the selected user.' : ''}`);
 
       setUploading(false);
       setFile(null);
-      setSelectedAssignee(currentUser?.uid || currentUser?.id || '');
+      setSelectedAssignee('');
       onClose();
 
     } catch (error) {
