@@ -57,7 +57,7 @@ const tabLabels = {
   hot: "Hot",
   warm: "Warm",
   cold: "Cold",
-  called: "Called",
+  called: "Dialed",
   onboarded: "Onboarded",
   deleted: "Deleted"
 };

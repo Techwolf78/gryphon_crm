@@ -569,7 +569,7 @@ const FollowupDashboard = ({
             <p className="text-2xl font-bold text-blue-900">{warmLeads}</p>
           </div>
           <div className="bg-blue-100 p-4 rounded-lg border border-blue-200">
-            <h4 className="text-sm font-medium text-blue-800">Called Follow-ups</h4>
+            <h4 className="text-sm font-medium text-blue-800">Dialed Follow-ups</h4>
             <p className="text-2xl font-bold text-blue-900">{calledLeads}</p>
           </div>
           <div className="bg-blue-100 p-4 rounded-lg border border-blue-200">
@@ -869,7 +869,7 @@ const FollowupDashboard = ({
                 <option value="hot">Hot</option>
                 <option value="warm">Warm</option>
                 <option value="cold">Cold</option>
-                <option value="called">Called</option>
+                <option value="called">Dialed</option>
                 <option value="onboarded">Onboarded</option>
                 <option value="deleted">Deleted</option>
               </select>

@@ -33,6 +33,6 @@ export const STATUS_OPTIONS = [
   "Hot",
   "Warm",
   "Cold",
-  "Called",
+  "Dialed",
   "Onboarded",
 ];
