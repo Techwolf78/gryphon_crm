@@ -237,12 +237,33 @@ const FollowupDashboard = ({
     return { date: new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), count };
   });
 
-  // Bar chart: follow-ups by user
-  const userCounts = filteredFollowUps.reduce((acc, f) => {
-    acc[f.assignedUserName || 'Unassigned'] = (acc[f.assignedUserName || 'Unassigned'] || 0) + 1;
+  // Bar chart: follow-ups by user (Fresh vs Re-follow-ups)
+  const leadGroups = filteredFollowUps.reduce((acc, f) => {
+    if (!acc[f.leadId]) acc[f.leadId] = [];
+    acc[f.leadId].push(f);
     return acc;
   }, {});
-  const userBarData = Object.entries(userCounts).map(([user, count]) => ({ user: user.length > 10 ? user.substring(0,10) + '...' : user, count }));
+
+  const userCounts = {};
+  Object.values(leadGroups).forEach(followups => {
+    // Sort by createdAt ascending to identify first follow-up
+    followups.sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
+    followups.forEach((f, index) => {
+      const user = f.assignedUserName || 'Unassigned';
+      if (!userCounts[user]) userCounts[user] = { fresh: 0, re: 0 };
+      if (index === 0) {
+        userCounts[user].fresh += 1;
+      } else {
+        userCounts[user].re += 1;
+      }
+    });
+  });
+
+  const userBarData = Object.entries(userCounts).map(([user, counts]) => ({
+    user: user.length > 10 ? user.substring(0, 10) + '...' : user,
+    fresh: counts.fresh,
+    re: counts.re
+  }));
 
   // Helper function to get date range display text
   const getDateRangeDisplay = () => {
@@ -611,14 +632,16 @@ const FollowupDashboard = ({
                   </ResponsiveContainer>
                 </div>
                 <div className="bg-white p-4 rounded-xl border border-blue-200">
-                  <h3 className="text-lg font-semibold mb-3 text-blue-800">Follow-ups by User</h3>
+                  <h3 className="text-lg font-semibold mb-3 text-blue-800">Follow-ups by User (Fresh vs Re-follow-ups)</h3>
                   <ResponsiveContainer width="100%" height={250}>
                     <BarChart data={userBarData} margin={{ top: 10, right: 10, left: -20, bottom: 10 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e9d5ff" />
                       <XAxis dataKey="user" fontSize={11} tickLine={false} axisLine={false} />
                       <YAxis fontSize={11} tickLine={false} axisLine={false} />
                       <Tooltip />
-                      <Bar dataKey="count" fill="#8B6FFF" radius={[4, 4, 0, 0]} />
+                      <Legend />
+                      <Bar dataKey="fresh" stackId="a" fill="#BBDEFB" radius={[4, 4, 0, 0]} name="Fresh Calls" />
+                      <Bar dataKey="re" stackId="a" fill="#0D47A1" radius={[4, 4, 0, 0]} name="Re-follow-ups" />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
