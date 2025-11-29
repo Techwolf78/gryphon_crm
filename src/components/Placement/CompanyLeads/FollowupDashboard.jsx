@@ -136,6 +136,12 @@ const FollowupDashboard = ({
 
   // Get unique values for filters
   const uniqueStatuses = [...new Set(allFollowUps.map(f => f.status).filter(Boolean))].sort();
+
+  // Helper function to get display label for status
+  const getStatusDisplayLabel = (status) => {
+    if (status === 'called') return 'Dialed';
+    return status ? status.charAt(0).toUpperCase() + status.slice(1) : status;
+  };
   const uniqueAssignedUsers = (() => {
     if (['Manager', 'Assistant Manager', 'Executive'].includes(user?.role)) {
       return [user.displayName || user.name].filter(Boolean);
@@ -330,7 +336,7 @@ const FollowupDashboard = ({
                 onClick={(e) => { e.stopPropagation(); toggleFilterDropdown('status'); }}
                 className="flex items-center px-3 py-1.5 bg-blue-100 hover:bg-blue-200 rounded-lg text-blue-900 text-xs font-medium transition-colors"
               >
-                <span>Status: {filters.status.length === 0 ? 'All' : filters.status.length === 1 ? filters.status[0] : `${filters.status.length} selected`}</span>
+                <span>Status: {filters.status.length === 0 ? 'All' : filters.status.length === 1 ? getStatusDisplayLabel(filters.status[0]) : `${filters.status.length} selected`}</span>
                 <svg className="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
@@ -362,7 +368,7 @@ const FollowupDashboard = ({
                           onChange={() => {}} // Handled by parent onClick
                           className="mr-2 h-3 w-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                         />
-                        {status}
+                        {getStatusDisplayLabel(status)}
                       </div>
                     ))}
                   </div>
@@ -717,7 +723,7 @@ const FollowupDashboard = ({
                         followup.status === 'deleted' ? 'bg-gray-100 text-gray-800' :
                         'bg-gray-100 text-gray-800'
                       }`}>
-                        {followup.status?.toUpperCase() || 'UNKNOWN'}
+                        {followup.status === 'called' ? 'DIALED' : (followup.status?.toUpperCase() || 'UNKNOWN')}
                       </span>
                     </td>
                     <td className="px-3 py-2 text-sm text-gray-500">
