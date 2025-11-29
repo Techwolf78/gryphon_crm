@@ -26,18 +26,8 @@ import { useMsal } from "@azure/msal-react";
 import { InteractionRequiredAuthError } from "@azure/msal-browser";
 
 import { logPlacementActivity } from "../../../utils/placementAuditLogger";
+import { INDUSTRY_OPTIONS, REMARKS_TEMPLATES } from "../../../utils/constants";
 
-// Predefined remarks templates for placement follow-ups
-const REMARKS_TEMPLATES = [
-  { value: "Call Connected", label: "Call Connected" },
-  { value: "Invite mail sent", label: "Invite mail sent" },
-  { value: "Call Disconnected", label: "Call Disconnected" },
-  { value: "Switched off", label: "Switched off" },
-  { value: "Busy", label: "Busy" },
-  { value: "Didn't pick", label: "Didn't pick" },
-  { value: "Not Hiring", label: "Not Hiring" },
-  { value: "Invalid Number", label: "Invalid Number" }
-];
 
 const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
   const [date, setDate] = useState(dayjs().format("YYYY-MM-DD"));
@@ -49,6 +39,7 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
   const [remarks, setRemarks] = useState("");
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState("");
+  const [selectedIndustry, setSelectedIndustry] = useState(company?.industry || "");
   const [loading, setLoading] = useState(false);
   const [pastFollowups, setPastFollowups] = useState([]);
   const [calendarError, setCalendarError] = useState(null);
@@ -310,6 +301,11 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
       return;
     }
 
+    if (!selectedIndustry) {
+      showSnackbar("Please select an industry", "error");
+      return;
+    }
+
     // Check for malicious input before proceeding
     if (maliciousWarning) {
       showSnackbar("Cannot submit: Please remove malicious content from remarks", "error");
@@ -324,6 +320,7 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
         date,
         time: getFullTimeString(),
         template: selectedTemplate,
+        industry: selectedIndustry,
         remarks,
         createdAt: new Date().toISOString(),
         calendarEventCreated: false,
@@ -378,6 +375,8 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
           const updatedCompany = {
             ...decodedCompany,
             followups: updatedFollowups,
+            // Always update company industry to match follow-up selection
+            industry: selectedIndustry,
           };
           // Use Unicode-safe encoding: encodeURIComponent + btoa to handle Unicode characters
           const updatedJsonString = JSON.stringify(updatedCompany);
@@ -388,6 +387,20 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
             ...batchData,
             companies: encodedCompanies,
           });
+
+          // Log industry update
+          if (decodedCompany.industry !== selectedIndustry) {
+            await logPlacementActivity({
+              action: 'UPDATE_COMPANY_INDUSTRY',
+              leadId: lead.id,
+              leadName: lead.companyName || lead.name,
+              details: {
+                oldIndustry: decodedCompany.industry || 'Not set',
+                newIndustry: selectedIndustry,
+                updatedDuring: 'Follow-up scheduling'
+              }
+            });
+          }
 
           // Log the follow-up scheduling activity
           await logPlacementActivity({
@@ -419,6 +432,7 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
           setTime({ hours: 12, minutes: 0, ampm: "AM" });
           setRemarks("");
           setSelectedTemplate("");
+          setSelectedIndustry(company?.industry || "");
           setSendInvite(false);
         } else {
           console.error("Invalid company index:", companyIndex, "for array length:", encodedCompanies.length);
@@ -924,6 +938,46 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
                   </select>
                 </div>
 
+                {/* Industry Selection - Show only after template is selected */}
+                {selectedTemplate && (
+                  selectedIndustry ? (
+                    // Show selected industry in nice UI like M365 connection
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                      <div className="flex items-center space-x-2">
+                        <FaCheckCircle className="text-green-600 text-sm" />
+                        <span className="text-xs text-green-800 font-medium">Industry: {selectedIndustry}</span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedIndustry("")}
+                          className="text-green-600 hover:text-green-800 text-xs underline ml-auto"
+                        >
+                          Change
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    // Show industry dropdown
+                    <div className="space-y-1">
+                      <label className="block text-sm font-medium text-slate-700">
+                        Industry <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={selectedIndustry}
+                        onChange={(e) => setSelectedIndustry(e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-slate-400"
+                        required
+                      >
+                        <option value="">Select industry to schedule</option>
+                        {INDUSTRY_OPTIONS.map((industry) => (
+                          <option key={industry} value={industry}>
+                            {industry}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )
+                )}
+
                 {/* Remarks */}
                 <div className="space-y-1">
                   <label className="block text-sm font-medium text-slate-700">
@@ -1000,7 +1054,7 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
                   </button>
                   <button
                     type="submit"
-                    disabled={loading || accounts.length === 0}
+                    disabled={loading || accounts.length === 0 || (selectedTemplate && !selectedIndustry)}
                     className="px-4 py-2 bg-linear-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:shadow-lg hover:shadow-blue-500/25 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none flex items-center justify-center font-medium"
                   >
                     {loading ? (
@@ -1012,6 +1066,11 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
                       <>
                         <FaCalendarAlt className="mr-2" />
                         Connect M365 to Schedule
+                      </>
+                    ) : selectedTemplate && !selectedIndustry ? (
+                      <>
+                        <FaExclamationTriangle className="mr-2" />
+                        Select Industry to Schedule
                       </>
                     ) : (
                       <>

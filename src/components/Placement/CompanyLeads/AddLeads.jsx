@@ -13,14 +13,9 @@ import {
   orderBy
 } from "firebase/firestore";
 import { XIcon } from "@heroicons/react/outline";
+import { INDUSTRY_OPTIONS, DESIGNATION_OPTIONS, STATUS_OPTIONS } from "../../../utils/constants";
 
-const statusOptions = [
-  "Hot",
-  "Warm",
-  "Cold",
-  "Called",
-  "Onboarded",
-];
+
 
 function AddLeads({ show, onClose, onAddLead }) {
   const [companyName, setCompanyName] = useState("");
@@ -51,13 +46,7 @@ function AddLeads({ show, onClose, onAddLead }) {
   // Duplicate warning state
   const [duplicateWarning, setDuplicateWarning] = useState(null);
 
-  // Designation options for consistency
-  const designationOptions = [
-    "CEO/Founder", "CTO/Technical Head", "HR Manager", "Recruitment Manager",
-    "Talent Acquisition Lead", "Business Development Manager", "Sales Manager",
-    "Operations Manager", "Project Manager", "Team Lead", "Senior Developer",
-    "Developer", "Intern", "Other"
-  ];
+
 
   // State for custom "Other" inputs
   const [customIndustry, setCustomIndustry] = useState("");
@@ -138,13 +127,7 @@ function AddLeads({ show, onClose, onAddLead }) {
     return num > 0 && num <= 100000; // Reasonable range: 1-100k employees
   };
 
-  // Industry options for consistency
-  const industryOptions = [
-    "IT Services", "Software Development", "Consulting", "Manufacturing", 
-    "Healthcare", "Education", "Finance", "Retail", "Real Estate", 
-    "Construction", "Automotive", "Telecommunications", "Energy", 
-    "Transportation", "Agriculture", "Media & Entertainment", "Other"
-  ];
+
 
   // Update all state setters to track changes and validation
   const updateField = (setter, value, fieldName) => {
@@ -649,7 +632,7 @@ function AddLeads({ show, onClose, onAddLead }) {
                       required
                     >
                       <option value="">Select Industry</option>
-                      {industryOptions.map((option) => (
+                      {INDUSTRY_OPTIONS.map((option) => (
                         <option key={option} value={option}>
                           {option}
                         </option>
@@ -758,7 +741,7 @@ function AddLeads({ show, onClose, onAddLead }) {
                       required
                     >
                       <option value="">Select Designation</option>
-                      {designationOptions.map((option) => (
+                      {DESIGNATION_OPTIONS.map((option) => (
                         <option key={option} value={option}>
                           {option}
                         </option>
@@ -912,7 +895,7 @@ function AddLeads({ show, onClose, onAddLead }) {
                       onChange={(e) => updateField(setStatus, e.target.value)}
                       className="w-full px-2.5 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 shadow-sm"
                     >
-                      {statusOptions.map((option) => (
+                      {STATUS_OPTIONS.map((option) => (
                         <option key={option} value={option}>
                           {option}
                         </option>
