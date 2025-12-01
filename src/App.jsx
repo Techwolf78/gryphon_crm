@@ -50,9 +50,6 @@ const Maintenance = React.lazy(() => import("./pages/Maintenance"));
 const UploadStudentData = React.lazy(() => import("./components/Placement/AddJd/UploadStudentData")); // ✅ Space removed
 const Purchase = React.lazy(() => import("./pages/Purchase"));
 
-// Lazy load UNO page
-const UNO = React.lazy(() => import("./pages/UNO"));
-
 // Lazy load Intro page
 const Intro = React.lazy(() => import("./pages/Intro"));
 
@@ -125,7 +122,6 @@ const AppContent = () => {
             <Route path="hr" element={<HR />} />
             <Route path="ca" element={<CA />} />
             <Route path="purchase" element={<Purchase />} />
-            <Route path="uno" element={<UNO />} />
             <Route path="intro" element={<Intro />} />
           </Route>
 
