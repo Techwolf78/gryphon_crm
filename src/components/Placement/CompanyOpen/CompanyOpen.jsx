@@ -587,6 +587,7 @@ function CompanyOpen() {
               fetchCompanies();
             }}
             company={editingCompany}
+            fetchCompanies={fetchCompanies}
           />
         )}
       </div>

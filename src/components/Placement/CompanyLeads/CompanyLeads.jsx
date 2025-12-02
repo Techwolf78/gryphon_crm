@@ -884,7 +884,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
       // Filter by date
       if (dateFilterType && ((dateFilterType === 'single' && singleDate) || (dateFilterType === 'range' && startDate && endDate))) {
         const getDateField = (lead) => {
-          if (activeTab === "called") return lead.calledAt;
+          if (activeTab === "called" || activeTab === "dialed") return lead.calledAt;
           if (activeTab === "warm") return lead.warmAt;
           if (activeTab === "cold") return lead.coldAt;
           if (activeTab === "hot") return lead.hotAt;
@@ -981,7 +981,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
     }
 
     // Use filteredLeads instead of all leads to respect applied filters
-    const leadsToGroup = filteredLeads.filter(lead => lead.status === activeTab);
+    const leadsToGroup = filteredLeads.filter(lead => activeTab === 'called' ? (lead.status === 'called' || lead.status === 'dialed') : lead.status === activeTab);
 
     // Group by date based on status
     const grouped = leadsToGroup.reduce((acc, lead) => {
@@ -989,7 +989,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         let dateField;
         
         // Determine which date field to use based on status
-        if (activeTab === "called") {
+        if (activeTab === "called" || activeTab === "dialed") {
           // For called leads, use calledAt (when they were marked as called)
           dateField = lead.calledAt;
         } else if (activeTab === "warm") {

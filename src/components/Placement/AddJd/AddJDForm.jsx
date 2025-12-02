@@ -13,7 +13,7 @@ function AddJDForm({ formData, setFormData, formErrors, handleFileChange, onClos
 
     // Parse salary and stipend inputs
     let processedValue = value;
-    if (name === 'salary') {
+    if (name === 'salary' || name === 'fixedSalary' || name === 'variableSalary') {
       processedValue = parseSalaryInput(value);
     } else if (name === 'stipend') {
       processedValue = parseStipendInput(value);
@@ -23,10 +23,16 @@ function AddJDForm({ formData, setFormData, formErrors, handleFileChange, onClos
 
     // Validate minimum amounts
     const newValidationErrors = { ...validationErrors };
-    if (name === 'salary' && processedValue !== null && processedValue < 100000) {
-      newValidationErrors.salary = 'Minimum salary is 1 LPA (₹1,00,000)';
-    } else if (name === 'salary') {
-      delete newValidationErrors.salary;
+    if ((name === 'salary' || name === 'fixedSalary') && processedValue !== null && processedValue < 100000) {
+      newValidationErrors[name] = 'Minimum salary is 1 LPA (₹1,00,000)';
+    } else if (name === 'salary' || name === 'fixedSalary') {
+      delete newValidationErrors[name];
+    }
+
+    if (name === 'variableSalary' && processedValue !== null && processedValue < 0) {
+      newValidationErrors.variableSalary = 'Variable salary cannot be negative';
+    } else if (name === 'variableSalary') {
+      delete newValidationErrors.variableSalary;
     }
 
     if (name === 'stipend' && processedValue !== null && processedValue < 1000) {
@@ -364,9 +370,9 @@ function AddJDForm({ formData, setFormData, formErrors, handleFileChange, onClos
           </div>
 
           {/* Compensation Fields - Dynamic based on Job Type */}
-          {formData.jobType === "Internship" && (
+          {(formData.jobType === "Internship" || formData.jobType === "Int + PPO" || formData.jobType === "Training + FT") && (
             <div className="bg-white p-3 border border-gray-100">
-              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Stipend</label>
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Stipend (per month)</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <span className="text-gray-500 text-sm">₹</span>
@@ -391,138 +397,69 @@ function AddJDForm({ formData, setFormData, formErrors, handleFileChange, onClos
             </div>
           )}
 
-          {formData.jobType === "Int + PPO" && (
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-white p-3 border border-gray-100">
-                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Stipend</label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <span className="text-gray-500 text-sm">₹</span>
-                  </div>
-                  <input
-                    type="text"
-                    name="stipend"
-                    value={formData.stipend || ''}
-                    onChange={handleChange}
-                    placeholder="e.g. 25000"
-                    className="w-full pl-8 px-3 py-2 text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                  {formData.stipend && (
-                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                      <span className="text-xs text-gray-500">({formatStipend(formData.stipend)})</span>
-                    </div>
-                  )}
-                </div>
-                {validationErrors.stipend && (
-                  <p className="mt-1 text-sm text-red-600">{validationErrors.stipend}</p>
-                )}
-              </div>
-              <div className="bg-white p-3 border border-gray-100">
-                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Salary (CTC)</label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <span className="text-gray-500 text-sm">₹</span>
-                  </div>
-                  <input
-                    type="text"
-                    name="salary"
-                    value={formData.salary || ''}
-                    onChange={handleChange}
-                    placeholder="e.g. 500000"
-                    className="w-full pl-8 px-3 py-2 text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                  {formData.salary && (
-                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                      <span className="text-xs text-gray-500">({formatSalary(formData.salary)})</span>
-                    </div>
-                  )}
-                </div>
-                {validationErrors.salary && (
-                  <p className="mt-1 text-sm text-red-600">{validationErrors.salary}</p>
-                )}
-              </div>
-            </div>
-          )}
 
-          {formData.jobType === "Full Time" && (
+
+          {formData.jobType !== "Internship" && (
             <div className="bg-white p-3 border border-gray-100">
-              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Salary (CTC)</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <span className="text-gray-500 text-sm">₹</span>
-                </div>
-                <input
-                  type="text"
-                  name="salary"
-                  value={formData.salary || ''}
-                  onChange={handleChange}
-                  placeholder="e.g. 500000"
-                  className="w-full pl-8 px-3 py-2 text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-                {formData.salary && (
-                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                    <span className="text-xs text-gray-500">({formatSalary(formData.salary)})</span>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Fixed Salary (CTC)*</label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <span className="text-gray-500 text-sm">₹</span>
+                    </div>
+                    <input
+                      type="text"
+                      name="fixedSalary"
+                      value={formData.fixedSalary || ''}
+                      onChange={handleChange}
+                      placeholder="e.g. 400000"
+                      className="w-full pl-8 px-3 py-2 text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    {formData.fixedSalary && (
+                      <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                        <span className="text-xs text-gray-500">({formatSalary(formData.fixedSalary)})</span>
+                      </div>
+                    )}
                   </div>
-                )}
+                  {validationErrors.fixedSalary && (
+                    <p className="mt-1 text-sm text-red-600">{validationErrors.fixedSalary}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Variable Salary (CTC)</label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <span className="text-gray-500 text-sm">₹</span>
+                    </div>
+                    <input
+                      type="text"
+                      name="variableSalary"
+                      value={formData.variableSalary || ''}
+                      onChange={handleChange}
+                      placeholder="e.g. 100000"
+                      className="w-full pl-8 px-3 py-2 text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    {formData.variableSalary && (
+                      <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                        <span className="text-xs text-gray-500">({formatSalary(formData.variableSalary)})</span>
+                      </div>
+                    )}
+                  </div>
+                  {validationErrors.variableSalary && (
+                    <p className="mt-1 text-sm text-red-600">{validationErrors.variableSalary}</p>
+                  )}
+                </div>
               </div>
-              {validationErrors.salary && (
-                <p className="mt-1 text-sm text-red-600">{validationErrors.salary}</p>
+              {(formData.fixedSalary || formData.variableSalary) && (
+                <div className="mt-2 text-sm text-gray-600">
+                  Total CTC: ₹{formatSalary((parseFloat(formData.fixedSalary) || 0) + (parseFloat(formData.variableSalary) || 0))}
+                </div>
               )}
             </div>
           )}
 
-          {formData.jobType === "Training + FT" && (
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-white p-3 border border-gray-100">
-                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Training Stipend (per month)</label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <span className="text-gray-500 text-sm">₹</span>
-                  </div>
-                  <input
-                    type="text"
-                    name="stipend"
-                    value={formData.stipend || ''}
-                    onChange={handleChange}
-                    placeholder="e.g. 25000"
-                    className="w-full pl-8 px-3 py-2 text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                  {formData.stipend && (
-                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                      <span className="text-xs text-gray-500">({formatStipend(formData.stipend)})</span>
-                    </div>
-                  )}
-                </div>
-                {validationErrors.stipend && (
-                  <p className="mt-1 text-sm text-red-600">{validationErrors.stipend}</p>
-                )}
-              </div>
-              <div className="bg-white p-3 border border-gray-100">
-                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">FT Salary (LPA)</label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <span className="text-gray-500 text-sm">₹</span>
-                  </div>
-                  <input
-                    type="text"
-                    name="salary"
-                    value={formData.salary || ''}
-                    onChange={handleChange}
-                    placeholder="e.g. 500000"
-                    className="w-full pl-8 px-3 py-2 text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                  {formData.salary && (
-                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                      <span className="text-xs text-gray-500">({formatSalary(formData.salary)})</span>
-                    </div>
-                  )}
-                </div>
-                {validationErrors.salary && (
-                  <p className="mt-1 text-sm text-red-600">{validationErrors.salary}</p>
-                )}
-              </div>
-            </div>
-          )}
+
 
           {/* Hiring Rounds */}
           <div className="bg-white p-3 border border-gray-100">

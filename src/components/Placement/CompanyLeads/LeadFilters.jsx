@@ -45,7 +45,7 @@ function LeadFilters({
     
     // Filter by active tab if not "all"
     if (activeTab !== "all") {
-      baseFilteredLeads = baseFilteredLeads.filter(lead => lead.status === activeTab);
+      baseFilteredLeads = baseFilteredLeads.filter(lead => activeTab === 'called' ? (lead.status === 'called' || lead.status === 'dialed') : lead.status === activeTab);
     }
 
     return {

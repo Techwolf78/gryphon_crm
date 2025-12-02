@@ -50,6 +50,9 @@ const ImportData = ({ handleImportComplete }) => {
     "Specialization": "specialization",
     "Job Type": "jobType",
     "Source": "source",
+    "Fixed Salary (LPA)": "fixedSalary",
+    "Variable Salary (LPA)": "variableSalary",
+    "Total Salary (LPA)": "salary",
     "Salary (LPA)": "salary",
     "Stipend (₹/month)": "stipend",
     "Job Location": "jobLocation",
@@ -224,7 +227,12 @@ const ImportData = ({ handleImportComplete }) => {
           specialization: company.specialization || "",
           jobType: company.jobType || "Full Time",
           source: company.source || "",
-          salary: normalizeSalaryForStorage(company.salary),
+          fixedSalary: company.fixedSalary ? normalizeSalaryForStorage(company.fixedSalary) : "",
+          variableSalary: company.variableSalary ? normalizeSalaryForStorage(company.variableSalary) : "",
+          salary: company.salary ? normalizeSalaryForStorage(company.salary) : 
+                 (company.fixedSalary && company.variableSalary) ? 
+                 (parseFloat(normalizeSalaryForStorage(company.fixedSalary) || 0) + 
+                  parseFloat(normalizeSalaryForStorage(company.variableSalary) || 0)).toString() : "",
           stipend: normalizeStipendForStorage(company.stipend),
           jobLocation: company.jobLocation || "",
           companyWebsite: company.companyWebsite || "",

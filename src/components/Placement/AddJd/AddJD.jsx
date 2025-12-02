@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { XIcon } from "@heroicons/react/outline";
+import { toast } from 'react-toastify';
 import { db } from "../../../firebase";
 import {
   collection,
@@ -56,7 +57,7 @@ const getStudentCurrentYear = (passingYear, course = "B.Tech") => {
   return courseDuration - yearsRemaining;
 };
 
-function AddJD({ show, onClose, company }) {
+function AddJD({ show, onClose, company, fetchCompanies }) {
   const [formData, setFormData] = useState({
     companyName: "",
     companyWebsite: "",
@@ -70,6 +71,8 @@ function AddJD({ show, onClose, company }) {
     jobType: "",
     jobDesignation: "",
     jobLocation: "",
+    fixedSalary: "",
+    variableSalary: "",
     salary: "",
     hiringRounds: [],
     internshipDuration: "",
@@ -117,8 +120,8 @@ function AddJD({ show, onClose, company }) {
   const [formErrors, setFormErrors] = useState({});
   const [availableColleges, setAvailableColleges] = useState([]);
   const [studentsData, setStudentsData] = useState({});
-  const [viewingCollege, setViewingCollege] = useState(null);
-  const [isLoadingStudents, setIsLoadingStudents] = useState(false);
+  const [_viewingCollege, _setViewingCollege] = useState(null);
+  const [_isLoadingStudents, _setIsLoadingStudents] = useState(false);
   const [otherCollegesInput, setOtherCollegesInput] = useState("");
   const [showOtherCollegesInput, setShowOtherCollegesInput] = useState(false);
   const [submissionError, setSubmissionError] = useState(null);
@@ -126,6 +129,7 @@ function AddJD({ show, onClose, company }) {
   const [collegeEmails, setCollegeEmails] = useState({});
   const [manualEmails, setManualEmails] = useState({});
   const [collegeDetails, setCollegeDetails] = useState({});
+  const [saveStatus, setSaveStatus] = useState(null); // null, 'saving', 'saved'
 
   // New states for template and upload
   const [showTemplateModal, setShowTemplateModal] = useState(false);
@@ -164,6 +168,8 @@ function AddJD({ show, onClose, company }) {
     if (!formData.source.trim()) errors.source = "Source is required";
     if (!formData.coordinator.trim())
       errors.coordinator = "Coordinator is required";
+    if (formData.jobType !== "Internship" && !formData.fixedSalary)
+      errors.fixedSalary = "Fixed salary is required";
 
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -176,6 +182,50 @@ function AddJD({ show, onClose, company }) {
   const handleSubmit = () => {
     if (!validateStep1()) return;
     setCurrentStep(2);
+  };
+
+  const handleSave = async () => {
+    if (!validateStep1()) return;
+
+    setSaveStatus('saving');
+    try {
+      // Compute total salary
+      const totalSalary = (parseFloat(formData.fixedSalary) || 0) + (parseFloat(formData.variableSalary) || 0);
+      const updatedFormData = { ...formData, salary: totalSalary.toString() };
+
+      if (company && company.id) {
+        // Update existing company
+        await updateDoc(doc(db, "companies", company.id), {
+          ...updatedFormData,
+          updatedAt: serverTimestamp(),
+        });
+        toast.success("Company updated successfully!");
+        setSaveStatus('saved');
+        setTimeout(() => {
+          setSaveStatus(null);
+          onClose(); // Close modal after successful update
+        }, 1500);
+      } else {
+        // Create new company (though this might not be typical without colleges)
+        await addDoc(collection(db, "companies"), {
+          ...updatedFormData,
+          status: "ongoing",
+          createdAt: serverTimestamp(),
+        });
+        toast.success("Company saved successfully!");
+        setSaveStatus('saved');
+        setTimeout(() => setSaveStatus(null), 3000);
+      }
+
+      // Refresh companies list
+      if (fetchCompanies) {
+        fetchCompanies();
+      }
+    } catch (error) {
+      console.error("Error saving company:", error);
+      toast.error("Failed to save company. Please try again.");
+      setSaveStatus(null);
+    }
   };
 
   const fetchFilteredColleges = useCallback(async () => {
@@ -245,7 +295,7 @@ function AddJD({ show, onClose, company }) {
   }, [formData.course, formData.passingYear, formData.specialization]);
 
   const fetchStudentsForCollege = async (college) => {
-    setIsLoadingStudents(true);
+    _setIsLoadingStudents(true);
     try {
       const placementQuery = query(
         collection(db, "placementData"),
@@ -281,14 +331,14 @@ function AddJD({ show, onClose, company }) {
       console.error("Error fetching students for college:", college, error);
       setStudentsData((prev) => ({ ...prev, [college]: [] }));
     } finally {
-      setIsLoadingStudents(false);
+      _setIsLoadingStudents(false);
     }
   };
 
   const viewStudents = (college) => {
     if (college === "Other" || !availableColleges.includes(college)) return;
 
-    setViewingCollege(college);
+    _setViewingCollege(college);
 
     if (!studentsData[college]) {
       fetchStudentsForCollege(college);
@@ -469,6 +519,10 @@ function AddJD({ show, onClose, company }) {
     try {
       const collegesToSubmit = selectedColleges.filter((c) => c !== "Other");
 
+      // Compute total salary
+      const totalSalary = (parseFloat(formData.fixedSalary) || 0) + (parseFloat(formData.variableSalary) || 0);
+      const updatedFormData = { ...formData, salary: totalSalary.toString() };
+
       const collegesWithTPO = collegesToSubmit.map((college) => ({
         college,
         tpoEmail: getCollegeEmail(college),
@@ -477,7 +531,7 @@ function AddJD({ show, onClose, company }) {
       // Save to database with template fields
       const promises = collegesToSubmit.map((college) => {
         const companyData = {
-          ...formData,
+          ...updatedFormData,
           college,
           tpoEmail: getCollegeEmail(college),
           templateFields: selectedTemplateFields, // ✅ Save selected columns
@@ -531,6 +585,8 @@ function AddJD({ show, onClose, company }) {
         jobType: company.jobType || "",
         jobDesignation: company.jobDesignation || "",
         jobLocation: company.jobLocation || "",
+        fixedSalary: company.fixedSalary || "",
+        variableSalary: company.variableSalary || "",
         salary: company.salary || "",
         hiringRounds: Array.isArray(company.hiringRounds) ? company.hiringRounds : (company.hiringRounds ? [company.hiringRounds] : []),
         internshipDuration: company.internshipDuration || "",
@@ -560,6 +616,8 @@ function AddJD({ show, onClose, company }) {
         jobType: "",
         jobDesignation: "",
         jobLocation: "",
+        fixedSalary: "",
+        variableSalary: "",
         salary: "",
         internshipDuration: "",
         stipend: "",
@@ -578,6 +636,7 @@ function AddJD({ show, onClose, company }) {
       setFormErrors({});
       setSubmissionError(null);
       setEmailSent(false);
+      setSaveStatus(null);
     }
   }, [show, company]);
 
@@ -636,6 +695,15 @@ function AddJD({ show, onClose, company }) {
                 >
                   Cancel
                 </button>
+                {company && (
+                  <button
+                    onClick={handleSave}
+                    disabled={saveStatus === 'saving' || saveStatus === 'saved'}
+                    className="px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'saved' ? 'Saved!' : 'Update'}
+                  </button>
+                )}
                 <button
                   onClick={handleSubmit}
                   className="px-6 py-2.5 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition"

@@ -57,7 +57,7 @@ const tabLabels = {
   hot: "Hot",
   warm: "Warm",
   cold: "Cold",
-  called: "Dialed",
+  called: "Called",
   onboarded: "Onboarded",
   deleted: "Deleted"
 };
@@ -116,7 +116,7 @@ const LeadStatusTabs = ({ activeTab, setActiveTab, leadsByStatus = {}, user }) =
         >
           {tabLabels[key]}{" "}
           <span className="ml-1 text-xs font-bold">
-            ({leadsByStatus[key] || 0})
+            ({key === 'called' ? ((leadsByStatus['called'] || 0) + (leadsByStatus['dialed'] || 0)) : (leadsByStatus[key] || 0)})
           </span>
         </button>
       ))}

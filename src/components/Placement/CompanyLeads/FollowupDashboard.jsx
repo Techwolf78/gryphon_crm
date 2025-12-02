@@ -144,7 +144,7 @@ const FollowupDashboard = ({
 
   // Helper function to get display label for status
   const getStatusDisplayLabel = (status) => {
-    if (status === 'called') return 'Dialed';
+    if (status === 'called' || status === 'dialed') return 'Called';
     return status ? status.charAt(0).toUpperCase() + status.slice(1) : status;
   };
   const uniqueAssignedUsers = (() => {
@@ -208,7 +208,7 @@ const FollowupDashboard = ({
   const todayFollowUpsCount = filteredFollowUps.filter(f => f.createdAt && new Date(f.createdAt).toDateString() === today).length;
   const hotLeads = filteredFollowUps.filter(f => f.status === 'hot').length;
   const warmLeads = filteredFollowUps.filter(f => f.status === 'warm').length;
-  const calledLeads = filteredFollowUps.filter(f => f.status === 'called').length;
+  const calledLeads = filteredFollowUps.filter(f => f.status === 'called' || f.status === 'dialed').length;
   const coldLeads = filteredFollowUps.filter(f => f.status === 'cold').length;
 
   // Calculate upcoming follow-ups in next 3 hours
@@ -648,7 +648,7 @@ const FollowupDashboard = ({
             <p className="text-2xl font-bold text-blue-900">{warmLeads}</p>
           </div>
           <div className="bg-blue-100 p-4 rounded-lg border border-blue-200">
-            <h4 className="text-sm font-medium text-blue-800">Dialed Follow-ups</h4>
+            <h4 className="text-sm font-medium text-blue-800">Called Follow-ups</h4>
             <p className="text-2xl font-bold text-blue-900">{calledLeads}</p>
           </div>
           <div className="bg-blue-100 p-4 rounded-lg border border-blue-200">
@@ -793,12 +793,12 @@ const FollowupDashboard = ({
                         followup.status === 'hot' ? 'bg-blue-800 text-white' :
                         followup.status === 'warm' ? 'bg-blue-600 text-white' :
                         followup.status === 'cold' ? 'bg-blue-400 text-blue-900' :
-                        followup.status === 'called' ? 'bg-blue-200 text-blue-800' :
+                        (followup.status === 'called' || followup.status === 'dialed') ? 'bg-blue-200 text-blue-800' :
                         followup.status === 'onboarded' ? 'bg-blue-700 text-white' :
                         followup.status === 'deleted' ? 'bg-gray-100 text-gray-800' :
                         'bg-gray-100 text-gray-800'
                       }`}>
-                        {followup.status === 'called' ? 'DIALED' : (followup.status?.toUpperCase() || 'UNKNOWN')}
+                        {(followup.status === 'called' || followup.status === 'dialed') ? 'Called' : (followup.status?.toUpperCase() || 'UNKNOWN')}
                       </span>
                     </td>
                     <td className="px-3 py-2 text-sm text-gray-500">
@@ -950,7 +950,7 @@ const FollowupDashboard = ({
                 <option value="hot">Hot</option>
                 <option value="warm">Warm</option>
                 <option value="cold">Cold</option>
-                <option value="called">Dialed</option>
+                <option value="called">Called</option>
                 <option value="onboarded">Onboarded</option>
                 <option value="deleted">Deleted</option>
               </select>

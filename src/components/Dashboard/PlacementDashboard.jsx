@@ -477,7 +477,7 @@ const LeadStatusDistribution = ({ leadData, isLoading }) => {
               cx="50%"
               cy="50%"
               labelLine={false}
-              label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+              label={({ value }) => `${value}`}
               outerRadius={70}
               fill="#8884d8"
               dataKey="value"
@@ -557,7 +557,7 @@ const CTCDistribution = ({ ctcData, isLoading }) => {
               cx="50%"
               cy="50%"
               labelLine={false}
-              label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+              label={({ value }) => `${value}`}
               outerRadius={70}
               fill="#8884d8"
               dataKey="value"
@@ -1365,8 +1365,9 @@ const PlacementDashboard = ({ filters }) => {
         uid: doc.id, // Add uid field for consistency
         ...doc.data(),
       }));
-      setUsers(usersData);
-      console.log("Fetched users:", usersData.length, usersData.slice(0, 3)); // Debug log
+      const placementUsers = usersData.filter(user => user.departments && user.departments.includes('Placement'));
+      setUsers(placementUsers);
+      console.log("Fetched placement users:", placementUsers.length, placementUsers.slice(0, 3)); // Debug log
     } catch (error) {
       console.error("Error fetching users:", error);
     }
