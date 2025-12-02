@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, Suspense, useRef } from "react";
+import React, { useState, useEffect, useCallback, useMemo, Suspense } from "react";
 import { useDebounce } from 'use-debounce';
 import { PlusIcon, CloudUploadIcon } from "@heroicons/react/outline";
 import AddLeads from "./AddLeads";
@@ -23,6 +23,7 @@ import FollowUpCompany from "./FollowUpCompany";
 import PlacementLeadAlert from "../PlacementLeadAlert";
 import ViewModeToggle from "./ViewModeToggle";
 import LeadFilters from "./LeadFilters";
+import FollowupDashboard from "./FollowupDashboard";
 import { useAuth } from "../../../context/AuthContext";
 import { useMsal } from "@azure/msal-react";
 import { InteractionRequiredAuthError } from "@azure/msal-browser";
@@ -31,6 +32,7 @@ import { logPlacementActivity, AUDIT_ACTIONS } from "../../../utils/placementAud
 import ViewToggle from "./ViewToggle";
 import * as XLSX from 'xlsx-js-style';
 import { saveAs } from 'file-saver';
+import CompanyLeadDeleteModal from './CompanyLeadDeleteModal';
 
   // Utility function to handle Firestore index errors
   const handleFirestoreIndexError = (error, operation = "operation") => {
@@ -70,6 +72,12 @@ function CompanyLeads() {
   const [showTodayFollowUpAlert, setShowTodayFollowUpAlert] = useState(false);
   const [reminderPopup, setReminderPopup] = useState(null);
 
+  // Follow-ups dashboard state
+  const [showFollowUpsDashboard, setShowFollowUpsDashboard] = useState(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get('show') === 'followupdashboard';
+  });
+
   // Toast notification state
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
@@ -105,6 +113,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
   // Additional filter states
   const [companyFilter, setCompanyFilter] = useState('');
   const [phoneFilter, setPhoneFilter] = useState('');
+  const [industryFilter, setIndustryFilter] = useState('');
   const [dateFilterType, setDateFilterType] = useState('single');
   const [singleDate, setSingleDate] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -124,11 +133,25 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportStatuses, setExportStatuses] = useState(['hot', 'warm', 'called', 'onboarded']); // Default selected statuses (cold only available for myleads)
 
+  // Selected leads for permanent deletion in deleted tab
+  const [selectedDeletedLeads, setSelectedDeletedLeads] = useState([]);
+
+  // Delete progress state - moved to modal
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+
   // Debounced search term for performance
   const [debouncedSearchTerm] = useDebounce(searchTerm, 500);
 
   // Debounced search logging with longer delay to avoid logging every keystroke
   const [debouncedSearchForLogging] = useDebounce(searchTerm, 2000);
+
+  // Check if user is admin
+  const isAdmin = user && (user?.departments?.includes("admin") || 
+                           user?.departments?.includes("Admin") || 
+                           user?.department === "admin" || 
+                           user?.department === "Admin" ||
+                           user?.role === "admin" || 
+                           user?.role === "Admin");
 
   // Log search activity when debounced search changes
   useEffect(() => {
@@ -283,6 +306,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
               time: followup.time,
               date: followup.date,
               remarks: followup.remarks,
+              template: followup.template,
               assignedTo: lead.assignedTo,
               leadId: lead.id,
               followupKey: followup.key
@@ -797,7 +821,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
   const filteredLeads = useMemo(() => {
     
     // Early return for empty search and "all" tab
-    if (!debouncedSearchTerm && activeTab === "all" && selectedUserFilter === 'all' && !companyFilter.trim() && !phoneFilter.trim()) {
+    if (!debouncedSearchTerm && activeTab === "all" && selectedUserFilter === 'all' && !companyFilter.trim() && !phoneFilter.trim() && !industryFilter.trim()) {
       // Sort by manual leads first, then by completeness score
       return [...leads].sort((a, b) => {
         // Manual leads always come first
@@ -849,10 +873,18 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         }
       }
 
+      // Filter by industry
+      if (industryFilter.trim()) {
+        const industry = (lead.industry || '').toLowerCase().trim();
+        if (industry !== industryFilter.trim().toLowerCase()) {
+          return false;
+        }
+      }
+
       // Filter by date
       if (dateFilterType && ((dateFilterType === 'single' && singleDate) || (dateFilterType === 'range' && startDate && endDate))) {
         const getDateField = (lead) => {
-          if (activeTab === "called") return lead.calledAt;
+          if (activeTab === "called" || activeTab === "dialed") return lead.calledAt;
           if (activeTab === "warm") return lead.warmAt;
           if (activeTab === "cold") return lead.coldAt;
           if (activeTab === "hot") return lead.hotAt;
@@ -914,9 +946,24 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
       const scoreB = calculateCompletenessScore(b);
       return scoreB - scoreA; // Higher score first
     });
-  }, [leads, activeTab, debouncedSearchTerm, selectedUserFilter, companyFilter, phoneFilter, dateFilterType, singleDate, startDate, endDate, calculateCompletenessScore]);
+  }, [leads, activeTab, debouncedSearchTerm, selectedUserFilter, companyFilter, phoneFilter, industryFilter, dateFilterType, singleDate, startDate, endDate, calculateCompletenessScore]);
 
-  // Group leads by date for all tabs (hot, warm, cold, called, onboarded, deleted)
+  const formatDate = useCallback((dateString) => {
+    if (dateString === 'Unknown Date') return 'Unknown Date';
+    try {
+      return dateString
+        ? new Date(dateString).toLocaleDateString("en-US", {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+        : "-";
+    } catch {
+      return "-";
+    }
+  }, []);
   const groupedLeads = useMemo(() => {
     // Only group for specific tabs and when view mode is "date"
     if (viewMode !== "date" || !["hot", "warm", "cold", "called", "onboarded", "deleted"].includes(activeTab)) return null;
@@ -934,7 +981,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
     }
 
     // Use filteredLeads instead of all leads to respect applied filters
-    const leadsToGroup = filteredLeads.filter(lead => lead.status === activeTab);
+    const leadsToGroup = filteredLeads.filter(lead => activeTab === 'called' ? (lead.status === 'called' || lead.status === 'dialed') : lead.status === activeTab);
 
     // Group by date based on status
     const grouped = leadsToGroup.reduce((acc, lead) => {
@@ -942,7 +989,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         let dateField;
         
         // Determine which date field to use based on status
-        if (activeTab === "called") {
+        if (activeTab === "called" || activeTab === "dialed") {
           // For called leads, use calledAt (when they were marked as called)
           dateField = lead.calledAt;
         } else if (activeTab === "warm") {
@@ -1715,23 +1762,6 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
     await fetchLeads();
   };
 
-  const formatDate = useCallback((dateString) => {
-    if (dateString === 'Unknown Date') return 'Unknown Date';
-    try {
-      return dateString
-        ? new Date(dateString).toLocaleDateString("en-US", {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-          })
-        : "-";
-    } catch {
-      return "-";
-    }
-  }, []);
-
   // Filter follow-ups based on view mode (My Leads vs My Team)
   const filteredFollowUps = useMemo(() => {
     if (!user) {
@@ -1797,7 +1827,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
                 month: 'short',
                 day: 'numeric'
               });
-              return `${index + 1}. ${date} - ${followup.remarks || 'No remarks'}`;
+              return `${index + 1}. ${date} - ${followup.template || 'No template'}`;
             }).join('\n');
           } else {
             remarks = lead.notes || 'No remarks';
@@ -1823,7 +1853,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
             'Designation': lead.pocDesignation || lead.designation || '',
             'Contact Details': lead.pocPhone || lead.phone || '',
             'Email ID': lead.pocMail || lead.email || '',
-            'LinkedIn Profile': lead.pocLinkedin || lead.linkedinUrl || '',
+            'CTC': lead.ctc || '',
             'Remarks': remarks,
             'ASSGN': assignedUser
           };
@@ -1839,7 +1869,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
           { wch: 20 }, // Designation
           { wch: 15 }, // Contact Details
           { wch: 25 }, // Email ID
-          { wch: 25 }, // LinkedIn Profile
+          { wch: 15 }, // CTC
           { wch: 40 }, // Remarks
           { wch: 15 }  // ASSGN
         ];
@@ -1981,254 +2011,342 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
 
   return (
     <div className="bg-white rounded-lg shadow p-4">
-      {/* Header with View Toggle on Left, Search in Center, Actions on Right */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between mb-2 gap-2">
-        {/* View Mode Toggle and Filters on Left */}
-        <div className="flex items-center gap-4 shrink-0 h-8">
-          <ViewModeToggle
-            viewMyLeadsOnly={viewMyLeadsOnly}
-            setViewMyLeadsOnly={(value) => {
-              // Log view mode change
+      {/* Header controls - only show when leads table is visible */}
+      {!showFollowUpsDashboard && (
+        <>
+          {/* Header with View Toggle on Left, Search in Center, Actions on Right */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between mb-2 gap-2">
+            {/* View Mode Toggle and Filters on Left */}
+            <div className="flex items-center gap-4 shrink-0 h-8">
+              <ViewModeToggle
+                viewMyLeadsOnly={viewMyLeadsOnly}
+                setViewMyLeadsOnly={(value) => {
+                  // Log view mode change
+                  logPlacementActivity({
+                    userId: user?.uid,
+                    userName: user?.displayName || user?.name || "Unknown User",
+                    action: AUDIT_ACTIONS.FILTER_APPLIED,
+                    companyId: null,
+                    companyName: null,
+                    details: `Changed view mode to: ${value ? 'My Leads Only' : 'All Leads'}`,
+                    changes: { viewMyLeadsOnly: value },
+                    sessionId: sessionStorage.getItem('sessionId') || 'unknown'
+                  });
+                  setViewMyLeadsOnly(value);
+                  // Update URL
+                  const url = new URL(window.location);
+                  url.searchParams.set('view', value ? 'myleads' : 'myteam');
+                  window.history.replaceState(null, '', url);
+                }}
+              />
+              <ViewToggle
+                viewMode={viewMode}
+                setViewMode={setViewMode}
+              />
+              <LeadFilters
+                filters={{ selectedUserFilter, companyFilter, phoneFilter, industryFilter, dateFilterType, singleDate, startDate, endDate }}
+                setFilters={(newFilters) => {
+                  // Log filter application
+                  logPlacementActivity({
+                    userId: user?.uid,
+                    userName: user?.displayName || user?.name || "Unknown User",
+                    action: AUDIT_ACTIONS.FILTER_APPLIED,
+                    companyId: null,
+                    companyName: null,
+                    details: `Applied filters: User=${newFilters.selectedUserFilter || 'all'}, Company="${newFilters.companyFilter || ''}", Phone="${newFilters.phoneFilter || ''}", Industry="${newFilters.industryFilter || ''}", Date Type="${newFilters.dateFilterType || 'single'}", Single Date="${newFilters.singleDate || ''}", Start Date="${newFilters.startDate || ''}", End Date="${newFilters.endDate || ''}"`,
+                    changes: newFilters,
+                    sessionId: sessionStorage.getItem('sessionId') || 'unknown'
+                  });
+
+                  setSelectedUserFilter(newFilters.selectedUserFilter || 'all');
+                  setCompanyFilter(newFilters.companyFilter || '');
+                  setPhoneFilter(newFilters.phoneFilter || '');
+                  setIndustryFilter(newFilters.industryFilter || '');
+                  setDateFilterType(newFilters.dateFilterType || 'single');
+                  setSingleDate(newFilters.singleDate || '');
+                  setStartDate(newFilters.startDate || '');
+                  setEndDate(newFilters.endDate || '');
+                }}
+                isFilterOpen={isFilterOpen}
+                setIsFilterOpen={setIsFilterOpen}
+                allUsers={allUsers}
+                leads={leads}
+                activeTab={activeTab}
+                viewMyLeadsOnly={viewMyLeadsOnly}
+                currentUser={user}
+                getTeamMemberIds={getTeamMemberIds}
+              />
+            </div>
+
+            {/* Search in Center */}
+            <div className="flex-1 flex justify-center max-w-md h-8">
+              <input
+                type="text"
+                placeholder="Search companies or contacts..."
+                className="w-full px-3 py-1 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs h-full"
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                }}
+              />
+            </div>
+
+            {/* Microsoft 365 Connection Status */}
+            <div className="flex items-center gap-2 shrink-0 h-8">
+              <div className="flex items-center gap-2 px-2 py-1 bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-gray-200/50">
+                {ms365TestingConnection ? (
+                  <div className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <div
+                    className={`w-3 h-3 rounded-full ${
+                      ms365ConnectionStatus === 'connected'
+                        ? 'bg-green-500 shadow-green-500/30 shadow-lg'
+                        : ms365ConnectionStatus === 'weak'
+                        ? 'bg-yellow-500 shadow-yellow-500/30 shadow-lg'
+                        : 'bg-red-500 shadow-red-500/30 shadow-lg'
+                    }`}
+                  ></div>
+                )}
+                <img 
+                  src="https://cdn-icons-png.flaticon.com/512/732/732221.png" 
+                  alt="Microsoft Logo" 
+                  title="Microsoft 365"
+                  className="w-3 h-3 rounded-sm object-cover" 
+                />
+                {ms365ConnectionStatus !== 'connected' && !ms365TestingConnection && (
+                  <button
+                    onClick={connectToMs365}
+                    className="ml-1 px-3 py-1 bg-blue-600 text-white text-xs font-semibold rounded-xl hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-md transition-all duration-200"
+                  >
+                    Connect
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Action Buttons on Right */}
+            <div className="flex gap-1 shrink-0 h-8">
+              <button
+                onClick={() => {
+                  const newState = !showFollowUpsDashboard;
+                  setShowFollowUpsDashboard(newState);
+                  const url = new URL(window.location);
+                  if (newState) {
+                    url.searchParams.set('show', 'followupdashboard');
+                  } else {
+                    url.searchParams.delete('show');
+                  }
+                  window.history.replaceState(null, '', url);
+                }}
+                className="px-3 py-1 bg-blue-500 text-white rounded-lg font-semibold flex items-center justify-center hover:bg-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-md transition-all duration-200 text-xs h-full"
+              >
+                Followups
+              </button>
+              <button
+                onClick={() => setShowAddLeadForm(true)}
+                className="px-3 py-1 bg-linear-to-r from-blue-600 to-blue-700 text-white rounded-lg font-semibold flex items-center justify-center hover:from-blue-700 hover:to-blue-800 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-md transition-all duration-200 text-xs h-full"
+              >
+                <PlusIcon className="h-3 w-3 mr-1" />
+                Add Company
+              </button>
+              {user && (user?.departments?.includes("admin") || 
+                         user?.departments?.includes("Admin") || 
+                         user?.department === "admin" || 
+                         user?.department === "Admin" ||
+                         user?.role === "admin" || 
+                         user?.role === "Admin") && (
+                <button
+                  onClick={() => setShowBulkUploadForm(true)}
+                  className="px-3 py-1 bg-blue-600 text-white rounded-lg font-semibold flex items-center justify-center hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-md text-xs h-full"
+                >
+                  <CloudUploadIcon className="h-3 w-3 mr-1" />
+                  Bulk Upload
+                </button>
+              )}
+              {user && (user?.role === "Director" || user?.role === "Head") && !viewMyLeadsOnly && (
+                <button
+                  onClick={() => setShowBulkAssignModal(true)}
+                  className="px-3 py-1 bg-blue-600 text-white rounded-lg font-semibold flex items-center justify-center hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-md text-xs h-full"
+                >
+                  Bulk Assign
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Status tabs - only show when leads table is visible */}
+          <LeadStatusTabs
+            activeTab={activeTab}
+            onTabChange={(tab) => {
+              // Log tab change activity
               logPlacementActivity({
                 userId: user?.uid,
                 userName: user?.displayName || user?.name || "Unknown User",
                 action: AUDIT_ACTIONS.FILTER_APPLIED,
                 companyId: null,
                 companyName: null,
-                details: `Changed view mode to: ${value ? 'My Leads Only' : 'All Leads'}`,
-                changes: { viewMyLeadsOnly: value },
+                details: `Changed tab filter to: ${tab}`,
+                changes: { tabFilter: tab },
                 sessionId: sessionStorage.getItem('sessionId') || 'unknown'
               });
-              setViewMyLeadsOnly(value);
+              setActiveTab(tab);
               // Update URL
               const url = new URL(window.location);
-              url.searchParams.set('view', value ? 'myleads' : 'myteam');
+              url.searchParams.set('tab', tab);
               window.history.replaceState(null, '', url);
             }}
+            setActiveTab={setActiveTab}
+            leadsByStatus={leadsByStatus}
+            user={user}
           />
-          <ViewToggle
-            viewMode={viewMode}
-            setViewMode={setViewMode}
-          />
-          <LeadFilters
-            filters={{ selectedUserFilter, companyFilter, phoneFilter, dateFilterType, singleDate, startDate, endDate }}
-            setFilters={(newFilters) => {
-              // Log filter application
-              logPlacementActivity({
-                userId: user?.uid,
-                userName: user?.displayName || user?.name || "Unknown User",
-                action: AUDIT_ACTIONS.FILTER_APPLIED,
-                companyId: null,
-                companyName: null,
-                details: `Applied filters: User=${newFilters.selectedUserFilter || 'all'}, Company="${newFilters.companyFilter || ''}", Phone="${newFilters.phoneFilter || ''}", Date Type="${newFilters.dateFilterType || 'single'}", Single Date="${newFilters.singleDate || ''}", Start Date="${newFilters.startDate || ''}", End Date="${newFilters.endDate || ''}"`,
-                changes: newFilters,
-                sessionId: sessionStorage.getItem('sessionId') || 'unknown'
-              });
+        </>
+      )}
 
-              setSelectedUserFilter(newFilters.selectedUserFilter || 'all');
-              setCompanyFilter(newFilters.companyFilter || '');
-              setPhoneFilter(newFilters.phoneFilter || '');
-              setDateFilterType(newFilters.dateFilterType || 'single');
-              setSingleDate(newFilters.singleDate || '');
-              setStartDate(newFilters.startDate || '');
-              setEndDate(newFilters.endDate || '');
-            }}
-            isFilterOpen={isFilterOpen}
-            setIsFilterOpen={setIsFilterOpen}
-            allUsers={allUsers}
-            leads={leads}
-            activeTab={activeTab}
-            viewMyLeadsOnly={viewMyLeadsOnly}
-            currentUser={user}
-            getTeamMemberIds={getTeamMemberIds}
-          />
-        </div>
-
-        {/* Search in Center */}
-        <div className="flex-1 flex justify-center max-w-md h-8">
-          <input
-            type="text"
-            placeholder="Search companies or contacts..."
-            className="w-full px-3 py-1 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs h-full"
-            value={searchTerm}
-            onChange={(e) => {
-              setSearchTerm(e.target.value);
-            }}
-          />
-        </div>
-
-        {/* Microsoft 365 Connection Status */}
-        <div className="flex items-center gap-2 shrink-0 h-8">
-          <div className="flex items-center gap-2 px-2 py-1 bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-gray-200/50">
-            {ms365TestingConnection ? (
-              <div className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
-            ) : (
-              <div
-                className={`w-3 h-3 rounded-full ${
-                  ms365ConnectionStatus === 'connected'
-                    ? 'bg-green-500 shadow-green-500/30 shadow-lg'
-                    : ms365ConnectionStatus === 'weak'
-                    ? 'bg-yellow-500 shadow-yellow-500/30 shadow-lg'
-                    : 'bg-red-500 shadow-red-500/30 shadow-lg'
-                }`}
-              ></div>
-            )}
-            <img 
-              src="https://cdn-icons-png.flaticon.com/512/732/732221.png" 
-              alt="Microsoft Logo" 
-              title="Microsoft 365"
-              className="w-3 h-3 rounded-sm object-cover" 
+      {/* Multi-select controls for deleted tab - only show for admins */}
+      {activeTab === 'deleted' && isAdmin && !showFollowUpsDashboard && (
+        <div className="flex items-center justify-between mb-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              checked={selectedDeletedLeads.length === filteredLeads.length && filteredLeads.length > 0}
+              onChange={(e) => {
+                if (e.target.checked) {
+                  setSelectedDeletedLeads(filteredLeads.map(l => l.id));
+                } else {
+                  setSelectedDeletedLeads([]);
+                }
+              }}
+              className="mr-3 w-4 h-4 text-red-600 bg-gray-100 border-gray-300 rounded focus:ring-red-500"
             />
-            {ms365ConnectionStatus !== 'connected' && !ms365TestingConnection && (
-              <button
-                onClick={connectToMs365}
-                className="ml-1 px-3 py-1 bg-blue-600 text-white text-xs font-semibold rounded-xl hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-md transition-all duration-200"
-              >
-                Connect
-              </button>
+            <span className="text-sm font-medium text-gray-700">
+              Select All ({filteredLeads.length})
+            </span>
+          </div>
+          <button
+            onClick={() => {
+              if (selectedDeletedLeads.length > 0) {
+                setDeleteModalOpen(true);
+              }
+            }}
+            disabled={selectedDeletedLeads.length === 0}
+            className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            Delete Permanently ({selectedDeletedLeads.length})
+          </button>
+        </div>
+      )}
+
+      {/* Conditionally render LeadsTable or FollowupDashboard */}
+      {showFollowUpsDashboard ? (
+        <FollowupDashboard
+          allLeads={allLeads}
+          allUsers={allUsers}
+          user={user}
+          showDashboard={showFollowUpsDashboard}
+          onClose={() => {
+            setShowFollowUpsDashboard(false);
+            const url = new URL(window.location);
+            url.searchParams.delete('show');
+            window.history.replaceState(null, '', url);
+          }}
+          onRefresh={async () => {
+            setLoading(true);
+            await fetchLeads();
+            await fetchTodayFollowUps();
+            setLoading(false);
+          }}
+          onScheduleMeeting={handleScheduleMeeting}
+          onStatusChange={handleStatusChange}
+        />
+      ) : (
+        <LeadsTable
+          leads={filteredLeads}
+          groupedLeads={groupedLeads}
+          activeTab={activeTab}
+          onLeadClick={(lead) => {
+            // Log the view activity
+            logPlacementActivity({
+              userId: user?.uid,
+              userName: user?.displayName || user?.name || "Unknown User",
+              action: AUDIT_ACTIONS.VIEW_LEAD,
+              companyId: lead.id,
+              companyName: lead.companyName || lead.name || "Unknown Company",
+              details: `Viewed lead details for ${lead.companyName || lead.name || "Unknown Company"}`,
+              sessionId: sessionStorage.getItem('sessionId') || 'unknown'
+            });
+
+            setSelectedLead(lead);
+            setShowLeadDetails(true);
+          }}
+          onStatusChange={handleStatusChange}
+          onScheduleMeeting={handleScheduleMeeting}
+          onDeleteLead={handleDeleteLead}
+          onAssignLead={handleAssignLead}
+          currentUserId={user?.uid}
+          currentUser={user}
+          allUsers={allUsers}
+          formatDate={formatDate}
+          order={true}
+          showCheckboxes={activeTab === 'deleted' && isAdmin}
+          selectedLeads={selectedDeletedLeads}
+          onSelectionChange={setSelectedDeletedLeads}
+        />
+      )}
+
+      {/* Company Count Display - only show when leads table is visible */}
+      {!showFollowUpsDashboard && (
+        <div className="flex justify-between items-center mt-4 px-4 py-3 bg-gray-50 rounded-lg">
+          <div className="text-sm text-gray-700">
+            Total: {filteredLeads.length} companies loaded
+            {selectedUserFilter !== 'all' && (
+              <span className="ml-2 text-blue-600">
+                (filtered by {selectedUserFilter === 'unassigned' ? 'unassigned leads' : 
+                  Object.values(allUsers).find(u => (u.uid || u.id) === selectedUserFilter)?.name || 'user'})
+              </span>
+            )}
+            {companyFilter.trim() && (
+              <span className="ml-2 text-green-600">
+                (company: "{companyFilter.trim()}")
+              </span>
+            )}
+            {phoneFilter.trim() && (
+              <span className="ml-2 text-blue-600">
+                (phone: "{phoneFilter.trim()}")
+              </span>
             )}
           </div>
-        </div>
-
-        {/* Action Buttons on Right */}
-        <div className="flex gap-1 shrink-0 h-8">
-          <button
-            onClick={() => setShowAddLeadForm(true)}
-            className="px-3 py-1 bg-linear-to-r from-blue-600 to-indigo-700 text-white rounded-lg font-semibold flex items-center justify-center hover:from-blue-700 hover:to-indigo-800 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-md transition-all duration-200 text-xs h-full"
-          >
-            <PlusIcon className="h-3 w-3 mr-1" />
-            Add Company
-          </button>
-          {user && (user?.departments?.includes("admin") || 
-                     user?.departments?.includes("Admin") || 
-                     user?.department === "admin" || 
-                     user?.department === "Admin" ||
-                     user?.role === "admin" || 
-                     user?.role === "Admin") && (
+          <div className="flex gap-2">
             <button
-              onClick={() => setShowBulkUploadForm(true)}
-              className="px-3 py-1 bg-green-600 text-white rounded-lg font-semibold flex items-center justify-center hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 shadow-md text-xs h-full"
+              onClick={() => setShowExportModal(true)}
+              className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
+              title="Export leads report with follow-ups"
             >
-              <CloudUploadIcon className="h-3 w-3 mr-1" />
-              Bulk Upload
+              Export Report
             </button>
-          )}
-          {user && (user?.role === "Director" || user?.role === "Head") && !viewMyLeadsOnly && (
             <button
-              onClick={() => setShowBulkAssignModal(true)}
-              className="px-3 py-1 bg-purple-600 text-white rounded-lg font-semibold flex items-center justify-center hover:bg-purple-700 focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 shadow-md text-xs h-full"
+              onClick={async () => {
+                // Log refresh action
+                logPlacementActivity({
+                  userId: user?.uid,
+                  userName: user?.displayName || user?.name || "Unknown User",
+                  action: AUDIT_ACTIONS.VIEW_LEAD,
+                  companyId: null,
+                  companyName: null,
+                  details: `Refreshed leads data`,
+                  sessionId: sessionStorage.getItem('sessionId') || 'unknown'
+                });
+
+                setLoading(true);
+                await fetchLeads();
+              }}
+              className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
+              title="Refresh data from server"
             >
-              Bulk Assign
+              Refresh
             </button>
-          )}
+          </div>
         </div>
-      </div>      <LeadStatusTabs
-        activeTab={activeTab}
-        onTabChange={(tab) => {
-          // Log tab change activity
-          logPlacementActivity({
-            userId: user?.uid,
-            userName: user?.displayName || user?.name || "Unknown User",
-            action: AUDIT_ACTIONS.FILTER_APPLIED,
-            companyId: null,
-            companyName: null,
-            details: `Changed tab filter to: ${tab}`,
-            changes: { tabFilter: tab },
-            sessionId: sessionStorage.getItem('sessionId') || 'unknown'
-          });
-          setActiveTab(tab);
-          // Update URL
-          const url = new URL(window.location);
-          url.searchParams.set('tab', tab);
-          window.history.replaceState(null, '', url);
-        }}
-        setActiveTab={setActiveTab}
-        leadsByStatus={leadsByStatus}
-        user={user}
-      />
-
-      <LeadsTable
-        leads={filteredLeads}
-        groupedLeads={groupedLeads}
-        activeTab={activeTab}
-        onLeadClick={(lead) => {
-          // Log the view activity
-          logPlacementActivity({
-            userId: user?.uid,
-            userName: user?.displayName || user?.name || "Unknown User",
-            action: AUDIT_ACTIONS.VIEW_LEAD,
-            companyId: lead.id,
-            companyName: lead.companyName || lead.name || "Unknown Company",
-            details: `Viewed lead details for ${lead.companyName || lead.name || "Unknown Company"}`,
-            sessionId: sessionStorage.getItem('sessionId') || 'unknown'
-          });
-
-          setSelectedLead(lead);
-          setShowLeadDetails(true);
-        }}
-        onStatusChange={handleStatusChange}
-        onScheduleMeeting={handleScheduleMeeting}
-        onDeleteLead={handleDeleteLead}
-        onAssignLead={handleAssignLead}
-        currentUserId={user?.uid}
-        currentUser={user}
-        allUsers={allUsers}
-        formatDate={formatDate}
-        order={true}
-      />
-
-      {/* Company Count Display */}
-      <div className="flex justify-between items-center mt-4 px-4 py-3 bg-gray-50 rounded-lg">
-        <div className="text-sm text-gray-700">
-          Total: {filteredLeads.length} companies loaded
-          {selectedUserFilter !== 'all' && (
-            <span className="ml-2 text-blue-600">
-              (filtered by {selectedUserFilter === 'unassigned' ? 'unassigned leads' : 
-                Object.values(allUsers).find(u => (u.uid || u.id) === selectedUserFilter)?.name || 'user'})
-            </span>
-          )}
-          {companyFilter.trim() && (
-            <span className="ml-2 text-green-600">
-              (company: "{companyFilter.trim()}")
-            </span>
-          )}
-          {phoneFilter.trim() && (
-            <span className="ml-2 text-purple-600">
-              (phone: "{phoneFilter.trim()}")
-            </span>
-          )}
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setShowExportModal(true)}
-            className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition-colors"
-            title="Export leads report with follow-ups"
-          >
-            Export Report
-          </button>
-          <button
-            onClick={async () => {
-              // Log refresh action
-              logPlacementActivity({
-                userId: user?.uid,
-                userName: user?.displayName || user?.name || "Unknown User",
-                action: AUDIT_ACTIONS.VIEW_LEAD,
-                companyId: null,
-                companyName: null,
-                details: `Refreshed leads data`,
-                sessionId: sessionStorage.getItem('sessionId') || 'unknown'
-              });
-
-              setLoading(true);
-              await fetchLeads();
-            }}
-            className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
-            title="Refresh data from server"
-          >
-            Refresh
-          </button>
-        </div>
-      </div>
+      )}
 
       {/* Lead View/Edit Modal */}
       {showLeadDetails && (
@@ -2522,9 +2640,22 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         </div>
       )}
 
-    </div>
+      <CompanyLeadDeleteModal
+        isOpen={deleteModalOpen}
+        onClose={() => {
+          setDeleteModalOpen(false);
+        }}
+        selectedLeads={selectedDeletedLeads}
+        allLeads={leads}
+        user={user}
+        onDeleteComplete={() => {
+          // Refresh data and clear selection after deletion
+          fetchLeads();
+          setSelectedDeletedLeads([]);
+        }}
+      />
 
-    
+    </div>    
   );
 }
 

@@ -523,7 +523,7 @@ const BulkAssignModal = ({ show, onClose, unassignedLeads, allUsers, onAssign, c
               {/* Search */}
               <div className="bg-white rounded-xl border border-gray-200 p-3 shadow-sm">
                 <h3 className="font-medium text-gray-900 mb-2 text-sm flex items-center">
-                  <div className="w-1.5 h-1.5 bg-purple-500 rounded-full mr-2"></div>
+                  <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mr-2"></div>
                   Search Leads
                 </h3>
                 <input
@@ -629,11 +629,11 @@ const BulkAssignModal = ({ show, onClose, unassignedLeads, allUsers, onAssign, c
                   <div className="text-lg font-bold text-green-600">{selectedLeads.length}</div>
                   <div className="text-xs text-green-700 font-medium">Leads</div>
                 </div>
-                <div className="flex-1 bg-purple-50 rounded-lg p-2 border border-purple-200">
-                  <div className="text-lg font-bold text-purple-600">
+                <div className="flex-1 bg-blue-50 rounded-lg p-2 border border-blue-200">
+                  <div className="text-lg font-bold text-blue-600">
                     {selectedUser ? selectedLeads.length : 0}
                   </div>
-                  <div className="text-xs text-purple-700 font-medium">To Member</div>
+                  <div className="text-xs text-blue-700 font-medium">To Member</div>
                 </div>
               </div>
             </div>

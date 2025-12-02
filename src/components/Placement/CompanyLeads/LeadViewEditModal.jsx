@@ -57,7 +57,12 @@ const LeadViewEditModal = ({
     pocMail: '',
     pocDesignation: '',
     pocLinkedin: '',
-    status: 'Warm'
+    status: 'Warm',
+    ctc: '',
+    ctcType: 'single', // 'single' or 'range'
+    ctcSingle: '',
+    ctcMin: '',
+    ctcMax: ''
   });
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
@@ -84,6 +89,25 @@ const LeadViewEditModal = ({
   // Populate edit form when lead changes
   useEffect(() => {
     if (lead) {
+      // Parse CTC data if it exists
+      let ctcType = 'single';
+      let ctcSingle = '';
+      let ctcMin = '';
+      let ctcMax = '';
+      
+      if (lead.ctc) {
+        const ctcString = lead.ctc;
+        if (ctcString.includes(' - ')) {
+          ctcType = 'range';
+          const [min, max] = ctcString.split(' - ');
+          ctcMin = min.replace(' LPA', '').trim();
+          ctcMax = max.replace(' LPA', '').trim();
+        } else {
+          ctcType = 'single';
+          ctcSingle = ctcString.replace(' LPA', '').trim();
+        }
+      }
+
       setEditData({
         companyName: lead.companyName || '',
         industry: lead.industry || '',
@@ -97,7 +121,12 @@ const LeadViewEditModal = ({
         pocMail: lead.pocMail || '',
         pocDesignation: lead.pocDesignation || '',
         pocLinkedin: lead.pocLinkedin || '',
-        status: lead.status ? lead.status.charAt(0).toUpperCase() + lead.status.slice(1) : 'Warm'
+        status: lead.status ? lead.status.charAt(0).toUpperCase() + lead.status.slice(1) : 'Warm',
+        ctc: lead.ctc || '',
+        ctcType: ctcType,
+        ctcSingle: ctcSingle,
+        ctcMin: ctcMin,
+        ctcMax: ctcMax
       });
       setHasUnsavedChanges(false);
       setValidationErrors({});
@@ -234,6 +263,25 @@ const LeadViewEditModal = ({
         if (value && !validateLinkedIn(value)) {
           error = "Please enter a valid LinkedIn URL";
         }
+        break;
+      case "ctcSingle":
+        if (editData.ctcType === "single" && value.trim() && (!/^\d+(\.\d+)?$/.test(value) || parseFloat(value) <= 0)) {
+          error = "Please enter a valid CTC amount (e.g., 6.5)";
+        }
+        break;
+      case "ctcMin":
+        if (editData.ctcType === "range" && value.trim() && (!/^\d+(\.\d+)?$/.test(value) || parseFloat(value) <= 0)) {
+          error = "Please enter a valid minimum CTC amount";
+        }
+        break;
+      case "ctcMax":
+        if (editData.ctcType === "range" && value.trim() && (!/^\d+(\.\d+)?$/.test(value) || parseFloat(value) <= 0)) {
+          error = "Please enter a valid maximum CTC amount";
+        } else if (editData.ctcType === "range" && value.trim() && editData.ctcMin.trim() && parseFloat(value) <= parseFloat(editData.ctcMin)) {
+          error = "Maximum CTC must be greater than minimum CTC";
+        }
+        break;
+      default:
         break;
     }
     
@@ -545,6 +593,13 @@ const LeadViewEditModal = ({
       updatedAt: new Date().toISOString(),
     };
 
+    // Add CTC data if provided
+    if (editData.ctcType === "single" && editData.ctcSingle.trim()) {
+      updatedData.ctc = `${editData.ctcSingle.trim()} LPA`;
+    } else if (editData.ctcType === "range" && editData.ctcMin.trim() && editData.ctcMax.trim()) {
+      updatedData.ctc = `${editData.ctcMin.trim()} LPA - ${editData.ctcMax.trim()} LPA`;
+    }
+
     try {
       if (onUpdateLead) {
         const result = await onUpdateLead(lead.id, updatedData);
@@ -620,7 +675,30 @@ const LeadViewEditModal = ({
         pocMail: lead.pocMail || '',
         pocDesignation: lead.pocDesignation || '',
         pocLinkedin: lead.pocLinkedin || '',
-        status: lead.status ? lead.status.charAt(0).toUpperCase() + lead.status.slice(1) : 'Warm'
+        status: lead.status ? lead.status.charAt(0).toUpperCase() + lead.status.slice(1) : 'Warm',
+        ctc: lead.ctc || '',
+        ctcType: (() => {
+          if (lead.ctc && lead.ctc.includes(' - ')) return 'range';
+          return 'single';
+        })(),
+        ctcSingle: (() => {
+          if (lead.ctc && !lead.ctc.includes(' - ')) {
+            return lead.ctc.replace(' LPA', '').trim();
+          }
+          return '';
+        })(),
+        ctcMin: (() => {
+          if (lead.ctc && lead.ctc.includes(' - ')) {
+            return lead.ctc.split(' - ')[0].replace(' LPA', '').trim();
+          }
+          return '';
+        })(),
+        ctcMax: (() => {
+          if (lead.ctc && lead.ctc.includes(' - ')) {
+            return lead.ctc.split(' - ')[1].replace(' LPA', '').trim();
+          }
+          return '';
+        })()
       });
       setHasUnsavedChanges(false);
     }
@@ -630,7 +708,7 @@ const LeadViewEditModal = ({
   return (
     <div className="fixed inset-0 bg-opacity-50 backdrop-blur flex items-center justify-center z-54 p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[95vh] overflow-y-auto">
-        <div className="bg-linear-to-r from-blue-600 to-indigo-700 text-white px-4 py-2 flex justify-between items-center sticky top-0 z-10">
+        <div className="bg-linear-to-r from-blue-600 to-blue-700 text-white px-4 py-2 flex justify-between items-center sticky top-0 z-10">
           <div className="flex items-center space-x-3">
             <div>
               <h2 className="text-lg font-semibold">
@@ -1139,6 +1217,11 @@ const LeadViewEditModal = ({
                   </div>
 
                   <div className="bg-gray-50 p-2 rounded-lg">
+                    <label className="block text-xs font-medium text-gray-600 mb-0.5">CTC</label>
+                    <p className="text-gray-900 text-sm">{lead.ctc || "-"}</p>
+                  </div>
+
+                  <div className="bg-gray-50 p-2 rounded-lg">
                     <label className="block text-xs font-medium text-gray-600 mb-0.5">Source</label>
                     <p className="text-gray-900 capitalize text-sm">{lead.source || "-"}</p>
                   </div>
@@ -1421,6 +1504,100 @@ const LeadViewEditModal = ({
                       </option>
                     ))}
                   </select>
+                </div>
+
+                {/* CTC Section */}
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    CTC (Cost to Company)
+                  </label>
+                  <div className="space-y-3">
+                    {/* CTC Type Selection */}
+                    <div className="flex gap-4">
+                      <label className="flex items-center">
+                        <input
+                          type="radio"
+                          name="ctcType"
+                          value="single"
+                          checked={editData.ctcType === "single"}
+                          onChange={(e) => updateEditField('ctcType', e.target.value)}
+                          className="w-3 h-3 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-1"
+                        />
+                        <span className="ml-2 text-sm text-gray-700">Single Value</span>
+                      </label>
+                      <label className="flex items-center">
+                        <input
+                          type="radio"
+                          name="ctcType"
+                          value="range"
+                          checked={editData.ctcType === "range"}
+                          onChange={(e) => updateEditField('ctcType', e.target.value)}
+                          className="w-3 h-3 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-1"
+                        />
+                        <span className="ml-2 text-sm text-gray-700">Range</span>
+                      </label>
+                    </div>
+
+                    {/* CTC Input Fields */}
+                    {editData.ctcType === "single" ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          step="0.1"
+                          min="0"
+                          value={editData.ctcSingle}
+                          onChange={(e) => updateEditField('ctcSingle', e.target.value)}
+                          placeholder="e.g. 6.5"
+                          className={`flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 shadow-sm ${
+                            validationErrors.ctcSingle && touchedFields.ctcSingle ? 'border-red-400 bg-red-50' : 'border-gray-300'
+                          }`}
+                        />
+                        <span className="text-sm text-gray-600 font-medium">LPA</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          step="0.1"
+                          min="0"
+                          value={editData.ctcMin}
+                          onChange={(e) => updateEditField('ctcMin', e.target.value)}
+                          placeholder="Min"
+                          className={`flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 shadow-sm ${
+                            validationErrors.ctcMin && touchedFields.ctcMin ? 'border-red-400 bg-red-50' : 'border-gray-300'
+                          }`}
+                        />
+                        <span className="text-sm text-gray-600 font-medium">-</span>
+                        <input
+                          type="number"
+                          step="0.1"
+                          min="0"
+                          value={editData.ctcMax}
+                          onChange={(e) => updateEditField('ctcMax', e.target.value)}
+                          placeholder="Max"
+                          className={`flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 shadow-sm ${
+                            validationErrors.ctcMax && touchedFields.ctcMax ? 'border-red-400 bg-red-50' : 'border-gray-300'
+                          }`}
+                        />
+                        <span className="text-sm text-gray-600 font-medium">LPA</span>
+                      </div>
+                    )}
+
+                    {/* Validation Errors */}
+                    {editData.ctcType === "single" && validationErrors.ctcSingle && touchedFields.ctcSingle && (
+                      <span className="text-red-500 text-xs block">{validationErrors.ctcSingle}</span>
+                    )}
+                    {editData.ctcType === "range" && (
+                      <>
+                        {validationErrors.ctcMin && touchedFields.ctcMin && (
+                          <span className="text-red-500 text-xs block">{validationErrors.ctcMin}</span>
+                        )}
+                        {validationErrors.ctcMax && touchedFields.ctcMax && (
+                          <span className="text-red-500 text-xs block">{validationErrors.ctcMax}</span>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

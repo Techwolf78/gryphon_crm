@@ -26,19 +26,8 @@ import { useMsal } from "@azure/msal-react";
 import { InteractionRequiredAuthError } from "@azure/msal-browser";
 
 import { logPlacementActivity } from "../../../utils/placementAuditLogger";
+import { INDUSTRY_OPTIONS, REMARKS_TEMPLATES } from "../../../utils/constants";
 
-// Predefined remarks templates for placement follow-ups
-const REMARKS_TEMPLATES = [
-  { value: "", label: "Select a template (optional)" },
-  { value: "Call Connected", label: "Call Connected" },
-  { value: "Invite mail sent", label: "Invite mail sent" },
-  { value: "Call Disconnected", label: "Call Disconnected" },
-  { value: "Switched off", label: "Switched off" },
-  { value: "Busy", label: "Busy" },
-  { value: "Didn't pick", label: "Didn't pick" },
-  { value: "Not Hiring", label: "Not Hiring" },
-  { value: "Invalid Number", label: "Invalid Number" }
-];
 
 const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
   const [date, setDate] = useState(dayjs().format("YYYY-MM-DD"));
@@ -50,6 +39,7 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
   const [remarks, setRemarks] = useState("");
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState("");
+  const [selectedIndustry, setSelectedIndustry] = useState(company?.industry || "");
   const [loading, setLoading] = useState(false);
   const [pastFollowups, setPastFollowups] = useState([]);
   const [calendarError, setCalendarError] = useState(null);
@@ -63,6 +53,7 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
   const [snackbarType, setSnackbarType] = useState("success");
   const [maliciousWarning, setMaliciousWarning] = useState("");
   const timePickerRef = useRef(null);
+  const [connecting, setConnecting] = useState(false);
 
   const { instance, accounts } = useMsal();
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -217,6 +208,22 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
     }
   };
 
+  const handleConnectM365 = async () => {
+    setConnecting(true);
+    try {
+      const loginRequest = {
+        scopes: graphScopes,
+      };
+      await instance.loginPopup(loginRequest);
+      showSnackbar("Successfully connected to Microsoft 365!", "success");
+    } catch (error) {
+      console.error("M365 connection failed:", error);
+      showSnackbar("Failed to connect to Microsoft 365", "error");
+    } finally {
+      setConnecting(false);
+    }
+  };
+
   const createCalendarEvent = async () => {
     setCalendarError(null);
 
@@ -288,6 +295,17 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    // Validate required fields
+    if (!selectedTemplate) {
+      showSnackbar("Please select a template", "error");
+      return;
+    }
+
+    if (!selectedIndustry) {
+      showSnackbar("Please select an industry", "error");
+      return;
+    }
+
     // Check for malicious input before proceeding
     if (maliciousWarning) {
       showSnackbar("Cannot submit: Please remove malicious content from remarks", "error");
@@ -301,6 +319,8 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
         key: Date.now().toString(),
         date,
         time: getFullTimeString(),
+        template: selectedTemplate,
+        industry: selectedIndustry,
         remarks,
         createdAt: new Date().toISOString(),
         calendarEventCreated: false,
@@ -355,6 +375,8 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
           const updatedCompany = {
             ...decodedCompany,
             followups: updatedFollowups,
+            // Always update company industry to match follow-up selection
+            industry: selectedIndustry,
           };
           // Use Unicode-safe encoding: encodeURIComponent + btoa to handle Unicode characters
           const updatedJsonString = JSON.stringify(updatedCompany);
@@ -365,6 +387,20 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
             ...batchData,
             companies: encodedCompanies,
           });
+
+          // Log industry update
+          if (decodedCompany.industry !== selectedIndustry) {
+            await logPlacementActivity({
+              action: 'UPDATE_COMPANY_INDUSTRY',
+              leadId: lead.id,
+              leadName: lead.companyName || lead.name,
+              details: {
+                oldIndustry: decodedCompany.industry || 'Not set',
+                newIndustry: selectedIndustry,
+                updatedDuring: 'Follow-up scheduling'
+              }
+            });
+          }
 
           // Log the follow-up scheduling activity
           await logPlacementActivity({
@@ -396,6 +432,7 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
           setTime({ hours: 12, minutes: 0, ampm: "AM" });
           setRemarks("");
           setSelectedTemplate("");
+          setSelectedIndustry(company?.industry || "");
           setSendInvite(false);
         } else {
           console.error("Invalid company index:", companyIndex, "for array length:", encodedCompanies.length);
@@ -669,7 +706,7 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
         <div className="bg-linear-to-r from-slate-50 to-slate-100 border-b border-slate-200/50 px-6 py-1.5">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-3">
-              <div className="w-6 h-6 bg-linear-to-br from-blue-500 to-indigo-600 rounded flex items-center justify-center shadow-lg">
+              <div className="w-6 h-6 bg-linear-to-br from-blue-500 to-blue-600 rounded flex items-center justify-center shadow-lg">
                 <FaCalendarAlt className="text-white text-sm" />
               </div>
               <div>
@@ -726,6 +763,49 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Left Side - Form */}
             <div className="lg:col-span-2 space-y-4">
+              {/* M365 Connection */}
+              {accounts.length === 0 ? (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg py-1 px-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-white flex items-center justify-center">
+                        <img src="https://cdn-icons-png.flaticon.com/512/732/732221.png" alt="Microsoft 365" className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-medium text-blue-900">Connect Microsoft 365</h3>
+                        <p className="text-xs text-blue-700">Enable calendar integration for follow-ups</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleConnectM365}
+                      disabled={connecting}
+                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-xs font-medium rounded-lg transition-all duration-200 disabled:cursor-not-allowed flex items-center space-x-1"
+                    >
+                      {connecting ? (
+                        <>
+                          <div className="animate-spin rounded-full h-3 w-3 border border-white border-t-transparent"></div>
+                          <span>Connecting...</span>
+                        </>
+                      ) : (
+                        <>
+                          <FaCalendarAlt size={10} />
+                          <span>Connect</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                  <div className="flex items-center space-x-2">
+                    <FaCheckCircle className="text-green-600 text-sm" />
+                    <span className="text-xs text-green-800 font-medium">Connected to Microsoft 365</span>
+                    <span className="text-xs text-green-600">({accounts[0].username})</span>
+                  </div>
+                </div>
+              )}
+
               <form onSubmit={handleSubmit} className="space-y-4">
                 {/* Date and Time */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -835,28 +915,74 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
                   </div>
                 </div>
 
-                {/* Remarks */}
+                {/* Template */}
                 <div className="space-y-1">
                   <label className="block text-sm font-medium text-slate-700">
-                    Remarks
+                    Template <span className="text-red-500">*</span>
                   </label>
                   <select
                     value={selectedTemplate}
                     onChange={(e) => {
                       const value = e.target.value;
                       setSelectedTemplate(value);
-                      if (value) {
-                        setRemarks(value);
-                      }
                     }}
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-slate-400 mb-2"
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-slate-400"
+                    required
                   >
+                    <option value="">Select a template</option>
                     {REMARKS_TEMPLATES.map((template) => (
                       <option key={template.value} value={template.value}>
                         {template.label}
                       </option>
                     ))}
                   </select>
+                </div>
+
+                {/* Industry Selection - Show only after template is selected */}
+                {selectedTemplate && (
+                  selectedIndustry ? (
+                    // Show selected industry in nice UI like M365 connection
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                      <div className="flex items-center space-x-2">
+                        <FaCheckCircle className="text-green-600 text-sm" />
+                        <span className="text-xs text-green-800 font-medium">Industry: {selectedIndustry}</span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedIndustry("")}
+                          className="text-green-600 hover:text-green-800 text-xs underline ml-auto"
+                        >
+                          Change
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    // Show industry dropdown
+                    <div className="space-y-1">
+                      <label className="block text-sm font-medium text-slate-700">
+                        Industry <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={selectedIndustry}
+                        onChange={(e) => setSelectedIndustry(e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-slate-400"
+                        required
+                      >
+                        <option value="">Select industry to schedule</option>
+                        {INDUSTRY_OPTIONS.map((industry) => (
+                          <option key={industry} value={industry}>
+                            {industry}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )
+                )}
+
+                {/* Remarks */}
+                <div className="space-y-1">
+                  <label className="block text-sm font-medium text-slate-700">
+                    Remarks
+                  </label>
                   <div className="relative">
                     <textarea
                       value={remarks}
@@ -870,7 +996,6 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
                             setMaliciousWarning("");
                           }
                           setRemarks(newValue);
-                          setSelectedTemplate("");
                         }
                       }}
                       placeholder="Add notes about this follow-up..."
@@ -890,7 +1015,7 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
                 </div>
 
                 {/* Calendar Integration */}
-                <div className="bg-linear-to-r from-blue-50 to-indigo-50 border border-blue-200/50 rounded-lg p-2">
+                <div className="bg-linear-to-r from-blue-50 to-blue-100 border border-blue-200/50 rounded-lg p-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
                       <div className="w-5 h-5 bg-blue-100 rounded flex items-center justify-center">
@@ -929,13 +1054,23 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
                   </button>
                   <button
                     type="submit"
-                    disabled={loading}
-                    className="px-4 py-2 bg-linear-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:shadow-lg hover:shadow-blue-500/25 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none flex items-center justify-center font-medium"
+                    disabled={loading || accounts.length === 0 || (selectedTemplate && !selectedIndustry)}
+                    className="px-4 py-2 bg-linear-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:shadow-lg hover:shadow-blue-500/25 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none flex items-center justify-center font-medium"
                   >
                     {loading ? (
                       <>
                         <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
                         Scheduling...
+                      </>
+                    ) : accounts.length === 0 ? (
+                      <>
+                        <FaCalendarAlt className="mr-2" />
+                        Connect M365 to Schedule
+                      </>
+                    ) : selectedTemplate && !selectedIndustry ? (
+                      <>
+                        <FaExclamationTriangle className="mr-2" />
+                        Select Industry to Schedule
                       </>
                     ) : (
                       <>
@@ -1142,7 +1277,7 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
                   <button
                     onClick={handleCalendarRetry}
                     disabled={isRetrying}
-                    className="px-4 py-2 bg-linear-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:shadow-lg hover:shadow-blue-500/25 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none flex items-center justify-center font-medium"
+                    className="px-4 py-2 bg-linear-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:shadow-lg hover:shadow-blue-500/25 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none flex items-center justify-center font-medium"
                   >
                     {isRetrying ? (
                       <>

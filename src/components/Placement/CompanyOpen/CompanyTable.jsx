@@ -1019,22 +1019,52 @@ const handleStudentSelection = React.useCallback(async (selectedStudents) => {
 
                         {/* Salary/Stipend - Column 3 */}
                         <div className="text-sm text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis flex items-center h-full">
-                          {company.jobType === "Int + PPO" && company.salary && company.stipend ? (
-                            <div className="flex flex-col gap-1">
-                              <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                                {formatSalary(company.salary)}
-                              </span>
+                          {company.jobType === "Internship" ? (
+                            company.stipend ? (
                               <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
                                 {formatStipend(company.stipend)}
                               </span>
+                            ) : "-"
+                          ) : company.jobType === "Int + PPO" && company.stipend ? (
+                            <div className="flex flex-col gap-1">
+                              <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                                {formatStipend(company.stipend)}
+                              </span>
+                              {(company.fixedSalary || company.variableSalary) ? (
+                                <div className="flex flex-col gap-0.5">
+                                  {company.fixedSalary && (
+                                    <span className="px-1 inline-flex text-xs leading-4 font-medium rounded bg-green-50 text-green-700">
+                                      F: {formatSalary(company.fixedSalary)}
+                                    </span>
+                                  )}
+                                  {company.variableSalary && (
+                                    <span className="px-1 inline-flex text-xs leading-4 font-medium rounded bg-yellow-50 text-yellow-700">
+                                      V: {formatSalary(company.variableSalary)}
+                                    </span>
+                                  )}
+                                </div>
+                              ) : company.salary ? (
+                                <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                  {formatSalary(company.salary)}
+                                </span>
+                              ) : null}
+                            </div>
+                          ) : (company.fixedSalary || company.variableSalary) ? (
+                            <div className="flex flex-col gap-0.5">
+                              {company.fixedSalary && (
+                                <span className="px-1 inline-flex text-xs leading-4 font-medium rounded bg-green-50 text-green-700">
+                                  F: {formatSalary(company.fixedSalary)}
+                                </span>
+                              )}
+                              {company.variableSalary && (
+                                <span className="px-1 inline-flex text-xs leading-4 font-medium rounded bg-yellow-50 text-yellow-700">
+                                  V: {formatSalary(company.variableSalary)}
+                                </span>
+                              )}
                             </div>
                           ) : company.salary ? (
                             <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
                               {formatSalary(company.salary)}
-                            </span>
-                          ) : company.stipend ? (
-                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                              {formatStipend(company.stipend)}
                             </span>
                           ) : (
                             "-"

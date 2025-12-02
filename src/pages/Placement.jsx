@@ -250,9 +250,9 @@ function Placement() {
   };
 
   // Function to check if dropdown should open above (for bottom rows)
-  const getDropdownPosition = (index) => {
-    // If it's one of the last 3 rows, open dropdown above
-    return index >= sortedFilteredData.length - 3 ? "above" : "below";
+  const getDropdownPosition = () => {
+    // Always open below
+    return "below";
   };
 
   // Filter training data based on selected filters
@@ -365,7 +365,7 @@ function Placement() {
   };
 
   return (
-    <div className="p-0 -mt-1">
+    <div className="p-0 -mt-4">
       <style>{tableStyles}</style>
       <h2 className="text-xl font-bold mb-2 text-blue-800 mt-0">
         Placement Management
@@ -554,7 +554,7 @@ function Placement() {
                   </p>
                 </div>
               ) : (
-                <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col" style={{ height: '100vh' }}>
                   {/* Compact Modern Header */}
                   <div className="bg-linear-to-r from-blue-500 via-indigo-600 to-indigo-700 px-4 py-3">
                     <div className="flex items-center justify-between">
@@ -720,9 +720,9 @@ function Placement() {
                   </div>
 
                   {/* Compact Table Body */}
-                  <div className="divide-y divide-gray-50">
-                    {sortedFilteredData.map((item, index) => {
-                      const dropdownPosition = getDropdownPosition(index);
+                  <div className="divide-y divide-gray-50 flex-1 overflow-y-auto">
+                    {sortedFilteredData.map((item) => {
+                      const dropdownPosition = getDropdownPosition();
 
                       return (
                         <div

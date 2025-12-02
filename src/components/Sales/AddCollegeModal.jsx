@@ -459,7 +459,7 @@ if (isDuplicate) {
     <div className="fixed inset-0 z-52 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
       <div className="bg-white w-full max-w-4xl max-h-[95vh] rounded-lg shadow-2xl overflow-hidden">
         {/* Modal Header - More compact */}
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-700 px-4 py-3 flex justify-between items-center">
+        <div className="bg-linear-to-r from-blue-600 to-indigo-700 px-4 py-3 flex justify-between items-center">
           <h2 className="text-lg font-semibold text-white">
             Add College/University
           </h2>
