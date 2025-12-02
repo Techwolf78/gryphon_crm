@@ -672,7 +672,7 @@ function AddJD({ show, onClose, company, fetchCompanies }) {
             <XIcon className="h-5 w-5" />
           </button>
         </div>
-
+{/* code */}
         {currentStep === 1 ? (
           <>
             <div className="p-6 overflow-y-auto max-h-[calc(100vh-180px)]">
