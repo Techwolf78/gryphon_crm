@@ -18,11 +18,10 @@ import CollegeSelection from "./CollegeSelection";
 import TemplateDownloadModal from "./TemplateDownloadModal";
 import ExcelUploadModal from "./ExcelUploadModal";
 
-// EmailJS configuration
 const EMAILJS_CONFIG = {
-  SERVICE_ID: "service_sl0i7kr",
-  TEMPLATE_ID: "template_q0oarab",
-  PUBLIC_KEY: "V5rET66jxvg4gqulO",
+  SERVICE_ID: "service_pskknsn",
+  TEMPLATE_ID: "template_p2as3pp",
+  PUBLIC_KEY: "zEVWxxT-QvGIrhvTV",
 };
 
 // Academic year calculation helper
@@ -378,116 +377,176 @@ function AddJD({ show, onClose, company, fetchCompanies }) {
     }
   };
 
-  const sendBulkEmail = async (collegesWithTPO, templateFields) => {
-    try {
-      const validEmails = collegesWithTPO
-        .filter(({ tpoEmail }) => tpoEmail && tpoEmail.trim() !== "")
-        .map(({ tpoEmail }) => tpoEmail);
+const sendBulkEmail = async (collegesWithTPO, templateFields) => {
+  try {
+    const validEmails = collegesWithTPO
+      .filter(({ tpoEmail }) => tpoEmail && tpoEmail.trim() !== "")
+      .map(({ tpoEmail }) => tpoEmail);
 
-      if (validEmails.length === 0) {
-        setSubmissionError(
-          "No valid email addresses found for selected colleges"
-        );
-        return;
-      }
-
-      // Create template fields with styling
-      const fieldNames = {
-        studentName: "Student Name*",
-        enrollmentNo: "Enrollment Number*",
-        email: "Email Address*",
-        phone: "Phone Number",
-        course: "Course*",
-        specialization: "Specialization*",
-        currentYear: "Current Year*",
-        tenthMarks: "10th Marks (%)",
-        twelfthMarks: "12th Marks (%)",
-        diplomaMarks: "Diploma Marks (%)",
-        cgpa: "CGPA",
-        activeBacklogs: "Active Backlogs",
-        totalBacklogs: "Total Backlogs",
-        gender: "Gender",
-        resumeLink: "Resume Link",
-      };
-
-      const requiredFields = [
-        "studentName",
-        "enrollmentNo",
-        "email",
-        "course",
-        "specialization",
-        "currentYear",
-      ];
-
-      const templateFieldsHTML = templateFields
-        .map((field) => {
-          const isRequired = requiredFields.includes(field);
-          const fieldName = fieldNames[field] || field;
-          return `<span class="field-item ${
-            isRequired ? "required-field" : "optional-field"
-          }">${fieldName}</span>`;
-        })
-        .join("");
-
-      // Send individual emails to each college
-      const emailPromises = collegesWithTPO
-        .filter(({ tpoEmail }) => tpoEmail && tpoEmail.trim() !== "")
-        .map(async ({ college, tpoEmail }) => {
-          const templateParams = {
-            to_email: "placements@gryphonacademy.co.in",
-            company_name: formData.companyName,
-            company_website: formData.companyWebsite || "Not provided",
-            job_designation: formData.jobDesignation,
-            job_location: formData.jobLocation,
-            salary: formData.salary,
-            job_type: formData.jobType,
-            mode_of_interview: formData.modeOfInterview,
-            course: formData.course,
-            passing_year: formData.passingYear,
-            Gender: formData.gender,
-            marks_criteria: formData.marksCriteria,
-            backlog_criteria: formData.backlogCriteria,
-            college_count: validEmails.length,
-            college_name: college,
-            template_fields: templateFieldsHTML,
-            field_count: templateFields.length,
-            hiring_rounds_html: formData.hiringRounds
-              .map((round) => `<li>${round}</li>`)
-              .join(""),
-
-            upload_link: `${
-              window.location.origin
-            }/upload-student-data?college=${encodeURIComponent(
-              college
-            )}&company=${encodeURIComponent(
-              formData.companyName
-            )}&course=${encodeURIComponent(
-              formData.course
-            )}&fields=${encodeURIComponent(JSON.stringify(templateFields))}`,
-            coordinator_name: formData.coordinator,
-            coordinator_phone: "+91-9876543210",
-            bcc: tpoEmail,
-          };
-          return emailjs.send(
-            EMAILJS_CONFIG.SERVICE_ID,
-            EMAILJS_CONFIG.TEMPLATE_ID,
-            templateParams,
-            EMAILJS_CONFIG.PUBLIC_KEY
-          );
-        });
-
-      await Promise.all(emailPromises);
-
-      console.log("All emails sent successfully");
-      setEmailSent(true);
-      alert(
-        `✅ Emails sent successfully to ${emailPromises.length} colleges with template configuration!`
+    if (validEmails.length === 0) {
+      setSubmissionError(
+        "No valid email addresses found for selected colleges"
       );
-    } catch (error) {
-      console.error("Error sending emails:", error);
-      throw new Error("Failed to send emails");
+      return;
     }
-  };
+
+    // Create template fields with styling
+    const fieldNames = {
+      studentName: "Student Name*",
+      enrollmentNo: "Enrollment Number*",
+      email: "Email Address*",
+      phone: "Phone Number",
+      course: "Course*",
+      specialization: "Specialization*",
+      currentYear: "Current Year*",
+      tenthMarks: "10th Marks (%)",
+      twelfthMarks: "12th Marks (%)",
+      diplomaMarks: "Diploma Marks (%)",
+      cgpa: "CGPA",
+      activeBacklogs: "Active Backlogs",
+      totalBacklogs: "Total Backlogs",
+      gender: "Gender",
+      resumeLink: "Resume Link",
+    };
+
+    const requiredFields = [
+      "studentName",
+      "enrollmentNo",
+      "email",
+      "course",
+      "specialization",
+      "currentYear",
+    ];
+
+    const templateFieldsHTML = templateFields
+      .map((field) => {
+        const isRequired = requiredFields.includes(field);
+        const fieldName = fieldNames[field] || field;
+        return `<span class="field-item ${
+          isRequired ? "required-field" : "optional-field"
+        }">${fieldName}</span>`;
+      })
+      .join("");
+
+    // Format salary and stipend values for display
+    const formatSalaryValue = (value) => {
+      if (!value || value === 0 || value === "0") return "Not Specified";
+      const num = parseFloat(value);
+      if (num >= 100000) {
+        return `₹${(num / 100000).toFixed(1)} LPA`;
+      }
+      return `₹${num.toLocaleString()}`;
+    };
+
+    const formatStipendValue = (value) => {
+      if (!value || value === 0 || value === "0") return "Not Specified";
+      const num = parseFloat(value);
+      return `₹${num.toLocaleString()}/month`;
+    };
+
+  const fixedSalaryDisplay = formatSalaryValue(formData.fixedSalary);
+const variableSalaryDisplay = formatSalaryValue(formData.variableSalary);
+const totalSalaryDisplay = formatSalaryValue(formData.salary);
+const stipendDisplay = formatStipendValue(formData.stipend);
+// --- BEGIN: Salary / Stipend HTML section (add here) ---
+const salarySectionHTML =
+  formData.jobType === "Internship"
+    ? `<p><strong>Stipend:</strong> ${stipendDisplay}${
+        formData.internshipDuration ? ` <span>(${formData.internshipDuration})</span>` : ""
+      }</p>`
+    : `
+      <p><strong>Fixed Salary:</strong> ${fixedSalaryDisplay}</p>
+      <p><strong>Variable Salary:</strong> ${variableSalaryDisplay}</p>
+      <p><strong>Total CTC:</strong> ${totalSalaryDisplay}</p>
+    `;
+// --- END ---
+
+
+    // Send individual emails to each college
+      const fileNames = jobFiles && jobFiles.length ? jobFiles.map((file) => file.name || file) : [];
+
+      const jobFilesHTML = fileNames.length
+        ? `<p><strong>Job Files:</strong><ul>${fileNames
+            .map((fn) => `<li>${fn}</li>`)
+            .join('')}</ul></p>`
+        : "<p><strong>Job Files:</strong> Not provided</p>";
+
+      const emailPromises = collegesWithTPO
+      .filter(({ tpoEmail }) => tpoEmail && tpoEmail.trim() !== "")
+      .map(async ({ college, tpoEmail }) => {
+   const templateParams = {
+  to_email: "placements@gryphonacademy.co.in",
+  company_name: formData.companyName,
+  company_website: formData.companyWebsite || "Not provided",
+  job_designation: formData.jobDesignation,
+  job_location: formData.jobLocation,
+
+  // Salary Fields (kept for debugging/other use if needed)
+  fixed_salary: fixedSalaryDisplay,
+  variable_salary: variableSalaryDisplay,
+  total_salary: totalSalaryDisplay,
+  stipend: stipendDisplay,
+
+  // New: HTML block for template that contains either stipend or salary lines
+  salary_section: salarySectionHTML,
+
+  // Other fields...
+  salary_info: formData.jobType === "Internship" 
+    ? `Stipend: ${stipendDisplay}`
+    : `Fixed: ${fixedSalaryDisplay} | Variable: ${variableSalaryDisplay} | Total: ${totalSalaryDisplay}`,
+
+  job_type: formData.jobType,
+  mode_of_interview: formData.modeOfInterview,
+  course: formData.course,
+  passing_year: formData.passingYear,
+  Gender: formData.gender,
+  marks_criteria: formData.marksCriteria,
+  backlog_criteria: formData.backlogCriteria,
+  other_criteria: formData.otherCriteria || "None",
+  internship_duration: formData.internshipDuration || "Not specified",
+  mode_of_work: formData.modeOfWork || "Not specified",
+  joining_period: formData.joiningPeriod || "Not specified",
+  company_open_date: formData.companyOpenDate || "Not specified",
+  source: formData.source || "Not specified",
+  coordinator: formData.coordinator || "Not specified",
+  college_count: validEmails.length,
+  college_name: college,
+  template_fields: templateFieldsHTML,
+  field_count: templateFields.length,
+  hiring_rounds_html: formData.hiringRounds.map((round) => `<li>${round}</li>`).join(""),
+  upload_link: `${window.location.origin}/upload-student-data?college=${encodeURIComponent(college)}&company=${encodeURIComponent(formData.companyName)}&course=${encodeURIComponent(formData.course)}&fields=${encodeURIComponent(JSON.stringify(templateFields))}`,
+  // Link where college can view company/job details/files (optional UI route)
+  company_files_link: `${window.location.origin}/company-files?company=${encodeURIComponent(formData.companyName)}&college=${encodeURIComponent(college)}`,
+  coordinator_name: formData.coordinator,
+  coordinator_phone: "+91-9876543210",
+  bcc: tpoEmail,
+  // Add job description and job files
+  job_description: formData.jobDescription || "Not specified",
+  job_description_html: formData.jobDescription ? `<p><strong>Job Description:</strong><br>${formData.jobDescription}</p>` : "<p><strong>Job Description:</strong> Not specified</p>",
+  job_files: fileNames.join(", "),
+  job_files_html: jobFilesHTML,
+};
+
+        return emailjs.send(
+          EMAILJS_CONFIG.SERVICE_ID,
+          EMAILJS_CONFIG.TEMPLATE_ID,
+          templateParams,
+          EMAILJS_CONFIG.PUBLIC_KEY
+        );
+      });
+
+    await Promise.all(emailPromises);
+
+    console.log("All emails sent successfully");
+    setEmailSent(true);
+    alert(
+      `✅ Emails sent successfully to ${emailPromises.length} colleges with template configuration!`
+    );
+  } catch (error) {
+    console.error("Error sending emails:", error);
+    throw new Error("Failed to send emails");
+  }
+};
 
   const handleFinalSubmit = async () => {
     if (
@@ -535,7 +594,7 @@ function AddJD({ show, onClose, company, fetchCompanies }) {
           college,
           tpoEmail: getCollegeEmail(college),
           templateFields: selectedTemplateFields, // ✅ Save selected columns
-          jobFiles: jobFiles.map((file) => file.name),
+          jobFiles: jobFiles.map((file) => file.name || file),
           updatedAt: serverTimestamp(),
         };
 
@@ -601,6 +660,10 @@ function AddJD({ show, onClose, company, fetchCompanies }) {
         status: company.status || "ongoing",
         createdAt: company.createdAt || serverTimestamp(),
       }));
+      // If company has jobFiles (from DB as array of strings), set state for display
+      if (company.jobFiles && company.jobFiles.length) {
+        setJobFiles(company.jobFiles);
+      }
     } else if (!show) {
       // Reset form when modal closes
       setFormData({
@@ -631,6 +694,7 @@ function AddJD({ show, onClose, company, fetchCompanies }) {
         status: "ongoing",
         createdAt: serverTimestamp(),
       });
+      setJobFiles([]);
       setCurrentStep(1);
       setSelectedColleges([]);
       setFormErrors({});
@@ -681,6 +745,8 @@ function AddJD({ show, onClose, company, fetchCompanies }) {
                 setFormData={setFormData}
                 formErrors={formErrors}
                 handleFileChange={handleFileChange}
+                jobFiles={jobFiles}
+                setJobFiles={setJobFiles}
                 onClose={onClose}
                 placementUsers={placementUsers}
                 isLoadingUsers={isLoadingUsers}
