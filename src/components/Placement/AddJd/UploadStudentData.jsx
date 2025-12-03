@@ -120,7 +120,8 @@ const UploadStudentData = () => {
         }
       };
 
-setCompanyWebsite(decodeSafe(searchParams.get("companyWebsite")));      setDesignation(decodeSafe(searchParams.get("designation")));
+      setCompanyWebsite(decodeSafe(searchParams.get("companyWebsite")));      
+      setDesignation(decodeSafe(searchParams.get("designation")));
       setJobType(decodeSafe(searchParams.get("jobType")));
       setJobLocation(decodeSafe(searchParams.get("jobLocation")));
       setFixedSalary(decodeSafe(searchParams.get("fixedSalary")));
