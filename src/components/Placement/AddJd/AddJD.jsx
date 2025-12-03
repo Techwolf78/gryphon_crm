@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { XIcon } from "@heroicons/react/outline";
-import { toast } from 'react-toastify';
+import { toast } from "react-toastify";
 import { db } from "../../../firebase";
 import {
   collection,
@@ -186,10 +186,12 @@ function AddJD({ show, onClose, company, fetchCompanies }) {
   const handleSave = async () => {
     if (!validateStep1()) return;
 
-    setSaveStatus('saving');
+    setSaveStatus("saving");
     try {
       // Compute total salary
-      const totalSalary = (parseFloat(formData.fixedSalary) || 0) + (parseFloat(formData.variableSalary) || 0);
+      const totalSalary =
+        (parseFloat(formData.fixedSalary) || 0) +
+        (parseFloat(formData.variableSalary) || 0);
       const updatedFormData = { ...formData, salary: totalSalary.toString() };
 
       if (company && company.id) {
@@ -199,7 +201,7 @@ function AddJD({ show, onClose, company, fetchCompanies }) {
           updatedAt: serverTimestamp(),
         });
         toast.success("Company updated successfully!");
-        setSaveStatus('saved');
+        setSaveStatus("saved");
         setTimeout(() => {
           setSaveStatus(null);
           onClose(); // Close modal after successful update
@@ -212,7 +214,7 @@ function AddJD({ show, onClose, company, fetchCompanies }) {
           createdAt: serverTimestamp(),
         });
         toast.success("Company saved successfully!");
-        setSaveStatus('saved');
+        setSaveStatus("saved");
         setTimeout(() => setSaveStatus(null), 3000);
       }
 
@@ -377,176 +379,225 @@ function AddJD({ show, onClose, company, fetchCompanies }) {
     }
   };
 
-const sendBulkEmail = async (collegesWithTPO, templateFields) => {
-  try {
-    const validEmails = collegesWithTPO
-      .filter(({ tpoEmail }) => tpoEmail && tpoEmail.trim() !== "")
-      .map(({ tpoEmail }) => tpoEmail);
+  const sendBulkEmail = async (collegesWithTPO, templateFields) => {
+    try {
+      const validEmails = collegesWithTPO
+        .filter(({ tpoEmail }) => tpoEmail && tpoEmail.trim() !== "")
+        .map(({ tpoEmail }) => tpoEmail);
 
-    if (validEmails.length === 0) {
-      setSubmissionError(
-        "No valid email addresses found for selected colleges"
-      );
-      return;
-    }
-
-    // Create template fields with styling
-    const fieldNames = {
-      studentName: "Student Name*",
-      enrollmentNo: "Enrollment Number*",
-      email: "Email Address*",
-      phone: "Phone Number",
-      course: "Course*",
-      specialization: "Specialization*",
-      currentYear: "Current Year*",
-      tenthMarks: "10th Marks (%)",
-      twelfthMarks: "12th Marks (%)",
-      diplomaMarks: "Diploma Marks (%)",
-      cgpa: "CGPA",
-      activeBacklogs: "Active Backlogs",
-      totalBacklogs: "Total Backlogs",
-      gender: "Gender",
-      resumeLink: "Resume Link",
-    };
-
-    const requiredFields = [
-      "studentName",
-      "enrollmentNo",
-      "email",
-      "course",
-      "specialization",
-      "currentYear",
-    ];
-
-    const templateFieldsHTML = templateFields
-      .map((field) => {
-        const isRequired = requiredFields.includes(field);
-        const fieldName = fieldNames[field] || field;
-        return `<span class="field-item ${
-          isRequired ? "required-field" : "optional-field"
-        }">${fieldName}</span>`;
-      })
-      .join("");
-
-    // Format salary and stipend values for display
-    const formatSalaryValue = (value) => {
-      if (!value || value === 0 || value === "0") return "Not Specified";
-      const num = parseFloat(value);
-      if (num >= 100000) {
-        return `₹${(num / 100000).toFixed(1)} LPA`;
+      if (validEmails.length === 0) {
+        setSubmissionError(
+          "No valid email addresses found for selected colleges"
+        );
+        return;
       }
-      return `₹${num.toLocaleString()}`;
-    };
 
-    const formatStipendValue = (value) => {
-      if (!value || value === 0 || value === "0") return "Not Specified";
-      const num = parseFloat(value);
-      return `₹${num.toLocaleString()}/month`;
-    };
+      // Create template fields with styling
+      const fieldNames = {
+        studentName: "Student Name*",
+        enrollmentNo: "Enrollment Number*",
+        email: "Email Address*",
+        phone: "Phone Number",
+        course: "Course*",
+        specialization: "Specialization*",
+        currentYear: "Current Year*",
+        tenthMarks: "10th Marks (%)",
+        twelfthMarks: "12th Marks (%)",
+        diplomaMarks: "Diploma Marks (%)",
+        cgpa: "CGPA",
+        activeBacklogs: "Active Backlogs",
+        totalBacklogs: "Total Backlogs",
+        gender: "Gender",
+        resumeLink: "Resume Link",
+      };
 
-  const fixedSalaryDisplay = formatSalaryValue(formData.fixedSalary);
-const variableSalaryDisplay = formatSalaryValue(formData.variableSalary);
-const totalSalaryDisplay = formatSalaryValue(formData.salary);
-const stipendDisplay = formatStipendValue(formData.stipend);
-// --- BEGIN: Salary / Stipend HTML section (add here) ---
-const salarySectionHTML =
-  formData.jobType === "Internship"
-    ? `<p><strong>Stipend:</strong> ${stipendDisplay}${
-        formData.internshipDuration ? ` <span>(${formData.internshipDuration})</span>` : ""
-      }</p>`
-    : `
+      const requiredFields = [
+        "studentName",
+        "enrollmentNo",
+        "email",
+        "course",
+        "specialization",
+        "currentYear",
+      ];
+
+      const templateFieldsHTML = templateFields
+        .map((field) => {
+          const isRequired = requiredFields.includes(field);
+          const fieldName = fieldNames[field] || field;
+          return `<span class="field-item ${
+            isRequired ? "required-field" : "optional-field"
+          }">${fieldName}</span>`;
+        })
+        .join("");
+
+      // Format salary and stipend values for display
+      const formatSalaryValue = (value) => {
+        if (!value || value === 0 || value === "0") return "Not Specified";
+        const num = parseFloat(value);
+        if (num >= 100000) {
+          return `₹${(num / 100000).toFixed(1)} LPA`;
+        }
+        return `₹${num.toLocaleString()}`;
+      };
+
+      const formatStipendValue = (value) => {
+        if (!value || value === 0 || value === "0") return "Not Specified";
+        const num = parseFloat(value);
+        return `₹${num.toLocaleString()}/month`;
+      };
+
+      const fixedSalaryDisplay = formatSalaryValue(formData.fixedSalary);
+      const variableSalaryDisplay = formatSalaryValue(formData.variableSalary);
+      const totalSalaryDisplay = formatSalaryValue(formData.salary);
+      const stipendDisplay = formatStipendValue(formData.stipend);
+      // --- BEGIN: Salary / Stipend HTML section (add here) ---
+      const salarySectionHTML =
+        formData.jobType === "Internship"
+          ? `<p><strong>Stipend:</strong> ${stipendDisplay}${
+              formData.internshipDuration
+                ? ` <span>(${formData.internshipDuration})</span>`
+                : ""
+            }</p>`
+          : `
       <p><strong>Fixed Salary:</strong> ${fixedSalaryDisplay}</p>
       <p><strong>Variable Salary:</strong> ${variableSalaryDisplay}</p>
       <p><strong>Total CTC:</strong> ${totalSalaryDisplay}</p>
     `;
-// --- END ---
+      // --- END ---
 
-
-    // Send individual emails to each college
-      const fileNames = jobFiles && jobFiles.length ? jobFiles.map((file) => file.name || file) : [];
+      // Send individual emails to each college
+      const fileNames =
+        jobFiles && jobFiles.length
+          ? jobFiles.map((file) => file.name || file)
+          : [];
 
       const jobFilesHTML = fileNames.length
         ? `<p><strong>Job Files:</strong><ul>${fileNames
             .map((fn) => `<li>${fn}</li>`)
-            .join('')}</ul></p>`
+            .join("")}</ul></p>`
         : "<p><strong>Job Files:</strong> Not provided</p>";
 
       const emailPromises = collegesWithTPO
-      .filter(({ tpoEmail }) => tpoEmail && tpoEmail.trim() !== "")
-      .map(async ({ college, tpoEmail }) => {
-   const templateParams = {
-  to_email: "placements@gryphonacademy.co.in",
-  company_name: formData.companyName,
-  company_website: formData.companyWebsite || "Not provided",
-  job_designation: formData.jobDesignation,
-  job_location: formData.jobLocation,
+        .filter(({ tpoEmail }) => tpoEmail && tpoEmail.trim() !== "")
+        .map(async ({ college, tpoEmail }) => {
+          const templateParams = {
+            to_email: "placements@gryphonacademy.co.in",
+            company_name: formData.companyName,
+            company_website: formData.companyWebsite || "Not provided",
+            job_designation: formData.jobDesignation,
+            job_location: formData.jobLocation,
 
-  // Salary Fields (kept for debugging/other use if needed)
-  fixed_salary: fixedSalaryDisplay,
-  variable_salary: variableSalaryDisplay,
-  total_salary: totalSalaryDisplay,
-  stipend: stipendDisplay,
+            // Salary Fields
+            fixed_salary: fixedSalaryDisplay,
+            variable_salary: variableSalaryDisplay,
+            total_salary: totalSalaryDisplay,
+            stipend: stipendDisplay,
 
-  // New: HTML block for template that contains either stipend or salary lines
-  salary_section: salarySectionHTML,
+            // HTML block for salary/stipend
+            salary_section: salarySectionHTML,
 
-  // Other fields...
-  salary_info: formData.jobType === "Internship" 
-    ? `Stipend: ${stipendDisplay}`
-    : `Fixed: ${fixedSalaryDisplay} | Variable: ${variableSalaryDisplay} | Total: ${totalSalaryDisplay}`,
+            salary_info:
+              formData.jobType === "Internship"
+                ? `Stipend: ${stipendDisplay}`
+                : `Fixed: ${fixedSalaryDisplay} | Variable: ${variableSalaryDisplay} | Total: ${totalSalaryDisplay}`,
 
-  job_type: formData.jobType,
-  mode_of_interview: formData.modeOfInterview,
-  course: formData.course,
-  passing_year: formData.passingYear,
-  Gender: formData.gender,
-  marks_criteria: formData.marksCriteria,
-  backlog_criteria: formData.backlogCriteria,
-  other_criteria: formData.otherCriteria || "None",
-  internship_duration: formData.internshipDuration || "Not specified",
-  mode_of_work: formData.modeOfWork || "Not specified",
-  joining_period: formData.joiningPeriod || "Not specified",
-  company_open_date: formData.companyOpenDate || "Not specified",
-  source: formData.source || "Not specified",
-  coordinator: formData.coordinator || "Not specified",
-  college_count: validEmails.length,
-  college_name: college,
-  template_fields: templateFieldsHTML,
-  field_count: templateFields.length,
-  hiring_rounds_html: formData.hiringRounds.map((round) => `<li>${round}</li>`).join(""),
-  upload_link: `${window.location.origin}/upload-student-data?college=${encodeURIComponent(college)}&company=${encodeURIComponent(formData.companyName)}&course=${encodeURIComponent(formData.course)}&fields=${encodeURIComponent(JSON.stringify(templateFields))}`,
-  // Link where college can view company/job details/files (optional UI route)
-  company_files_link: `${window.location.origin}/company-files?company=${encodeURIComponent(formData.companyName)}&college=${encodeURIComponent(college)}`,
-  coordinator_name: formData.coordinator,
-  coordinator_phone: "+91-9876543210",
-  bcc: tpoEmail,
-  // Add job description and job files
-  job_description: formData.jobDescription || "Not specified",
-  job_description_html: formData.jobDescription ? `<p><strong>Job Description:</strong><br>${formData.jobDescription}</p>` : "<p><strong>Job Description:</strong> Not specified</p>",
-  job_files: fileNames.join(", "),
-  job_files_html: jobFilesHTML,
-};
+            job_type: formData.jobType,
+            mode_of_interview: formData.modeOfInterview,
+            course: formData.course,
+            passing_year: formData.passingYear,
+            Gender: formData.gender,
+            marks_criteria: formData.marksCriteria,
+            backlog_criteria: formData.backlogCriteria,
+            other_criteria: formData.otherCriteria || "None",
+            internship_duration: formData.internshipDuration || "Not specified",
+            mode_of_work: formData.modeOfWork || "Not specified",
+            joining_period: formData.joiningPeriod || "Not specified",
+            company_open_date: formData.companyOpenDate || "Not specified",
+            source: formData.source || "Not specified",
+            coordinator: formData.coordinator || "Not specified",
+            college_count: validEmails.length,
+            college_name: college,
+            template_fields: templateFieldsHTML,
+            field_count: templateFields.length,
+            hiring_rounds_html: formData.hiringRounds
+              .map((round) => `<li>${round}</li>`)
+              .join(""),
 
-        return emailjs.send(
-          EMAILJS_CONFIG.SERVICE_ID,
-          EMAILJS_CONFIG.TEMPLATE_ID,
-          templateParams,
-          EMAILJS_CONFIG.PUBLIC_KEY
-        );
-      });
+            // ✅ FIXED: Complete URL with ALL job details parameters
+            upload_link: `${
+              window.location.origin
+            }/upload-student-data?college=${encodeURIComponent(
+              college
+            )}&company=${encodeURIComponent(
+              formData.companyName
+            )}&course=${encodeURIComponent(
+              formData.course
+            )}&fields=${encodeURIComponent(
+              JSON.stringify(templateFields)
+            )}&companyWebsite=${encodeURIComponent(
+              formData.companyWebsite || ""
+            )}&designation=${encodeURIComponent(
+              formData.jobDesignation || ""
+            )}&jobType=${encodeURIComponent(
+              formData.jobType || ""
+            )}&jobLocation=${encodeURIComponent(
+              formData.jobLocation || ""
+            )}&fixedSalary=${encodeURIComponent(
+              formData.fixedSalary || ""
+            )}&variableSalary=${encodeURIComponent(
+              formData.variableSalary || ""
+            )}&totalCTC=${encodeURIComponent(
+              formData.salary || ""
+            )}&modeOfInterview=${encodeURIComponent(
+              formData.modeOfInterview || ""
+            )}&passingYear=${encodeURIComponent(
+              formData.passingYear || ""
+            )}&genderEligibility=${encodeURIComponent(
+              formData.gender || ""
+            )}&marksCriteria=${encodeURIComponent(
+              formData.marksCriteria || ""
+            )}&backlogCriteria=${encodeURIComponent(
+              formData.backlogCriteria || ""
+            )}&jobDescription=${encodeURIComponent(
+              formData.jobDescription || ""
+            )}`,
 
-    await Promise.all(emailPromises);
+            company_files_link: `${
+              window.location.origin
+            }/company-files?company=${encodeURIComponent(
+              formData.companyName
+            )}&college=${encodeURIComponent(college)}`,
+            coordinator_name: formData.coordinator,
+            coordinator_phone: "+91-9876543210",
+            bcc: tpoEmail,
+            job_description: formData.jobDescription || "Not specified",
+            job_description_html: formData.jobDescription
+              ? `<p><strong>Job Description:</strong><br>${formData.jobDescription}</p>`
+              : "<p><strong>Job Description:</strong> Not specified</p>",
+            job_files: fileNames.join(", "),
+            job_files_html: jobFilesHTML,
+          };
 
-    console.log("All emails sent successfully");
-    setEmailSent(true);
-    alert(
-      `✅ Emails sent successfully to ${emailPromises.length} colleges with template configuration!`
-    );
-  } catch (error) {
-    console.error("Error sending emails:", error);
-    throw new Error("Failed to send emails");
-  }
-};
+          return emailjs.send(
+            EMAILJS_CONFIG.SERVICE_ID,
+            EMAILJS_CONFIG.TEMPLATE_ID,
+            templateParams,
+            EMAILJS_CONFIG.PUBLIC_KEY
+          );
+        });
+
+      await Promise.all(emailPromises);
+
+      console.log("All emails sent successfully");
+      setEmailSent(true);
+      alert(
+        `✅ Emails sent successfully to ${emailPromises.length} colleges with template configuration!`
+      );
+    } catch (error) {
+      console.error("Error sending emails:", error);
+      throw new Error("Failed to send emails");
+    }
+  };
 
   const handleFinalSubmit = async () => {
     if (
@@ -579,7 +630,9 @@ const salarySectionHTML =
       const collegesToSubmit = selectedColleges.filter((c) => c !== "Other");
 
       // Compute total salary
-      const totalSalary = (parseFloat(formData.fixedSalary) || 0) + (parseFloat(formData.variableSalary) || 0);
+      const totalSalary =
+        (parseFloat(formData.fixedSalary) || 0) +
+        (parseFloat(formData.variableSalary) || 0);
       const updatedFormData = { ...formData, salary: totalSalary.toString() };
 
       const collegesWithTPO = collegesToSubmit.map((college) => ({
@@ -635,7 +688,11 @@ const salarySectionHTML =
         companyName: company.companyName || company.name || "",
         companyWebsite: company.companyUrl || company.companyWebsite || "",
         course: company.course || "",
-        specialization: Array.isArray(company.specialization) ? company.specialization : (company.specialization ? [company.specialization] : []),
+        specialization: Array.isArray(company.specialization)
+          ? company.specialization
+          : company.specialization
+          ? [company.specialization]
+          : [],
         passingYear: company.passingYear || "",
         gender: company.gender || "",
         marksCriteria: company.marksCriteria || "",
@@ -647,7 +704,11 @@ const salarySectionHTML =
         fixedSalary: company.fixedSalary || "",
         variableSalary: company.variableSalary || "",
         salary: company.salary || "",
-        hiringRounds: Array.isArray(company.hiringRounds) ? company.hiringRounds : (company.hiringRounds ? [company.hiringRounds] : []),
+        hiringRounds: Array.isArray(company.hiringRounds)
+          ? company.hiringRounds
+          : company.hiringRounds
+          ? [company.hiringRounds]
+          : [],
         internshipDuration: company.internshipDuration || "",
         stipend: company.stipend || "",
         modeOfInterview: company.modeOfInterview || "",
@@ -727,7 +788,11 @@ const salarySectionHTML =
         {/* Modal Header */}
         <div className="bg-linear-to-r from-blue-600 to-indigo-700 px-6 py-4 flex justify-between items-center">
           <h2 className="text-xl font-semibold text-white">
-            {currentStep === 1 ? (company ? "Edit JD Form" : "Add JD Form") : "Select Colleges"}
+            {currentStep === 1
+              ? company
+                ? "Edit JD Form"
+                : "Add JD Form"
+              : "Select Colleges"}
           </h2>
           <button
             onClick={onClose}
@@ -736,7 +801,7 @@ const salarySectionHTML =
             <XIcon className="h-5 w-5" />
           </button>
         </div>
-{/* code */}
+        {/* code */}
         {currentStep === 1 ? (
           <>
             <div className="p-6 overflow-y-auto max-h-[calc(100vh-180px)]">
@@ -764,10 +829,14 @@ const salarySectionHTML =
                 {company && (
                   <button
                     onClick={handleSave}
-                    disabled={saveStatus === 'saving' || saveStatus === 'saved'}
+                    disabled={saveStatus === "saving" || saveStatus === "saved"}
                     className="px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'saved' ? 'Saved!' : 'Update'}
+                    {saveStatus === "saving"
+                      ? "Saving..."
+                      : saveStatus === "saved"
+                      ? "Saved!"
+                      : "Update"}
                   </button>
                 )}
                 <button
