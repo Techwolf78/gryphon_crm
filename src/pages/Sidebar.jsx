@@ -12,6 +12,17 @@ import logo from "../assets/SYNC-logo-2.png";
 import compactLogo from "../assets/s-final.png";
 import collapseIcon from "../assets/sidebar-close.png";
 import expandIcon from "../assets/sidebar-open.png";
+import helpGif from "../assets/bubble-chat.gif";
+import hackerGif from "../assets/hacker.gif";
+import mortarboardGif from "../assets/mortarboard.gif";
+import lineChartGif from "../assets/line-chart.gif";
+import briefcaseGif from "../assets/briefcase.gif";
+import customerGif from "../assets/customer.gif";
+import checklistGif from "../assets/checklist.gif";
+import moneyBagGif from "../assets/money-bag.gif";
+import calculatorGif from "../assets/calculator.gif";
+import receiptGif from "../assets/receipt.gif";
+import dashboardGif from "../assets/dashboard.gif";
 import { MdOutlineCurrencyRupee } from "react-icons/md";
 import {
   FiHome,
@@ -27,29 +38,32 @@ import {
   FiShield,
   FiShoppingCart,
   FiBell,
+  FiFileText,
+  FiTerminal,
 } from "react-icons/fi";
 
 const roleLinks = {
   admin: [
-    { label: "Admin", path: "/dashboard/admin", icon: <FiUsers /> },
+    { label: "Admin", path: "/dashboard/admin", icon: <img src={hackerGif} alt="Admin" className="w-6 h-6" /> },
     {
       label: "Sales",
       path: "/dashboard/sales",
-      icon: <MdOutlineCurrencyRupee />,
+      icon: <img src={moneyBagGif} alt="Sales" className="w-6 h-6" />,
     },
     {
       label: "L & D",
       path: "/dashboard/learning-development",
-      icon: <FiBook />,
+      icon: <img src={mortarboardGif} alt="L & D" className="w-6 h-6" />,
     },
-    { label: "Placement", path: "/dashboard/placement", icon: <FiBriefcase /> },
-    { label: "D M", path: "/dashboard/marketing", icon: <FiTrendingUp /> },
-    { label: "CA", path: "/dashboard/ca", icon: <FiUserCheck /> },
-    { label: "HR", path: "/dashboard/hr", icon: <FiShield /> },
+    { label: "Placement", path: "/dashboard/placement", icon: <img src={briefcaseGif} alt="Placement" className="w-6 h-6" /> },
+    { label: "D M", path: "/dashboard/marketing", icon: <img src={lineChartGif} alt="D M" className="w-6 h-6" /> },
+    { label: "CA", path: "/dashboard/ca", icon: <img src={checklistGif} alt="CA" className="w-6 h-6" /> },
+    { label: "HR", path: "/dashboard/hr", icon: <img src={customerGif} alt="HR" className="w-6 h-6" /> },
+    { label: "Accounts", path: "/dashboard/accounts", icon: <img src={calculatorGif} alt="Accounts" className="w-6 h-6" /> },
     {
       label: "Purchase",
       path: "/dashboard/purchase",
-      icon: <FiShoppingCart />,
+      icon: <img src={receiptGif} alt="Purchase" className="w-6 h-6" />,
     },
   ],
   sales: [
@@ -88,6 +102,12 @@ const roleLinks = {
       icon: <FiShoppingCart />,
     },
   ],
+  accountant: [
+    { label: "Accounts", path: "/dashboard/accounts", icon: <FiFileText /> },
+  ],
+  accounts: [
+    { label: "Accounts", path: "/dashboard/accounts", icon: <FiFileText /> },
+  ],
 };
 
 const normalizeRole = (role) => {
@@ -104,6 +124,7 @@ const normalizeRole = (role) => {
   if (norm.includes("ca")) return "ca";
   if (norm.includes("hr")) return "hr";
   if (norm.includes("placement")) return "placement";
+  if (norm.includes("accountant") || norm.includes("accounts")) return "accounts";
   return "";
 };
 
@@ -209,13 +230,19 @@ const Sidebar = ({ collapsed, onToggle }) => {
       ? location.pathname === "/dashboard"
       : location.pathname.startsWith(path);
 
+  // Check if user is in accounts department
+  const isAccountsUser = user?.departments?.some(dept =>
+    dept.toLowerCase().includes('accounts') || dept.toLowerCase().includes('accountant')
+  ) || user?.department?.toLowerCase().includes('accounts') || user?.department?.toLowerCase().includes('accountant');
+
   const links = [
-    {
+    // Hide Dashboard link for accounts users
+    ...(isAccountsUser ? [] : [{
       label: "Dashboard",
       path: "/dashboard",
-      icon: <FiHome />,
+      icon: <img src={dashboardGif} alt="Dashboard" className="w-6 h-6" />,
       skipRedirect: true,
-    },
+    }]),
     // {
     //   label: "Intro",
     //   path: "/dashboard/intro",
@@ -225,7 +252,7 @@ const Sidebar = ({ collapsed, onToggle }) => {
     {
       label: "Help",
       path: "/dashboard/help",
-      icon: <FiHelpCircle />,
+      icon: <img src={helpGif} alt="Help" className="w-7 h-7" />,
       skipRedirect: true,
     },
   ];
@@ -355,8 +382,8 @@ const Sidebar = ({ collapsed, onToggle }) => {
                           collapsed ? "justify-center px-2 py-2" : "px-3 py-2"
                         } rounded text-sm transition ${
                           isActive(path)
-                            ? "bg-blue-50 text-blue-600 font-medium"
-                            : "text-gray-600 hover:bg-gray-100"
+                            ? "bg-blue-100 text-blue-700 font-medium shadow-sm"
+                            : "text-gray-600 hover:bg-gray-200 hover:shadow-sm"
                         }`}
                         title={!collapsed ? label : ""}
                         onClick={() => {

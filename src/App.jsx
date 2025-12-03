@@ -4,8 +4,9 @@ import {
   Routes,
   Route,
   useLocation,
+  Navigate,
 } from "react-router-dom";
-import { AuthProvider } from "./context/AuthContext";
+import { AuthProvider, AuthContext } from "./context/AuthContext";
 import { NotificationsProvider } from "./context/NotificationsContext";
 import Navbar from "./components/Navbar";
 import ProtectedRoute from "./routes/ProtectedRoute";
@@ -49,6 +50,7 @@ const PublicInvoiceDetails = React.lazy(() =>
 const Maintenance = React.lazy(() => import("./pages/Maintenance"));
 const UploadStudentData = React.lazy(() => import("./components/Placement/AddJd/UploadStudentData")); // ✅ Space removed
 const Purchase = React.lazy(() => import("./pages/Purchase"));
+const Accountant = React.lazy(() => import("./pages/Accountant"));
 
 // Lazy load Intro page
 const Intro = React.lazy(() => import("./pages/Intro"));
@@ -73,7 +75,49 @@ const AppContent = () => {
   // Routes where navbar should not appear
   const hideNavbarRoutes = ['/404', '/upload-student-data'];
 
-  if (isMaintenanceMode) {
+  // Component to handle dashboard redirection based on user department
+  const DashboardOrRedirect = () => {
+    const { user } = React.useContext(AuthContext);
+
+    // If user is admin, show dashboard
+    const isAdmin = user?.departments?.some(dept =>
+      dept.toLowerCase().includes('admin')
+    ) || user?.department?.toLowerCase().includes('admin');
+
+    if (isAdmin) {
+      return <Dashboard />;
+    }
+
+    // Department to path mapping
+    const departmentPaths = {
+      'sales': '/dashboard/sales',
+      'placement': '/dashboard/placement',
+      'learning': '/dashboard/learning-development',
+      'l&d': '/dashboard/learning-development',
+      'ld': '/dashboard/learning-development',
+      'marketing': '/dashboard/marketing',
+      'dm': '/dashboard/marketing',
+      'ca': '/dashboard/ca',
+      'hr': '/dashboard/hr',
+      'accountant': '/dashboard/accounts',
+      'accounts': '/dashboard/accounts',
+      'purchase': '/dashboard/purchase'
+    };
+
+    // Find the first matching department and redirect
+    const userDepartments = user?.departments || (user?.department ? [user?.department] : []);
+    for (const dept of userDepartments) {
+      const normalizedDept = dept.toLowerCase().replace(/[^a-z0-9]/g, '');
+      for (const [key, path] of Object.entries(departmentPaths)) {
+        if (normalizedDept.includes(key)) {
+          return <Navigate to={path} replace />;
+        }
+      }
+    }
+
+    // Fallback to dashboard if no department match
+    return <Dashboard />;
+  };  if (isMaintenanceMode) {
     return (
       <Suspense fallback={<PageLoader />}>
         <Maintenance />
@@ -103,7 +147,7 @@ const AppContent = () => {
               </ProtectedRoute>
             }
           >
-            <Route index element={<Dashboard />} />
+            <Route index element={<DashboardOrRedirect />} />
             <Route path="profile" element={<UpdateProfile />} />
             <Route path="admin" element={<Admin />} />
             <Route path="sales" element={<Sales />} />
@@ -122,6 +166,7 @@ const AppContent = () => {
             <Route path="hr" element={<HR />} />
             <Route path="ca" element={<CA />} />
             <Route path="purchase" element={<Purchase />} />
+            <Route path="accounts/*" element={<Accountant />} />
             <Route path="intro" element={<Intro />} />
           </Route>
 
