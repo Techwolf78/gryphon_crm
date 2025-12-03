@@ -19,9 +19,9 @@ import TemplateDownloadModal from "./TemplateDownloadModal";
 import ExcelUploadModal from "./ExcelUploadModal";
 
 const EMAILJS_CONFIG = {
-  SERVICE_ID: "service_pskknsn",
-  TEMPLATE_ID: "template_p2as3pp",
-  PUBLIC_KEY: "zEVWxxT-QvGIrhvTV",
+  SERVICE_ID: "service_sl0i7kr",
+  TEMPLATE_ID: "template_q0oarab",
+  PUBLIC_KEY: "V5rET66jxvg4gqulO",
 };
 
 // Academic year calculation helper
@@ -452,12 +452,17 @@ function AddJD({ show, onClose, company, fetchCompanies }) {
       const stipendDisplay = formatStipendValue(formData.stipend);
       // --- BEGIN: Salary / Stipend HTML section (add here) ---
       const salarySectionHTML =
-        formData.jobType === "Internship"
-          ? `<p><strong>Stipend:</strong> ${stipendDisplay}${
+        formData.jobType === "Internship" || formData.jobType === "Int + PPO"
+          ? `
+      <p><strong>Stipend:</strong> ${stipendDisplay}${
               formData.internshipDuration
                 ? ` <span>(${formData.internshipDuration})</span>`
                 : ""
-            }</p>`
+            }</p>
+      <p><strong>Fixed Salary:</strong> ${fixedSalaryDisplay}</p>
+      <p><strong>Variable Salary:</strong> ${variableSalaryDisplay}</p>
+      <p><strong>Total CTC:</strong> ${totalSalaryDisplay}</p>
+    `
           : `
       <p><strong>Fixed Salary:</strong> ${fixedSalaryDisplay}</p>
       <p><strong>Variable Salary:</strong> ${variableSalaryDisplay}</p>
@@ -497,8 +502,8 @@ function AddJD({ show, onClose, company, fetchCompanies }) {
             salary_section: salarySectionHTML,
 
             salary_info:
-              formData.jobType === "Internship"
-                ? `Stipend: ${stipendDisplay}`
+              formData.jobType === "Internship" || formData.jobType === "Int + PPO"
+                ? `Stipend: ${stipendDisplay} | Fixed: ${fixedSalaryDisplay} | Variable: ${variableSalaryDisplay} | Total: ${totalSalaryDisplay}`
                 : `Fixed: ${fixedSalaryDisplay} | Variable: ${variableSalaryDisplay} | Total: ${totalSalaryDisplay}`,
 
             job_type: formData.jobType,
