@@ -23,14 +23,16 @@ const FollowupDashboard = ({
         status: [],
         assignedTo: [userName],
         dateRange: 'all',
-        template: []
+        template: [],
+        industry: []
       };
     } else {
       return {
         status: [],
         assignedTo: [],
         dateRange: 'all',
-        template: []
+        template: [],
+        industry: []
       };
     }
   });
@@ -38,7 +40,8 @@ const FollowupDashboard = ({
     status: false,
     assignedTo: false,
     dateRange: false,
-    template: false
+    template: false,
+    industry: false
   });
   const [chartsVisible, setChartsVisible] = useState(true);
   const [openDropdownId, setOpenDropdownId] = useState(null);
@@ -90,7 +93,8 @@ const FollowupDashboard = ({
             assignedUserName: lead.assignedTo ?
               Object.values(allUsers).find(u => (u.uid || u.id) === lead.assignedTo)?.displayName ||
               Object.values(allUsers).find(u => (u.uid || u.id) === lead.assignedTo)?.name ||
-              'Unknown User' : 'Unassigned'
+              'Unknown User' : 'Unassigned',
+            industry: followup.industry || 'N/A'
           });
         });
       });
@@ -136,6 +140,13 @@ const FollowupDashboard = ({
 
   // Get unique values for filters
   const uniqueStatuses = [...new Set(allFollowUps.map(f => f.status).filter(Boolean))].sort();
+  const uniqueIndustries = [...new Set(allFollowUps.map(f => f.industry).filter(Boolean))].sort();
+
+  // Helper function to get display label for status
+  const getStatusDisplayLabel = (status) => {
+    if (status === 'called' || status === 'dialed') return 'Called';
+    return status ? status.charAt(0).toUpperCase() + status.slice(1) : status;
+  };
   const uniqueAssignedUsers = (() => {
     if (['Manager', 'Assistant Manager', 'Executive'].includes(user?.role)) {
       return [user.displayName || user.name].filter(Boolean);
@@ -155,6 +166,7 @@ const FollowupDashboard = ({
     const statusMatch = filters.status.length === 0 || filters.status.includes(followup.status);
     const assignedMatch = filters.assignedTo.length === 0 || filters.assignedTo.includes(followup.assignedUserName);
     const templateMatch = filters.template.length === 0 || filters.template.includes(followup.template);
+    const industryMatch = filters.industry.length === 0 || filters.industry.includes(followup.industry);
     const dateMatch = (() => {
       if (filters.dateRange === 'all') return true;
       const followupDate = new Date(followup.createdAt);
@@ -188,7 +200,7 @@ const FollowupDashboard = ({
           return true;
       }
     })();
-    return statusMatch && assignedMatch && templateMatch && dateMatch;
+    return statusMatch && assignedMatch && templateMatch && industryMatch && dateMatch;
   });
 
   // Calculate KPIs
@@ -196,7 +208,7 @@ const FollowupDashboard = ({
   const todayFollowUpsCount = filteredFollowUps.filter(f => f.createdAt && new Date(f.createdAt).toDateString() === today).length;
   const hotLeads = filteredFollowUps.filter(f => f.status === 'hot').length;
   const warmLeads = filteredFollowUps.filter(f => f.status === 'warm').length;
-  const calledLeads = filteredFollowUps.filter(f => f.status === 'called').length;
+  const calledLeads = filteredFollowUps.filter(f => f.status === 'called' || f.status === 'dialed').length;
   const coldLeads = filteredFollowUps.filter(f => f.status === 'cold').length;
 
   // Calculate upcoming follow-ups in next 3 hours
@@ -231,12 +243,33 @@ const FollowupDashboard = ({
     return { date: new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), count };
   });
 
-  // Bar chart: follow-ups by user
-  const userCounts = filteredFollowUps.reduce((acc, f) => {
-    acc[f.assignedUserName || 'Unassigned'] = (acc[f.assignedUserName || 'Unassigned'] || 0) + 1;
+  // Bar chart: follow-ups by user (Fresh vs Re-follow-ups)
+  const leadGroups = filteredFollowUps.reduce((acc, f) => {
+    if (!acc[f.leadId]) acc[f.leadId] = [];
+    acc[f.leadId].push(f);
     return acc;
   }, {});
-  const userBarData = Object.entries(userCounts).map(([user, count]) => ({ user: user.length > 10 ? user.substring(0,10) + '...' : user, count }));
+
+  const userCounts = {};
+  Object.values(leadGroups).forEach(followups => {
+    // Sort by createdAt ascending to identify first follow-up
+    followups.sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
+    followups.forEach((f, index) => {
+      const user = f.assignedUserName || 'Unassigned';
+      if (!userCounts[user]) userCounts[user] = { fresh: 0, re: 0 };
+      if (index === 0) {
+        userCounts[user].fresh += 1;
+      } else {
+        userCounts[user].re += 1;
+      }
+    });
+  });
+
+  const userBarData = Object.entries(userCounts).map(([user, counts]) => ({
+    user: user.length > 10 ? user.substring(0, 10) + '...' : user,
+    fresh: counts.fresh,
+    re: counts.re
+  }));
 
   // Helper function to get date range display text
   const getDateRangeDisplay = () => {
@@ -284,7 +317,7 @@ const FollowupDashboard = ({
 
   // Handle filter changes
   const handleFilterChange = (filterType, value) => {
-    if (filterType === 'status' || filterType === 'assignedTo' || filterType === 'template') {
+    if (filterType === 'status' || filterType === 'assignedTo' || filterType === 'template' || filterType === 'industry') {
       if (value === 'all') {
         setFilters(prev => ({
           ...prev,
@@ -330,7 +363,7 @@ const FollowupDashboard = ({
                 onClick={(e) => { e.stopPropagation(); toggleFilterDropdown('status'); }}
                 className="flex items-center px-3 py-1.5 bg-blue-100 hover:bg-blue-200 rounded-lg text-blue-900 text-xs font-medium transition-colors"
               >
-                <span>Status: {filters.status.length === 0 ? 'All' : filters.status.length === 1 ? filters.status[0] : `${filters.status.length} selected`}</span>
+                <span>Status: {filters.status.length === 0 ? 'All' : filters.status.length === 1 ? getStatusDisplayLabel(filters.status[0]) : `${filters.status.length} selected`}</span>
                 <svg className="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
@@ -362,7 +395,7 @@ const FollowupDashboard = ({
                           onChange={() => {}} // Handled by parent onClick
                           className="mr-2 h-3 w-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                         />
-                        {status}
+                        {getStatusDisplayLabel(status)}
                       </div>
                     ))}
                   </div>
@@ -458,6 +491,52 @@ const FollowupDashboard = ({
                           className="mr-2 h-3 w-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                         />
                         <span className="truncate">{template}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Industry Filter */}
+            <div className="relative">
+              <button
+                onClick={(e) => { e.stopPropagation(); toggleFilterDropdown('industry'); }}
+                className="flex items-center px-3 py-1.5 bg-blue-100 hover:bg-blue-200 rounded-lg text-blue-900 text-xs font-medium transition-colors"
+              >
+                <span>Industry: {filters.industry.length === 0 ? 'All' : filters.industry.length === 1 ? filters.industry[0] : `${filters.industry.length} selected`}</span>
+                <svg className="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {filterDropdowns.industry && (
+                <div className="absolute right-0 top-full mt-1 w-40 bg-white shadow-lg border border-gray-200 z-20">
+                  <div className="p-1">
+                    <div 
+                      className="flex items-center px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50 rounded cursor-pointer transition-colors"
+                      onClick={(e) => { e.stopPropagation(); handleFilterChange('industry', 'all'); }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={filters.industry.length === 0}
+                        onChange={() => {}} // Handled by parent onClick
+                        className="mr-2 h-3 w-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      All
+                    </div>
+                    {uniqueIndustries.map(industry => (
+                      <div 
+                        key={industry} 
+                        className="flex items-center px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50 rounded cursor-pointer transition-colors"
+                        onClick={(e) => { e.stopPropagation(); handleFilterChange('industry', industry); }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={filters.industry.includes(industry)}
+                          onChange={() => {}} // Handled by parent onClick
+                          className="mr-2 h-3 w-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        />
+                        <span className="truncate">{industry}</span>
                       </div>
                     ))}
                   </div>
@@ -600,19 +679,21 @@ const FollowupDashboard = ({
                       <XAxis dataKey="date" fontSize={11} tickLine={false} axisLine={false} />
                       <YAxis fontSize={11} tickLine={false} axisLine={false} />
                       <Tooltip />
-                      <Bar dataKey="count" fill="#8B6FFF" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="count" fill="#8B6FFF" />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
                 <div className="bg-white p-4 rounded-xl border border-blue-200">
-                  <h3 className="text-lg font-semibold mb-3 text-blue-800">Follow-ups by User</h3>
+                  <h3 className="text-lg font-semibold mb-3 text-blue-800">Follow-ups by User (Fresh vs Re-follow-ups)</h3>
                   <ResponsiveContainer width="100%" height={250}>
                     <BarChart data={userBarData} margin={{ top: 10, right: 10, left: -20, bottom: 10 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e9d5ff" />
                       <XAxis dataKey="user" fontSize={11} tickLine={false} axisLine={false} />
                       <YAxis fontSize={11} tickLine={false} axisLine={false} />
                       <Tooltip />
-                      <Bar dataKey="count" fill="#8B6FFF" radius={[4, 4, 0, 0]} />
+                      <Legend />
+                      <Bar dataKey="fresh" stackId="a" fill="#2196F3" name="Fresh Calls" />
+                      <Bar dataKey="re" stackId="a" fill="#0D47A1" name="Re-follow-ups" />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -712,12 +793,12 @@ const FollowupDashboard = ({
                         followup.status === 'hot' ? 'bg-blue-800 text-white' :
                         followup.status === 'warm' ? 'bg-blue-600 text-white' :
                         followup.status === 'cold' ? 'bg-blue-400 text-blue-900' :
-                        followup.status === 'called' ? 'bg-blue-200 text-blue-800' :
+                        (followup.status === 'called' || followup.status === 'dialed') ? 'bg-blue-200 text-blue-800' :
                         followup.status === 'onboarded' ? 'bg-blue-700 text-white' :
                         followup.status === 'deleted' ? 'bg-gray-100 text-gray-800' :
                         'bg-gray-100 text-gray-800'
                       }`}>
-                        {followup.status?.toUpperCase() || 'UNKNOWN'}
+                        {(followup.status === 'called' || followup.status === 'dialed') ? 'Called' : (followup.status?.toUpperCase() || 'UNKNOWN')}
                       </span>
                     </td>
                     <td className="px-3 py-2 text-sm text-gray-500">

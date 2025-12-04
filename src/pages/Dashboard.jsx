@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { FiBell } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationsContext';
@@ -12,6 +12,7 @@ const Dashboard = () => {
   const { user } = useAuth();
   const { ticketAlerts, dismissAlert } = useNotifications();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [activeDepartment, setActiveDepartment] = useState('sales');
   const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
 
@@ -33,8 +34,16 @@ const Dashboard = () => {
     { id: 'marketing', name: 'Marketing', component: <MarketingDashboard /> }
   ];
 
-  // Set initial department based on user's department
+  // Set initial department based on URL params or user's department
   useEffect(() => {
+    const departmentFromUrl = searchParams.get('department');
+    const validDepartments = ['sales', 'learning-development', 'placement', 'marketing'];
+
+    if (departmentFromUrl && validDepartments.includes(departmentFromUrl)) {
+      setActiveDepartment(departmentFromUrl);
+      return;
+    }
+
     if (user?.departments || user?.department) {
       // Handle both array and single department formats
       const userDepts = Array.isArray(user.departments) ? user.departments : (user.department ? [user.department] : []);
@@ -59,10 +68,11 @@ const Dashboard = () => {
 
       setActiveDepartment(mappedDepartment);
     }
-  }, [user]);
+  }, [user, searchParams]);
 
   const handleDepartmentChange = (deptId) => {
     setActiveDepartment(deptId);
+    setSearchParams({ department: deptId });
   };
 
   // Helper function to check if department belongs to user

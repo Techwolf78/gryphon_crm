@@ -187,6 +187,60 @@ const Admin = () => {
     setEditUser(null);
   };
 
+  const migrateAccountantToAccounts = async () => {
+    try {
+      setRefreshing(true);
+      const usersSnap = await getDocs(collection(db, "users"));
+      const updatePromises = [];
+
+      usersSnap.docs.forEach((userDoc) => {
+        const userData = userDoc.data();
+        let needsUpdate = false;
+        const updatedData = { ...userData };
+
+        // Check single department field
+        if (userData.department === "Accountant") {
+          updatedData.department = "Accounts";
+          needsUpdate = true;
+        }
+
+        // Check departments array
+        if (userData.departments && Array.isArray(userData.departments)) {
+          const updatedDepartments = userData.departments.map(dept =>
+            dept === "Accountant" ? "Accounts" : dept
+          );
+          if (JSON.stringify(updatedDepartments) !== JSON.stringify(userData.departments)) {
+            updatedData.departments = updatedDepartments;
+            needsUpdate = true;
+          }
+        }
+
+        if (needsUpdate) {
+          updatePromises.push(
+            updateDoc(userDoc.ref, {
+              ...updatedData,
+              updatedAt: new Date()
+            })
+          );
+        }
+      });
+
+      if (updatePromises.length > 0) {
+        await Promise.all(updatePromises);
+        alert(`Successfully migrated ${updatePromises.length} user(s) from "Accountant" to "Accounts"`);
+      } else {
+        alert("No users found with 'Accountant' department to migrate");
+      }
+
+      handleRefresh();
+    } catch (error) {
+      console.error("Migration failed:", error);
+      alert("Migration failed: " + error.message);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   const cleanupStaleSessions = async () => {
     try {
       const now = new Date();
@@ -498,7 +552,18 @@ const Admin = () => {
                     </option>
                   ))}
                   <option value="HR">HR</option>
+                  <option value="Accounts">Accounts</option>
                 </select>
+
+                <button
+                  onClick={migrateAccountantToAccounts}
+                  disabled={refreshing}
+                  className="p-2 text-orange-500 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors border border-gray-200 mr-2"
+                  aria-label="Migrate Accountant to Accounts"
+                  title="Migrate users from 'Accountant' to 'Accounts' department"
+                >
+                  <FiArrowUp className={`w-4 h-4 ${refreshing ? "animate-pulse" : ""}`} />
+                </button>
 
                 <button
                   onClick={handleRefresh}

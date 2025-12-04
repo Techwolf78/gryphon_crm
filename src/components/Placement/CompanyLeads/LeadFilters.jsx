@@ -45,7 +45,7 @@ function LeadFilters({
     
     // Filter by active tab if not "all"
     if (activeTab !== "all") {
-      baseFilteredLeads = baseFilteredLeads.filter(lead => lead.status === activeTab);
+      baseFilteredLeads = baseFilteredLeads.filter(lead => activeTab === 'called' ? (lead.status === 'called' || lead.status === 'dialed') : lead.status === activeTab);
     }
 
     return {
@@ -79,6 +79,13 @@ function LeadFilters({
         ...new Set(
           baseFilteredLeads
             .map((lead) => lead.pocPhone)
+            .filter(Boolean)
+        ),
+      ].sort(),
+      industries: [
+        ...new Set(
+          baseFilteredLeads
+            .map((lead) => lead.industry)
             .filter(Boolean)
         ),
       ].sort(),
@@ -312,6 +319,43 @@ function LeadFilters({
                     )}
                   </div>
 
+                  {/* Industry Section */}
+                  <div className="bg-gray-50/50 rounded-lg p-2 border border-gray-100/50">
+                    <button
+                      onClick={() => toggleSection('industry')}
+                      className="flex justify-between items-center w-full text-left group"
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className="w-5 h-5 bg-purple-500 rounded-md flex items-center justify-center shadow-sm">
+                          <FiBriefcase className="w-3 h-3 text-white" />
+                        </div>
+                        <span className="font-medium text-gray-900 text-sm">Industry ({filterOptions.industries.length})</span>
+                      </div>
+                      <div className={`w-4 h-4 rounded-full bg-gray-100 flex items-center justify-center transition-transform duration-200 ${activeSection === 'industry' ? 'rotate-180' : ''}`}>
+                        <FiChevronDown className="w-2.5 h-2.5 text-gray-500" />
+                      </div>
+                    </button>
+                    {activeSection === 'industry' && (
+                      <div className="mt-2 ml-7">
+                        <select
+                          value={localFilters.industryFilter || ""}
+                          onChange={(e) => {
+                            console.log("Industry filter selected:", e.target.value);
+                            setLocalFilters({ ...localFilters, industryFilter: e.target.value });
+                          }}
+                          className="w-full px-2 py-1.5 text-xs bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 shadow-sm"
+                        >
+                          <option value="">All Industries</option>
+                          {filterOptions.industries.map((industry) => (
+                            <option key={industry} value={industry}>
+                              {industry}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+
                   {/* Date Section */}
                   <div className="bg-gray-50/50 rounded-lg p-2 border border-gray-100/50">
                     <button
@@ -418,13 +462,13 @@ function LeadFilters({
             <div className="flex gap-2 mt-3 pt-2 border-t border-gray-100">
               <button
                 onClick={resetFilters}
-                className="flex-1 px-3 py-2 text-sm font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-all duration-200 shadow-sm hover:shadow-md"
+                className="flex-1 px-2 py-1.5 text-xs font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-all duration-200 shadow-sm hover:shadow-md"
               >
                 Reset
               </button>
               <button
                 onClick={applyFilters}
-                className="flex-1 px-3 py-2 text-sm font-semibold text-white bg-linear-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-lg transition-all duration-200 shadow-sm hover:shadow-lg transform hover:scale-[1.02]"
+                className="flex-1 px-2 py-1.5 text-xs font-semibold text-white bg-linear-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-lg transition-all duration-200 shadow-sm hover:shadow-lg transform hover:scale-[1.02]"
               >
                 Apply
               </button>

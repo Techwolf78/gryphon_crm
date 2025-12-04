@@ -1,7 +1,7 @@
 import React, { useState,  } from "react";
 import { XIcon } from "@heroicons/react/outline";
 import StudentDataView from './StudentDataView';
-import { formatSalary } from "../../../utils/salaryUtils";
+import { formatSalary, formatStipend } from "../../../utils/salaryUtils";
 
 function CompanyDetails({ company, onClose }) {
   const [showStudentData, setShowStudentData] = useState(false);
@@ -106,8 +106,36 @@ function CompanyDetails({ company, onClose }) {
                   <p className="text-gray-900 font-medium text-sm">{company.jobDesignation || "—"}</p>
                 </div>
                 <div className="bg-white p-2 border border-gray-100">
-                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Salary</label>
-                  <p className="text-gray-900 font-medium text-sm">{company.salary ? formatSalary(company.salary) : "—"}</p>
+                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                    {company.jobType === "Internship" ? "Stipend" : "Salary"}
+                  </label>
+                  {company.jobType === "Internship" ? (
+                    <p className="text-gray-900 font-medium text-sm">{company.stipend ? formatStipend(company.stipend) : "—"}</p>
+                  ) : (
+                    <div className="space-y-1">
+                      {company.fixedSalary && (
+                        <div className="flex justify-between text-xs">
+                          <span className="text-gray-600">Fixed:</span>
+                          <span className="font-medium">{formatSalary(company.fixedSalary)}</span>
+                        </div>
+                      )}
+                      {company.variableSalary && (
+                        <div className="flex justify-between text-xs">
+                          <span className="text-gray-600">Variable:</span>
+                          <span className="font-medium">{formatSalary(company.variableSalary)}</span>
+                        </div>
+                      )}
+                      {(company.fixedSalary || company.variableSalary) && (
+                        <div className="flex justify-between text-xs border-t pt-1">
+                          <span className="text-gray-600 font-medium">Total:</span>
+                          <span className="font-medium">{formatSalary(company.salary)}</span>
+                        </div>
+                      )}
+                      {!company.fixedSalary && !company.variableSalary && company.salary && (
+                        <p className="text-gray-900 font-medium text-sm">{formatSalary(company.salary)}</p>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

@@ -38,11 +38,6 @@ function SendSchedule({
     contactPerson: "",
     contactNumber: "",
   });
-  const [trainerCostDetails, setTrainerCostDetails] = useState({
-    conveyance: 0,
-    food: 0,
-    lodging: 0
-  });
 
   const [feePerHour, setFeePerHour] = useState(0);
 
@@ -54,31 +49,40 @@ function SendSchedule({
 
   const [trainingFormDoc, setTrainingFormDoc] = useState(null);
   const [phaseDocData, setPhaseDocData] = useState(null);
+  const [paymentCycle, setPaymentCycle] = useState("30");
 
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Helper to calculate training days
-function getTrainingDays(startDate, endDate, excludeDays = "None") {
-  if (!startDate || !endDate) return 0;
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  if (isNaN(start) || isNaN(end) || end < start) return 0;
-  let days = 0;
-  const cur = new Date(start);
-  while (cur <= end) {
-    const dayOfWeek = cur.getDay();
-    let shouldInclude = true;
-    if (excludeDays === "Saturday" && dayOfWeek === 6) shouldInclude = false;
-    else if (excludeDays === "Sunday" && dayOfWeek === 0) shouldInclude = false;
-    else if (excludeDays === "Both" && (dayOfWeek === 0 || dayOfWeek === 6))
-      shouldInclude = false;
-    if (shouldInclude) days++;
-    cur.setDate(cur.getDate() + 1);
-  }
-  return days;
-}
+  // Helper function to calculate expenses for selected assignments
+  const calculateExpensesForSelected = (selectedAssignmentsData) => {
+    const uniqueDetails = new Set();
+    let conveyance = 0;
+    let food = 0;
+    let lodging = 0;
 
-// Utility: format date
+    selectedAssignmentsData.forEach(assignment => {
+      const detail = trainersData.find(d => 
+        d.domain === assignment.domain && 
+        d.batchCode === assignment.batchCode && 
+        new Date(d.startDate) <= new Date(assignment.date) && 
+        new Date(assignment.date) <= new Date(d.endDate)
+      );
+      if (detail) {
+        const detailKey = `${detail.domain}_${detail.batchCode}_${detail.startDate}_${detail.endDate}`;
+        if (!uniqueDetails.has(detailKey)) {
+          uniqueDetails.add(detailKey);
+          conveyance += Number(detail.conveyance) || 0;
+        }
+        // Add per day
+        food += Number(detail.food) || 0;
+        lodging += Number(detail.lodging) || 0;
+      }
+    });
+
+    return { conveyance, food, lodging };
+  };
+
+  // Utility: format date
 const formatDate = (dateStr) => {
   if (!dateStr) return "";
   return new Date(dateStr).toLocaleDateString("en-US", {
@@ -88,38 +92,6 @@ const formatDate = (dateStr) => {
     day: "numeric",
   });
 };
-
-
-
-useEffect(() => {
-  if (!selectedTrainer || trainersData.length === 0) return;
-
-  const trainerDetails = trainersData.filter(trainer => {
-    return trainer.trainerId === selectedTrainer.trainerId || trainer.trainerId === selectedTrainer.id;
-  });
-
-  let totalConveyance = 0;
-  let totalFood = 0;
-  let totalLodging = 0;
-
-  trainerDetails.forEach(detail => {
-    // Calculate days for this assignment
-    const days = getTrainingDays(detail.startDate, detail.endDate, phaseData?.excludeDays || "None");
-    
-    // Conveyance is one-time per assignment
-    totalConveyance += Number(detail.conveyance) || 0;
-    
-    // Food and lodging are per day * days
-    totalFood += (Number(detail.food) || 0) * days;
-    totalLodging += (Number(detail.lodging) || 0) * days;
-  });
-
-  setTrainerCostDetails({
-    conveyance: totalConveyance,
-    food: totalFood,
-    lodging: totalLodging
-  });
-}, [selectedTrainer, trainersData, phaseData?.excludeDays]);
 
 
 
@@ -303,6 +275,12 @@ useEffect(() => {
     fetchTrainingFormAndPhase();
   }, [training?.id, training?.selectedPhase]);
 
+  // Initialize payment cycle from form or training data when available
+  useEffect(() => {
+    const initialPaymentCycle = trainingFormDoc?.payment_cycle || trainingFormDoc?.paymentCycle || trainingData?.payment_cycle || trainingData?.paymentCycle;
+    if (initialPaymentCycle) setPaymentCycle(String(initialPaymentCycle));
+  }, [trainingFormDoc, trainingData]);
+
   // ---------- Fetch trainer-specific assignments ----------
   const fetchTrainerSchedule = async (trainerId) => {
     setFetchingSchedule(true);
@@ -438,6 +416,10 @@ useEffect(() => {
     setEmailData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const handlePaymentCycleChange = (e) => {
+    setPaymentCycle(e.target.value);
+  };
+
   // Function to import email from trainer data
   const handleImportEmail = async () => {
     // First try to get email from selectedTrainer (if already loaded)
@@ -495,9 +477,7 @@ useEffect(() => {
       
       // Calculate expenses the same way as InitiationTrainingDetails
       // Conveyance is one-time, food and lodging are already totals from assignments
-      const conveyanceTotal = trainerCostDetails.conveyance || 0;
-      const foodTotal = trainerCostDetails.food || 0;
-      const lodgingTotal = trainerCostDetails.lodging || 0;
+      const { conveyance: conveyanceTotal, food: foodTotal, lodging: lodgingTotal } = calculateExpensesForSelected(selectedAssignmentsData);
       const totalExpenses = roundToNearestWhole(conveyanceTotal + foodTotal + lodgingTotal);
       
       const totalAmount = roundToNearestWhole(trainingFees + totalExpenses);
@@ -560,10 +540,7 @@ useEffect(() => {
         payable_cost: payableCost,
         project_code:
           trainingFormDoc?.projectCode || trainingData?.projectCode || "",
-        payment_cycle:
-          trainingFormDoc?.payment_cycle ||
-          trainingFormDoc?.paymentCycle ||
-          "30",
+        payment_cycle: paymentCycle || trainingFormDoc?.payment_cycle || trainingFormDoc?.paymentCycle || "30",
       };      await emailjs.send(
         "service_75e50yr",
         "template_c7rfyrl",
@@ -864,9 +841,7 @@ useEffect(() => {
 
                 // Calculate expenses the same way as InitiationTrainingDetails
                 // Conveyance is one-time, food and lodging are already totals from assignments
-                const conveyanceTotal = trainerCostDetails.conveyance || 0;
-                const foodTotal = trainerCostDetails.food || 0;
-                const lodgingTotal = trainerCostDetails.lodging || 0;
+                const { conveyance: conveyanceTotal, food: foodTotal, lodging: lodgingTotal } = calculateExpensesForSelected(selectedAssignmentsData);
                 const totalExpenses = roundToNearestWhole(conveyanceTotal + foodTotal + lodgingTotal);
 
                 const totalAmount = roundToNearestWhole(trainingFees + totalExpenses);
@@ -1090,6 +1065,37 @@ useEffect(() => {
                             placeholder="+91 XXXXX XXXXX"
                           />
                         </div>
+                        
+                        {/* Payment Cycle radio buttons */}
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Payment Cycle
+                          </label>
+                          <div className="flex items-center gap-4 mt-1">
+                            <label className="inline-flex items-center space-x-2 text-xs">
+                              <input
+                                type="radio"
+                                name="paymentCycle"
+                                value="30"
+                                checked={paymentCycle === '30'}
+                                onChange={handlePaymentCycleChange}
+                                className="form-radio h-4 w-4 text-blue-600"
+                              />
+                              <span>30 days</span>
+                            </label>
+                            <label className="inline-flex items-center space-x-2 text-xs">
+                              <input
+                                type="radio"
+                                name="paymentCycle"
+                                value="45"
+                                checked={paymentCycle === '45'}
+                                onChange={handlePaymentCycleChange}
+                                className="form-radio h-4 w-4 text-blue-600"
+                              />
+                              <span>45 days</span>
+                            </label>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1149,7 +1155,8 @@ useEffect(() => {
                             const selectedData = trainerAssignments.filter(a => selectedAssignments.includes(a.id));
                             const totalHours = selectedData.reduce((acc, a) => acc + (a.assignedHours || 0), 0);
                             const trainingFees = Math.round(totalHours * feePerHour);
-                            const expenses = Math.round((trainerCostDetails.conveyance || 0) + (trainerCostDetails.food || 0) + (trainerCostDetails.lodging || 0));
+                            const { conveyance, food, lodging } = calculateExpensesForSelected(selectedData);
+                            const expenses = Math.round(conveyance + food + lodging);
                             const total = trainingFees + expenses;
                             const tds = Math.round(trainingFees * 0.1);
                             return (total - tds).toLocaleString('en-IN');
@@ -1168,6 +1175,7 @@ useEffect(() => {
                     <div className="text-xs text-blue-700 space-y-1">
                       <p><strong>Subject:</strong> Assignment Mail for {trainingFormDoc?.collegeName || trainingData?.collegeName || ""} - Gryphon Academy Pvt. Ltd.</p>
                       <p><strong>To:</strong> {emailData.to || 'trainer@example.com'}</p>
+                      <p><strong>Payment Cycle:</strong> {paymentCycle} days</p>
                       <p className="mt-2">
                         Includes detailed schedule table, financial breakdown, venue information, and contact details.
                       </p>

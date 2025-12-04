@@ -113,6 +113,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
   // Additional filter states
   const [companyFilter, setCompanyFilter] = useState('');
   const [phoneFilter, setPhoneFilter] = useState('');
+  const [industryFilter, setIndustryFilter] = useState('');
   const [dateFilterType, setDateFilterType] = useState('single');
   const [singleDate, setSingleDate] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -820,7 +821,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
   const filteredLeads = useMemo(() => {
     
     // Early return for empty search and "all" tab
-    if (!debouncedSearchTerm && activeTab === "all" && selectedUserFilter === 'all' && !companyFilter.trim() && !phoneFilter.trim()) {
+    if (!debouncedSearchTerm && activeTab === "all" && selectedUserFilter === 'all' && !companyFilter.trim() && !phoneFilter.trim() && !industryFilter.trim()) {
       // Sort by manual leads first, then by completeness score
       return [...leads].sort((a, b) => {
         // Manual leads always come first
@@ -872,10 +873,18 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         }
       }
 
+      // Filter by industry
+      if (industryFilter.trim()) {
+        const industry = (lead.industry || '').toLowerCase().trim();
+        if (industry !== industryFilter.trim().toLowerCase()) {
+          return false;
+        }
+      }
+
       // Filter by date
       if (dateFilterType && ((dateFilterType === 'single' && singleDate) || (dateFilterType === 'range' && startDate && endDate))) {
         const getDateField = (lead) => {
-          if (activeTab === "called") return lead.calledAt;
+          if (activeTab === "called" || activeTab === "dialed") return lead.calledAt;
           if (activeTab === "warm") return lead.warmAt;
           if (activeTab === "cold") return lead.coldAt;
           if (activeTab === "hot") return lead.hotAt;
@@ -937,7 +946,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
       const scoreB = calculateCompletenessScore(b);
       return scoreB - scoreA; // Higher score first
     });
-  }, [leads, activeTab, debouncedSearchTerm, selectedUserFilter, companyFilter, phoneFilter, dateFilterType, singleDate, startDate, endDate, calculateCompletenessScore]);
+  }, [leads, activeTab, debouncedSearchTerm, selectedUserFilter, companyFilter, phoneFilter, industryFilter, dateFilterType, singleDate, startDate, endDate, calculateCompletenessScore]);
 
   const formatDate = useCallback((dateString) => {
     if (dateString === 'Unknown Date') return 'Unknown Date';
@@ -972,7 +981,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
     }
 
     // Use filteredLeads instead of all leads to respect applied filters
-    const leadsToGroup = filteredLeads.filter(lead => lead.status === activeTab);
+    const leadsToGroup = filteredLeads.filter(lead => activeTab === 'called' ? (lead.status === 'called' || lead.status === 'dialed') : lead.status === activeTab);
 
     // Group by date based on status
     const grouped = leadsToGroup.reduce((acc, lead) => {
@@ -980,7 +989,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         let dateField;
         
         // Determine which date field to use based on status
-        if (activeTab === "called") {
+        if (activeTab === "called" || activeTab === "dialed") {
           // For called leads, use calledAt (when they were marked as called)
           dateField = lead.calledAt;
         } else if (activeTab === "warm") {
@@ -2035,7 +2044,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
                 setViewMode={setViewMode}
               />
               <LeadFilters
-                filters={{ selectedUserFilter, companyFilter, phoneFilter, dateFilterType, singleDate, startDate, endDate }}
+                filters={{ selectedUserFilter, companyFilter, phoneFilter, industryFilter, dateFilterType, singleDate, startDate, endDate }}
                 setFilters={(newFilters) => {
                   // Log filter application
                   logPlacementActivity({
@@ -2044,7 +2053,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
                     action: AUDIT_ACTIONS.FILTER_APPLIED,
                     companyId: null,
                     companyName: null,
-                    details: `Applied filters: User=${newFilters.selectedUserFilter || 'all'}, Company="${newFilters.companyFilter || ''}", Phone="${newFilters.phoneFilter || ''}", Date Type="${newFilters.dateFilterType || 'single'}", Single Date="${newFilters.singleDate || ''}", Start Date="${newFilters.startDate || ''}", End Date="${newFilters.endDate || ''}"`,
+                    details: `Applied filters: User=${newFilters.selectedUserFilter || 'all'}, Company="${newFilters.companyFilter || ''}", Phone="${newFilters.phoneFilter || ''}", Industry="${newFilters.industryFilter || ''}", Date Type="${newFilters.dateFilterType || 'single'}", Single Date="${newFilters.singleDate || ''}", Start Date="${newFilters.startDate || ''}", End Date="${newFilters.endDate || ''}"`,
                     changes: newFilters,
                     sessionId: sessionStorage.getItem('sessionId') || 'unknown'
                   });
@@ -2052,6 +2061,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
                   setSelectedUserFilter(newFilters.selectedUserFilter || 'all');
                   setCompanyFilter(newFilters.companyFilter || '');
                   setPhoneFilter(newFilters.phoneFilter || '');
+                  setIndustryFilter(newFilters.industryFilter || '');
                   setDateFilterType(newFilters.dateFilterType || 'single');
                   setSingleDate(newFilters.singleDate || '');
                   setStartDate(newFilters.startDate || '');
