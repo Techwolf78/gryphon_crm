@@ -3,7 +3,7 @@ import { db } from "../firebase";
 import { doc, setDoc, collection, getDocs, query, orderBy } from "firebase/firestore";
 
 // Smart batching utility to find the next available batch number and check existing batches
-const getNextBatchInfo = async () => {
+const getNextBatchInfo = async (chunkSize = 1000) => {
   try {
     console.log("🔍 Checking existing batches in Firestore...");
 
@@ -31,7 +31,7 @@ const getNextBatchInfo = async () => {
 
     console.log(`� Found ${highestBatchNumber} existing batches. Last batch: ${lastBatchId}`);
 
-    // Check if the last batch has space (<999 records)
+    // Check if the last batch has space (<chunkSize records)
     let shouldCreateNewBatch = true;
     let nextBatchNumber = highestBatchNumber + 1;
 
@@ -39,14 +39,14 @@ const getNextBatchInfo = async () => {
       const lastBatchSize = lastBatchData.companies.length;
       console.log(`📏 Last batch (${lastBatchId}) has ${lastBatchSize} records`);
 
-      if (lastBatchSize < 999) {
+      if (lastBatchSize < chunkSize) {
         // Last batch has space, we can append to it
         shouldCreateNewBatch = false;
         nextBatchNumber = highestBatchNumber;
-        console.log(`✅ Will append to existing batch_${nextBatchNumber} (${lastBatchSize}/999 records)`);
+        console.log(`✅ Will append to existing batch_${nextBatchNumber} (${lastBatchSize}/${chunkSize} records)`);
       } else {
         // Last batch is full, create new batch
-        console.log(`� Last batch is full (${lastBatchSize}/999), will create batch_${nextBatchNumber}`);
+        console.log(`� Last batch is full (${lastBatchSize}/${chunkSize}), will create batch_${nextBatchNumber}`);
       }
     } else if (highestBatchNumber === 0) {
       // No existing batches, start from 1
@@ -204,7 +204,8 @@ export const uploadCompaniesFromExcel = async (file, onProgress = null, assignee
         console.log(`✨ Encoded ${encodedCompanies.length} companies as Base64 strings`);
 
         // 4. Get smart batching information
-        const batchInfo = await getNextBatchInfo();
+        const chunkSize = 500; // Batch size limit reduced to stay under 1MB document size
+        const batchInfo = await getNextBatchInfo(chunkSize);
         const { nextBatchNumber, shouldCreateNewBatch, lastBatchData, lastBatchId } = batchInfo;
 
         console.log(`🎯 Smart batching: Starting from batch_${nextBatchNumber}, Create new: ${shouldCreateNewBatch}`);
@@ -212,7 +213,6 @@ export const uploadCompaniesFromExcel = async (file, onProgress = null, assignee
         // 5. Handle batching logic with batch size limit
         let batchesToUpload = [];
         let currentBatchNumber = nextBatchNumber;
-        const chunkSize = 1000; // Batch size limit
 
         if (!shouldCreateNewBatch && lastBatchData) {
           // Append to existing batch

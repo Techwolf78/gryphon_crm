@@ -217,13 +217,13 @@ function BulkUploadModal({ show, onClose, allUsers = null, currentUser = null })
               </div>
             </div>
             <p className="mt-2 text-xs text-red-600 font-medium">
-              ⚠️ Each batch of ~1000 companies creates:<br/>
+              ⚠️ Each batch of ~500 companies creates:<br/>
               - 1 write per batch document<br/><br/>
-              For 58,000 companies: ~58 batches × 1 = 58 writes<br/><br/>
+              For 58,000 companies: ~116 batches × 1 = 116 writes<br/><br/>
               Free tier: 20,000 writes/day. This upload is well within limits.<br/><br/>
               ⏱️ 2-second delay between batches to prevent rate limiting.<br/><br/>
               � Failed batches will be retried up to 3 times with exponential backoff.<br/><br/>
-              🧠 <strong>Smart batching enabled:</strong> Automatically detects existing batches and continues numbering from the highest batch found. If the last batch has space (&lt;999 records), new records will be appended to it. Otherwise, a new batch is created automatically.<br/><br/>
+              🧠 <strong>Smart batching enabled:</strong> Automatically detects existing batches and continues numbering from the highest batch found. If the last batch has space (&lt;499 records), new records will be appended to it. Otherwise, a new batch is created automatically.<br/><br/>
               �💡 Uses Base64 encoding for efficient storage and reduced document size.
             </p>
             
