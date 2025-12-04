@@ -1435,6 +1435,7 @@ const InitiationDashboard = ({ onRowClick, onStartPhase, onRefresh }) => {
                                 <option value="phase-1">Phase 1</option>
                                 <option value="phase-2">Phase 2</option>
                                 <option value="phase-3">Phase 3</option>
+                                <option value="JD">JD</option>
                               </select>
                             </div>
 
@@ -1716,6 +1717,9 @@ const InitiationDashboard = ({ onRowClick, onStartPhase, onRefresh }) => {
                               Batches
                             </th>
                             <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                              Training Cost
+                            </th>
+                            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                               Status
                             </th>
                             <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
@@ -1812,6 +1816,11 @@ const InitiationDashboard = ({ onRowClick, onStartPhase, onRefresh }) => {
                                         ? training.table1Data.length
                                         : 0}
                                     </span>
+                                  </div>
+                                </td>
+                                <td className="px-4 py-2 whitespace-nowrap">
+                                  <div className="text-sm text-gray-900">
+                                    ₹{training.totalCost ? training.totalCost.toLocaleString('en-IN') : '0'}
                                   </div>
                                 </td>
                                 <td className="px-4 py-2 whitespace-nowrap">
@@ -2216,6 +2225,15 @@ const InitiationDashboard = ({ onRowClick, onStartPhase, onRefresh }) => {
                                       : 0}
                                   </span>
                                 </div>
+                              </div>
+
+                              <div>
+                                <p className="text-xs font-medium text-gray-500 mb-0.5">
+                                  Training Cost
+                                </p>
+                                <p className="text-xs text-gray-900">
+                                  ₹{training.totalCost ? training.totalCost.toLocaleString('en-IN') : '0'}
+                                </p>
                               </div>
 
                               {/* New Assigned section */}

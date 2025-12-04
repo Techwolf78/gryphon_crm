@@ -490,6 +490,30 @@ function InitiationTrainingDetails({ training, onBack }) {
                           });
                         }
                         return totalAssigned;
+                      })()} | 
+                      Total Cost: ₹{(() => {
+                        // Calculate total cost from all trainers in this domain
+                        let totalCost = 0;
+                        if (Array.isArray(domainInfo.table1Data)) {
+                          domainInfo.table1Data.forEach(row => {
+                            if (row.batches && Array.isArray(row.batches)) {
+                              row.batches.forEach(batch => {
+                                if (batch.trainers && Array.isArray(batch.trainers)) {
+                                  batch.trainers.forEach(trainer => {
+                                    const days = getTrainingDays(trainer.startDate, trainer.endDate, phaseData?.excludeDays || "None");
+                                    const conveyanceTotal = trainer.conveyance || 0;
+                                    const foodTotal = (trainer.food || 0) * days;
+                                    const lodgingTotal = (trainer.lodging || 0) * days;
+                                    const trainerCost = (trainer.assignedHours || 0) * (trainer.perHourCost || 0);
+                                    const miscTotal = conveyanceTotal + foodTotal + lodgingTotal;
+                                    totalCost += trainerCost + miscTotal;
+                                  });
+                                }
+                              });
+                            }
+                          });
+                        }
+                        return totalCost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                       })()}
                     </div>
                   </div>
