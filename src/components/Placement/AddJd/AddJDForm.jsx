@@ -19,7 +19,15 @@ function AddJDForm({ formData, setFormData, formErrors, handleFileChange, onClos
       processedValue = parseStipendInput(value);
     }
 
-    setFormData({ ...formData, [name]: processedValue });
+    // Compute salary total if fixedSalary/variableSalary changed
+    if (name === 'fixedSalary' || name === 'variableSalary') {
+      const newFixed = name === 'fixedSalary' ? processedValue : (formData.fixedSalary || 0);
+      const newVariable = name === 'variableSalary' ? processedValue : (formData.variableSalary || 0);
+      const totalSalary = (parseFloat(newFixed) || 0) + (parseFloat(newVariable) || 0);
+      setFormData({ ...formData, [name]: processedValue, salary: totalSalary.toString() });
+    } else {
+      setFormData({ ...formData, [name]: processedValue });
+    }
 
     // Validate minimum amounts
     const newValidationErrors = { ...validationErrors };
@@ -370,7 +378,7 @@ function AddJDForm({ formData, setFormData, formErrors, handleFileChange, onClos
           </div>
 
           {/* Compensation Fields - Dynamic based on Job Type */}
-          {(formData.jobType === "Internship" || formData.jobType === "Int + PPO" || formData.jobType === "Training + FT") && (
+          {(formData.jobType === "Internship" || formData.jobType === "Int + PPO") && (
             <div className="bg-white p-3 border border-gray-100">
               <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Stipend (per month)</label>
               <div className="relative">
@@ -401,9 +409,9 @@ function AddJDForm({ formData, setFormData, formErrors, handleFileChange, onClos
 
           {formData.jobType !== "Internship" && (
             <div className="bg-white p-3 border border-gray-100">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Fixed Salary (CTC)*</label>
+                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Fixed Salary*</label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                       <span className="text-gray-500 text-sm">₹</span>
@@ -427,7 +435,7 @@ function AddJDForm({ formData, setFormData, formErrors, handleFileChange, onClos
                   )}
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Variable Salary (CTC)</label>
+                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Variable Salary</label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                       <span className="text-gray-500 text-sm">₹</span>
@@ -451,11 +459,22 @@ function AddJDForm({ formData, setFormData, formErrors, handleFileChange, onClos
                   )}
                 </div>
               </div>
-              {(formData.fixedSalary || formData.variableSalary) && (
-                <div className="mt-2 text-sm text-gray-600">
-                  Total CTC: ₹{formatSalary((parseFloat(formData.fixedSalary) || 0) + (parseFloat(formData.variableSalary) || 0))}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">CTC</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <span className="text-gray-500 text-sm">₹</span>
+                  </div>
+                  <input
+                    type="text"
+                    name="salary"
+                    value={formatSalary(formData.salary || ((parseFloat(formData.fixedSalary) || 0) + (parseFloat(formData.variableSalary) || 0)))}
+                    placeholder="Total CTC"
+                    readOnly
+                    className="w-full pl-8 px-3 py-2 text-sm border border-gray-300 bg-gray-50"
+                  />
                 </div>
-              )}
+              </div>
             </div>
           )}
 
@@ -562,7 +581,7 @@ function AddJDForm({ formData, setFormData, formErrors, handleFileChange, onClos
             </div>
           </div>
 
-          {formData.jobType === "Internship" || formData.jobType === "Int + PPO" || formData.jobType === "Training + FT" ? (
+          {formData.jobType === "Internship" || formData.jobType === "Int + PPO" ? (
             <div className="bg-white p-3 border border-gray-100">
               <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Internship Duration</label>
               <input
@@ -621,6 +640,7 @@ function AddJDForm({ formData, setFormData, formErrors, handleFileChange, onClos
                 </div>
               </div>
             )}
+            <p className="mt-2 text-xs text-gray-500">These files will be included in the email sent to college TPO(s) and stored with the job listing (only the file names are stored unless you upload files to the central file store).</p>
           </div>
         </div>
       </div>      {/* Internal Use Only */}
