@@ -39,34 +39,6 @@ const StatisticsCards = ({ stats, formatIndianCurrency }) => {
           </div>
         </div>
 
-        {/* Cash Invoices */}
-        <div className="bg-white rounded-lg p-2 shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Cash Invoices</p>
-              <p className="text-xl font-bold text-green-600 mt-0.5">
-                {stats.cashInvoices}
-              </p>
-              <p className="text-xs text-gray-400 mt-0.5">Cash payments</p>
-            </div>
-            <div className="w-7 h-7 bg-green-100 rounded-lg flex items-center justify-center">
-              <svg
-                className="w-4 h-4 text-green-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2z"
-                />
-              </svg>
-            </div>
-          </div>
-        </div>
-
         {/* Approved Invoices */}
         <div className="bg-white rounded-lg p-2 shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
@@ -377,7 +349,6 @@ const ContractInvoicesTab = () => {
     receivedAmount: 0,
     dueAmount: 0,
     bookedInvoices: 0,
-    cashInvoices: 0,
     taxInvoices: 0,
     approvedInvoices: 0,
     pendingInvoices: 0,
@@ -391,7 +362,6 @@ const ContractInvoicesTab = () => {
       receivedAmount: 0,
       dueAmount: 0,
       bookedInvoices: invoiceData.filter(inv => inv.status === "Booked" || inv.registered).length,
-      cashInvoices: invoiceData.filter(inv => inv.invoiceType === "Cash Invoice").length,
       taxInvoices: invoiceData.filter(inv => inv.invoiceType === "Tax Invoice").length,
       approvedInvoices: invoiceData.filter(inv => inv.approved === true).length,
       pendingInvoices: invoiceData.filter(inv => inv.approvalStatus === "pending" && !inv.approved).length,
@@ -406,11 +376,6 @@ const ContractInvoicesTab = () => {
       const totalBilledAmount = invoice.paymentHistory?.reduce((sum, payment) => {
         const originalAmount = parseFloat(payment.originalAmount) || parseFloat(payment.amount) || 0;
         const tdsBaseType = payment.tdsBaseType || "base";
-        const isCashInvoice = invoice.invoiceType === "Cash Invoice";
-
-        if (isCashInvoice) {
-          return sum + originalAmount;
-        }
 
         // Use stored GST amounts to calculate the rate
         const amounts = getPaymentAmounts(invoice);
@@ -515,8 +480,6 @@ const ContractInvoicesTab = () => {
       filtered = filtered.filter((invoice) => {
         if (filters.invoiceType === "tax") {
           return invoice.invoiceType === "Tax Invoice";
-        } else if (filters.invoiceType === "cash") {
-          return invoice.invoiceType === "Cash Invoice";
         }
         return true;
       });
@@ -536,11 +499,6 @@ const ContractInvoicesTab = () => {
           const totalBilledAmount = invoice.paymentHistory?.reduce((sum, payment) => {
             const originalAmount = parseFloat(payment.originalAmount) || parseFloat(payment.amount) || 0;
             const tdsBaseType = payment.tdsBaseType || "base";
-            const isCashInvoice = invoice.invoiceType === "Cash Invoice";
-
-            if (isCashInvoice) {
-              return sum + originalAmount;
-            }
 
             // Use stored GST amounts to calculate the rate
             const amounts = getPaymentAmounts(invoice);
@@ -847,7 +805,6 @@ const ContractInvoicesTab = () => {
 
   const getInvoiceTypeText = (invoiceType) => {
     if (invoiceType === "Tax Invoice") return "Tax Invoice";
-    if (invoiceType === "Cash Invoice") return "Cash Invoice";
     return invoiceType || "N/A";
   };
 
@@ -890,12 +847,6 @@ const ContractInvoicesTab = () => {
     const totalBilledAmount = invoice.paymentHistory?.reduce((sum, payment) => {
       const originalAmount = parseFloat(payment.originalAmount) || parseFloat(payment.amount) || 0;
       const tdsBaseType = payment.tdsBaseType || "base";
-      const isCashInvoice = invoice.invoiceType === "Cash Invoice";
-
-      if (isCashInvoice) {
-        return sum + originalAmount;
-      }
-
       // Use stored GST amounts to calculate the rate
       const gstRate = amounts.baseAmount > 0 ? amounts.gstAmount / amounts.baseAmount : 0.18; // fallback to 18% if no stored amounts
 
@@ -1417,22 +1368,21 @@ const ContractInvoicesTab = () => {
       const tdsAmount = originalAmount - receivedAmount;
 
       // Calculate base amount and GST using stored amounts from Firestore
-      const isCashInvoice = invoice.invoiceType === "Cash Invoice";
       let baseAmount, gstAmount, totalBilled, actualReceivedAmount;
 
       if (tdsBaseType === "base") {
         // TDS calculated on base amount
         // originalAmount here is the base amount (after TDS deduction)
         baseAmount = originalAmount;
-        gstAmount = isCashInvoice ? 0 : amounts.gstAmount; // Use stored GST amount
+        gstAmount = amounts.gstAmount; // Use stored GST amount
         totalBilled = baseAmount + gstAmount;
         actualReceivedAmount = receivedAmount + gstAmount; // Add GST back to show total received
       } else {
         // TDS calculated on total amount including GST
         // originalAmount here is the total billed amount (after TDS deduction)
         totalBilled = originalAmount;
-        baseAmount = isCashInvoice ? totalBilled : amounts.baseAmount; // Use stored base amount
-        gstAmount = isCashInvoice ? 0 : amounts.gstAmount; // Use stored GST amount
+        baseAmount = amounts.baseAmount; // Use stored base amount
+        gstAmount = amounts.gstAmount; // Use stored GST amount
         actualReceivedAmount = receivedAmount; // Total amount after TDS
       }
 
@@ -1472,22 +1422,15 @@ const ContractInvoicesTab = () => {
       const tdsAmount = originalAmount - receivedAmount;
 
       // Calculate the total billed amount for validation using stored GST amounts
-      // For cash invoices, no GST is applied (base = total), for tax invoices, GST is applied
-      const isCashInvoice = invoice.invoiceType === "Cash Invoice";
       let totalBilledAmount;
 
-      if (isCashInvoice) {
-        // For cash invoices, base = total, no GST
-        totalBilledAmount = originalAmount;
+      // For tax invoices, apply GST based on TDS base type using stored amounts
+      if (tdsBaseType === "base") {
+        // TDS calculated on base amount, GST added to remaining base
+        totalBilledAmount = originalAmount + amounts.gstAmount; // Use stored GST amount
       } else {
-        // For tax invoices, apply GST based on TDS base type using stored amounts
-        if (tdsBaseType === "base") {
-          // TDS calculated on base amount, GST added to remaining base
-          totalBilledAmount = originalAmount + amounts.gstAmount; // Use stored GST amount
-        } else {
-          // TDS calculated on total amount including GST
-          totalBilledAmount = originalAmount;
-        }
+        // TDS calculated on total amount including GST
+        totalBilledAmount = originalAmount;
       }
 
       // Check if the calculated total billed amount exceeds due amount
@@ -1787,7 +1730,7 @@ const ContractInvoicesTab = () => {
                     <span className="text-gray-600">TDS Deducted ({tdsPercentage}%):</span>
                     <span className="font-semibold text-red-600">-₹{tdsBreakdown.tdsAmount.toString()}</span>
                   </div>
-                  {tdsBaseType === "base" && invoice.invoiceType !== "Cash Invoice" && (
+                  {tdsBaseType === "base" && (
                     <div className="flex justify-between items-center">
                       <span className="text-gray-600">GST Amount:</span>
                       <span className="font-semibold text-blue-600">{formatIndianCurrency(amounts.gstAmount, false)}</span>
@@ -2076,7 +2019,6 @@ const ContractInvoicesTab = () => {
                             >
                               <option value="all">All Types</option>
                               <option value="tax">Tax Invoice</option>
-                              <option value="cash">Cash Invoice</option>
                             </select>
                           </div>
 
@@ -2320,11 +2262,6 @@ const ContractInvoicesTab = () => {
                 const totalBilledAmount = invoice.paymentHistory?.reduce((sum, payment) => {
                   const originalAmount = parseFloat(payment.originalAmount) || parseFloat(payment.amount) || 0;
                   const tdsBaseType = payment.tdsBaseType || "base";
-                  const isCashInvoice = invoice.invoiceType === "Cash Invoice";
-
-                  if (isCashInvoice) {
-                    return sum + originalAmount;
-                  }
 
                   // Use stored GST amounts to calculate the rate
                   const gstRate = amounts.baseAmount > 0 ? amounts.gstAmount / amounts.baseAmount : 0.18; // fallback to 18% if no stored amounts
@@ -2563,11 +2500,6 @@ const ContractInvoicesTab = () => {
                     const totalBilledAmount = invoice.paymentHistory?.reduce((sum, payment) => {
                       const originalAmount = parseFloat(payment.originalAmount) || parseFloat(payment.amount) || 0;
                       const tdsBaseType = payment.tdsBaseType || "base";
-                      const isCashInvoice = invoice.invoiceType === "Cash Invoice";
-
-                      if (isCashInvoice) {
-                        return sum + originalAmount;
-                      }
 
                       // Use stored GST amounts to calculate the rate
                       const gstRate = amounts.baseAmount > 0 ? amounts.gstAmount / amounts.baseAmount : 0.18; // fallback to 18% if no stored amounts

@@ -296,11 +296,10 @@ const generateInvoiceNumber = async (invoiceType = "Tax Invoice") => {
   const financialYear = getCurrentFinancialYear();
   let prefix = "TI"; // Default for Tax Invoice
   if (invoiceType === "Proforma Invoice") prefix = "PI";
-  if (invoiceType === "Cash Invoice") prefix = "CI";
 
   try {
     // Har invoice type ke liye alag collection mein search karo
-    let collectionName = "ContractInvoices"; // Tax aur Cash invoices yahan hain
+    let collectionName = "ContractInvoices"; // Tax invoices yahan hain
     if (invoiceType === "Proforma Invoice") {
       collectionName = "ProformaInvoices";
     }
@@ -565,7 +564,7 @@ const generateInvoiceNumber = async (invoiceType = "Tax Invoice") => {
       console.log("Starting invoice cancellation for:", invoice.id, invoice.invoiceNumber, invoice.invoiceType);
 
       // First, delete the current invoice from Firestore
-      let collectionName = "ContractInvoices"; // Default for merged invoices and Tax/Cash invoices
+      let collectionName = "ContractInvoices"; // Default for merged invoices and Tax invoices
       if (!invoice.isMergedInvoice && invoice.invoiceType === "Proforma Invoice") {
         collectionName = "ProformaInvoices"; // Only non-merged Proforma invoices are in ProformaInvoices
       }
@@ -804,20 +803,6 @@ const generateInvoiceNumber = async (invoiceType = "Tax Invoice") => {
     regeneratedFrom: editInvoice.invoiceNumber,
   };
 
-  // ✅ Cash Invoice ke liye amounts properly set karo
-  if (formData.invoiceType === "Cash Invoice") {
-    // ✅ EditInvoice se baseAmount use karo (jo Firebase se aaya hai)
-    const baseAmount = editInvoice.baseAmount || 
-                      (editInvoice.paymentDetails && editInvoice.paymentDetails[0] && editInvoice.paymentDetails[0].baseAmount) ||
-                      0;
-    
-    regenerateData.baseAmount = baseAmount;
-    regenerateData.gstAmount = 0;
-    regenerateData.netPayableAmount = baseAmount;
-    regenerateData.amountRaised = baseAmount;
-    regenerateData.dueAmount = baseAmount;
-  }
-
   const { id: _, ...dataWithoutId } = regenerateData;
 
   const docRef = await addDoc(
@@ -895,28 +880,15 @@ const generateInvoiceNumber = async (invoiceType = "Tax Invoice") => {
     baseAmount = selectedInstallment.baseAmount;
     gstAmount = selectedInstallment.gstAmount;
     totalAmount = selectedInstallment.totalAmount;
-    
-    // ✅ Cash Invoice ke liye amounts adjust karo
-    if (formData.invoiceType === "Cash Invoice") {
-      gstAmount = 0;
-      totalAmount = baseAmount; // Cash mein totalAmount = baseAmount
-    }
   } else {
     // ✅ Agar paymentDetails mein amounts nahi hain toh manually calculate karo
     totalAmount = selectedInstallment
       ? selectedInstallment.totalAmount
       : contract.netPayableAmount;
 
-    // Cash Invoice ke liye different calculation
-    if (formData.invoiceType === "Cash Invoice") {
-      baseAmount = totalAmount;
-      gstAmount = 0;
-      totalAmount = baseAmount; // Cash mein totalAmount = baseAmount
-    } else {
-      // Tax/Proforma invoice ke liye normal calculation
-      baseAmount = totalAmount / 1.18;
-      gstAmount = totalAmount - baseAmount;
-    }
+    // Tax/Proforma invoice ke liye normal calculation
+    baseAmount = totalAmount / 1.18;
+    gstAmount = totalAmount - baseAmount;
   }
 
   // Calculate amounts based on invoice type
@@ -935,10 +907,8 @@ const generateInvoiceNumber = async (invoiceType = "Tax Invoice") => {
   // Check gstType for dynamic GST calculation
   const isGstExcluded = contract.gstType === 'exclude';
   
-  baseAmount = formData.invoiceType === "Cash Invoice" ? totalAmount : 
-               (isGstExcluded ? totalAmount : Math.round(totalAmount / 1.18));
-  gstAmount = formData.invoiceType === "Cash Invoice" ? 0 : 
-              (isGstExcluded ? 0 : totalAmount - baseAmount);
+  baseAmount = isGstExcluded ? totalAmount : Math.round(totalAmount / 1.18);
+  gstAmount = isGstExcluded ? 0 : totalAmount - baseAmount;
 
   const invoiceData = {
     ...formData,
@@ -1124,8 +1094,6 @@ const generateInvoiceNumber = async (invoiceType = "Tax Invoice") => {
         return "Undo PI";
       case "Tax Invoice":
         return "Undo TI";
-      case "Cash Invoice":
-        return "Undo CI";
       default:
         return "Undo";
     }
@@ -1278,28 +1246,20 @@ const handleMergeSubmit = async (formData) => {
     const isGstExcluded = firstContract.gstType === 'exclude';
 
     // Use exact amounts without rounding
-    const totalBaseAmount = formData.invoiceType === "Cash Invoice" 
-      ? totalInstallmentAmount 
-      : (isGstExcluded ? totalInstallmentAmount : Math.round(totalInstallmentAmount / 1.18));
+    const totalBaseAmount = isGstExcluded ? totalInstallmentAmount : Math.round(totalInstallmentAmount / 1.18);
     
-    // ✅ Cash aur Tax ke liye alag GST calculation
+    // ✅ Tax ke liye GST calculation
     let gstAmount = 0;
     let netPayableAmount = 0;
 
-    if (formData.invoiceType === "Cash Invoice") {
-      // ✅ Cash Invoice: Base Amount same, GST = 0, Total = Base Amount
+    // ✅ Tax Invoice: Base Amount calculated, GST calculate karo based on gstType
+    if (isGstExcluded) {
       gstAmount = 0;
       netPayableAmount = totalBaseAmount;
     } else {
-      // ✅ Tax Invoice: Base Amount calculated, GST calculate karo based on gstType
-      if (isGstExcluded) {
-        gstAmount = 0;
-        netPayableAmount = totalBaseAmount;
-      } else {
-        const gstRate = 0.18;
-        gstAmount = Math.round(totalBaseAmount * gstRate);
-        netPayableAmount = totalBaseAmount + gstAmount;
-      }
+      const gstRate = 0.18;
+      gstAmount = Math.round(totalBaseAmount * gstRate);
+      netPayableAmount = totalBaseAmount + gstAmount;
     }
 
     // Use exact final amount without rounding
@@ -2170,12 +2130,8 @@ const handleMergeSubmit = async (formData) => {
                                                   )}
                                                   {hasOther && (
                                                     <div className="flex items-center gap-2">
-                                                      <span className={`text-xs font-semibold py-1 px-2 rounded-full ${
-                                                        inv.invoiceType === "Cash Invoice"
-                                                          ? "bg-orange-100 text-orange-800 border border-orange-300"
-                                                          : "bg-gray-100 text-gray-800 border border-gray-300"
-                                                      }`}>
-                                                        {inv.invoiceType === "Cash Invoice" ? "Cash" : inv.invoiceType}
+                                                      <span className={`text-xs font-semibold py-1 px-2 rounded-full bg-gray-100 text-gray-800 border border-gray-300`}>
+                                                        {inv.invoiceType}
                                                       </span>
                                                       {inv.invoiceType === "Tax Invoice" && getApprovalStatusBadge(inv)}
                                                       <span className="text-xs text-gray-500">
@@ -2504,17 +2460,12 @@ const handleMergeSubmit = async (formData) => {
                                                       )}
                                                       {hasOther && (
                                                         <div className="text-center">
-                                                          <div className={`font-semibold ${inv.invoiceType === "Tax Invoice" ? "text-green-600" : inv.invoiceType === "Cash Invoice" ? "text-orange-600" : "text-blue-600"}`}>
-                                                            {inv.invoiceType === "Proforma Invoice" ? "Proforma" : inv.invoiceType === "Cash Invoice" ? "Cash" : "Tax"}
+                                                          <div className={`font-semibold ${inv.invoiceType === "Tax Invoice" ? "text-green-600" : "text-blue-600"}`}>
+                                                            {inv.invoiceType === "Proforma Invoice" ? "Proforma" : "Tax"}
                                                             {isCancelled && inv.regenerated && " (Cancelled - Regenerated)"}
                                                             {!isCancelled && inv.regeneratedFrom && ` (Regenerated from ${inv.regeneratedFrom})`}
                                                           </div>
                                                           {inv.invoiceType === "Tax Invoice" && getApprovalStatusBadge(inv)}
-                                                          {inv.invoiceType === "Cash Invoice" && (
-                                                            <span className="ml-1 px-1.5 py-0.5 rounded text-xs bg-orange-100 text-orange-800 border border-orange-300">
-                                                              Cash
-                                                            </span>
-                                                          )}
                                                           {inv.invoiceType === "Proforma Invoice" && (
                                                             <span className="ml-1 px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-800 border border-blue-300">
                                                               Proforma
@@ -3089,12 +3040,8 @@ const handleMergeSubmit = async (formData) => {
                                               )}
                                               {hasOther && (
                                                 <div className="flex items-center gap-2">
-                                                  <span className={`text-xs font-semibold py-1 px-2 rounded-full ${
-                                                    inv.invoiceType === "Cash Invoice"
-                                                      ? "bg-orange-100 text-orange-800 border border-orange-300"
-                                                      : "bg-gray-100 text-gray-800 border border-gray-300"
-                                                  }`}>
-                                                    {inv.invoiceType === "Cash Invoice" ? "Cash" : inv.invoiceType}
+                                                  <span className={`text-xs font-semibold py-1 px-2 rounded-full bg-gray-100 text-gray-800 border border-gray-300`}>
+                                                    {inv.invoiceType}
                                                   </span>
                                                   {inv.invoiceType === "Tax Invoice" && getApprovalStatusBadge(inv)}
                                                   <span className="text-xs text-gray-500">
@@ -3428,17 +3375,12 @@ const handleMergeSubmit = async (formData) => {
                                                   )}
                                                   {hasOther && (
                                                     <div className="text-center">
-                                                      <div className={`font-semibold ${inv.invoiceType === "Tax Invoice" ? "text-green-600" : inv.invoiceType === "Cash Invoice" ? "text-orange-600" : "text-blue-600"}`}>
-                                                        {inv.invoiceType === "Proforma Invoice" ? "Proforma" : inv.invoiceType === "Cash Invoice" ? "Cash" : "Tax"}
+                                                      <div className={`font-semibold ${inv.invoiceType === "Tax Invoice" ? "text-green-600" : "text-blue-600"}`}>
+                                                        {inv.invoiceType === "Proforma Invoice" ? "Proforma" : "Tax"}
                                                         {isCancelled && inv.regenerated && " (Cancelled - Regenerated)"}
                                                         {!isCancelled && inv.regeneratedFrom && ` (Regenerated from ${inv.regeneratedFrom})`}
                                                       </div>
                                                       {inv.invoiceType === "Tax Invoice" && getApprovalStatusBadge(inv)}
-                                                      {inv.invoiceType === "Cash Invoice" && (
-                                                        <span className="ml-1 px-1.5 py-0.5 rounded text-xs bg-orange-100 text-orange-800 border border-orange-300">
-                                                          Cash
-                                                        </span>
-                                                      )}
                                                       {inv.invoiceType === "Proforma Invoice" && (
                                                         <span className="ml-1 px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-800 border border-blue-300">
                                                           Proforma

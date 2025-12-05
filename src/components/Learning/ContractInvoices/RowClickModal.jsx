@@ -192,11 +192,7 @@ const RowClickModal = ({ installment, invoice, contract, onClose }) => {
                 </button>
 
                 <div className="text-right">
-                  <div className={`inline-flex items-center px-2 py-1 rounded text-xs font-semibold ${
-                    invoice?.invoiceType === "Cash Invoice"
-                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                      : "bg-blue-50 text-blue-700 border border-blue-200"
-                  }`}>
+                  <div className={`inline-flex items-center px-2 py-1 rounded text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200`}>
                     {invoice?.invoiceType || "Installment Preview"}
                   </div>
 
@@ -409,18 +405,7 @@ const RowClickModal = ({ installment, invoice, contract, onClose }) => {
                       </span>
                     </div>
 
-                    {invoice?.invoiceType === "Cash Invoice" ? (
-                      <>
-                        <div className="px-4 py-3 flex justify-between items-center">
-                          <span className="text-slate-600 text-sm">CGST @ 0%</span>
-                          <span className="text-slate-500 text-sm">₹0.00</span>
-                        </div>
-                        <div className="px-4 py-3 flex justify-between items-center">
-                          <span className="text-slate-600 text-sm">SGST @ 0%</span>
-                          <span className="text-slate-500 text-sm">₹0.00</span>
-                        </div>
-                      </>
-                    ) : contract?.gstType === 'exclude' ? (
+                    {contract?.gstType === 'exclude' ? (
                       <>
                         <div className="px-4 py-3 flex justify-between items-center">
                           <span className="text-slate-600 text-sm">CGST @ 0%</span>

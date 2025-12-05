@@ -431,7 +431,7 @@ const calculateGSTBreakdown = (invoice) => {
               
               {dropdownOpen && (
                 <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg">
-                  {["Tax Invoice", "Cash Invoice", "Proforma Invoice"].map((type) => (
+                  {["Tax Invoice", "Proforma Invoice"].map((type) => (
                     <label
                       key={type}
                       className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer"

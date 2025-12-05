@@ -70,23 +70,6 @@ const RaiseInvoiceModal = ({
                   <input
                     type="radio"
                     name="invoiceType"
-                    value="Cash Invoice"
-                    checked={formData.invoiceType === "Cash Invoice"}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        invoiceType: e.target.value,
-                      }))
-                    }
-                    disabled={isEdit}
-                  />
-                  <span>Cash Invoice (CI) - Without GST</span>
-                </label>
-                
-                <label className="flex items-center gap-2 justify-center">
-                  <input
-                    type="radio"
-                    name="invoiceType"
                     value="Proforma Invoice"
                     checked={formData.invoiceType === "Proforma Invoice"}
                     onChange={(e) =>
@@ -100,12 +83,6 @@ const RaiseInvoiceModal = ({
                   <span>Proforma Invoice (PI)</span>
                 </label>
               </div>
-              
-              {formData.invoiceType === "Cash Invoice" && (
-                <p className="text-xs text-blue-600 mt-1">
-                  Cash Invoice: Base amount only, GST will be zero
-                </p>
-              )}
               
               {isEdit && (
                 <p className="text-xs text-yellow-600 mt-1">

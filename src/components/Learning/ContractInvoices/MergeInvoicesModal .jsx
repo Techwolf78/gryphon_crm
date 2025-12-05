@@ -43,28 +43,20 @@ useEffect(() => {
     const gstExcluded = hasExcludedGst;
     setIsGstExcluded(gstExcluded);
     
-    const totalBaseAmount = invoiceType === 'Cash Invoice' 
-      ? calculatedTotal 
-      : (gstExcluded ? calculatedTotal : Math.round(calculatedTotal / 1.18));
+    const totalBaseAmount = gstExcluded ? calculatedTotal : Math.round(calculatedTotal / 1.18);
     
-    // ✅ Cash aur Tax ke liye alag GST calculation
+    // ✅ Tax ke liye GST calculation
     let gstAmount = 0;
     let netPayableAmount = 0;
 
-    if (invoiceType === 'Cash Invoice') {
-      // ✅ Cash Invoice: Base Amount same, GST = 0, Total = Base Amount
+    // ✅ Tax Invoice: Base Amount calculated, GST calculate karo based on gstType
+    if (gstExcluded) {
       gstAmount = 0;
-      netPayableAmount = calculatedTotal;
+      netPayableAmount = totalBaseAmount;
     } else {
-      // ✅ Tax Invoice: Base Amount calculated, GST calculate karo based on gstType
-      if (gstExcluded) {
-        gstAmount = 0;
-        netPayableAmount = totalBaseAmount;
-      } else {
-        const gstRate = 0.18;
-        gstAmount = Math.round(totalBaseAmount * gstRate);
-        netPayableAmount = totalBaseAmount + gstAmount;
-      }
+      const gstRate = 0.18;
+      gstAmount = Math.round(totalBaseAmount * gstRate);
+      netPayableAmount = totalBaseAmount + gstAmount;
     }
 
     // Use exact final amount without rounding
@@ -75,8 +67,8 @@ useEffect(() => {
     setTotalStudents(calculatedStudents);
     
     // ✅ BASE AMOUNT calculation - use the exact amounts that will be stored
-    const calculatedBaseAmount = invoiceType === 'Cash Invoice' ? finalNetPayableAmount : totalBaseAmount;
-    const calculatedGstAmount = invoiceType === 'Cash Invoice' ? 0 : gstAmount;
+    const calculatedBaseAmount = totalBaseAmount;
+    const calculatedGstAmount = gstAmount;
     
     setBaseAmount(calculatedBaseAmount);
     setGstAmount(calculatedGstAmount);
@@ -181,7 +173,7 @@ const getDisplayAmounts = () => {
                     {formatIndianCurrency(displayAmounts.totalAmount)}
                   </span>
                   <span className="ml-2 text-xs text-purple-500">
-                    ({invoiceType === 'Cash Invoice' ? 'Cash Invoice - No GST' : 'Tax Invoice - With GST'})
+                    ('Tax Invoice - With GST')
                   </span>
                 </div>
               </div>
@@ -241,13 +233,10 @@ const getDisplayAmounts = () => {
               required
             >
               <option value="Tax Invoice">Tax Invoice</option>
-              <option value="Cash Invoice">Cash Invoice</option>
               <option value="Proforma Invoice">Proforma Invoice</option>
             </select>
             <p className="text-xs text-gray-500 mt-1">
-              {invoiceType === 'Cash Invoice' 
-                ? 'Cash Invoice: Base Amount will be used as Final Amount (No GST)' 
-                : invoiceType === 'Tax Invoice'
+              {invoiceType === 'Tax Invoice'
                 ? isGstExcluded 
                   ? 'Tax Invoice: GST Excluded - Base Amount = Final Amount'
                   : 'Tax Invoice: Base Amount + 18% GST = Final Amount'

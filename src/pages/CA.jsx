@@ -63,7 +63,6 @@ const Register = () => {
         const allTaxInvoices = data.filter(
           (invoice) =>
             invoice.invoiceType === "Tax Invoice" ||
-            invoice.invoiceType === "Cash Invoice" ||
             invoice.invoiceType === undefined
         );
 
@@ -110,8 +109,6 @@ const Register = () => {
       filtered = filtered.filter((invoice) => {
         if (filters.invoiceType === "tax") {
           return invoice.invoiceType === "Tax Invoice";
-        } else if (filters.invoiceType === "cash") {
-          return invoice.invoiceType === "Cash Invoice";
         }
         return true;
       });
@@ -464,7 +461,6 @@ const getDescription = (invoice) => {
 
   const getInvoiceTypeText = (invoiceType) => {
     if (invoiceType === "Tax Invoice") return "Tax Invoice";
-    if (invoiceType === "Cash Invoice") return "Cash Invoice";
     return invoiceType || "N/A";
   };
 
@@ -739,7 +735,6 @@ const getDescription = (invoice) => {
                       >
                         <option value="all">All Types</option>
                         <option value="tax">Tax Invoice</option>
-                        <option value="cash">Cash Invoice</option>
                       </select>
                     </div>
 
@@ -1048,7 +1043,7 @@ const getDescription = (invoice) => {
                         ₹{invoice.amount?.toLocaleString('en-IN') || "0"}
                       </div>
                       <div className="text-xs text-gray-500 mt-0.5">
-                        {invoice.invoiceType === "Tax Invoice" ? "Tax Invoice" : "Cash Invoice"}
+                        Tax Invoice
                       </div>
                     </td>
 
