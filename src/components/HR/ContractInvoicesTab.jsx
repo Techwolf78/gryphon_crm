@@ -285,6 +285,7 @@ const ContractInvoicesTab = () => {
     invoice: null,
   });
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [exportLoading, setExportLoading] = useState(false);
 
   // Filter states
@@ -437,22 +438,50 @@ const ContractInvoicesTab = () => {
     }
   }, [calculateStats]);
 
+  // Optimized search function - searches only relevant fields
+  const searchInvoices = useCallback((invoices, searchTerm) => {
+    if (!searchTerm.trim()) return invoices;
+
+    const term = searchTerm.toLowerCase().trim();
+    return invoices.filter((invoice) => {
+      // Define searchable fields (most relevant ones first)
+      const searchableFields = [
+        invoice.invoiceNumber,
+        invoice.clientName,
+        invoice.collegeName,
+        invoice.contractId,
+        invoice.invoiceType,
+        invoice.status,
+        invoice.approvalStatus,
+        invoice.amountRaised?.toString(),
+        invoice.netPayableAmount?.toString(),
+        invoice.baseAmount?.toString(),
+        invoice.gstAmount?.toString(),
+        invoice.remarks,
+        invoice.raisedBy,
+        invoice.approvedBy,
+      ];
+
+      // Check each field for the search term
+      return searchableFields.some((field) => {
+        if (field && typeof field === 'string') {
+          return field.toLowerCase().includes(term);
+        }
+        return false;
+      });
+    });
+  }, []);
+
   // Apply filters
-  const applyFilters = () => {
+  const applyFilters = useCallback(() => {
     let filtered = [...invoices];
 
     // Exclude Proforma Invoices from HR table - they should only be in Learning/Contract Invoices
     filtered = filtered.filter((invoice) => invoice.invoiceType !== "Proforma Invoice");
 
-    // Search filter
-    if (searchTerm) {
-      filtered = filtered.filter((invoice) =>
-        Object.values(invoice).some(
-          (value) =>
-            value &&
-            value.toString().toLowerCase().includes(searchTerm.toLowerCase())
-        )
-      );
+    // Search filter (using debounced term for performance)
+    if (debouncedSearchTerm) {
+      filtered = searchInvoices(filtered, debouncedSearchTerm);
     }
 
     // Financial Year filter
@@ -552,7 +581,7 @@ const ContractInvoicesTab = () => {
 
     setFilteredInvoices(filtered);
     calculateStats(filtered);
-  };
+  }, [debouncedSearchTerm, filters, invoices, calculateStats, searchInvoices]);
 
   // Clear filters
   const clearFilters = () => {
@@ -1334,6 +1363,7 @@ const ContractInvoicesTab = () => {
     const [tdsBaseType, setTdsBaseType] = useState("base"); // "base" or "total"
     const amounts = getPaymentAmounts(invoice);
     const dueAmount = invoice.dueAmount || amounts.totalAmount;
+    const isCashInvoice = invoice.invoiceType !== "Tax Invoice";
 
     // Auto-calculate received amount when TDS percentage or base type changes
     useEffect(() => {
@@ -1833,6 +1863,20 @@ const ContractInvoicesTab = () => {
   useEffect(() => {
     fetchInvoices();
   }, [fetchInvoices]);
+
+  // Apply filters when debounced search term or filters change
+  useEffect(() => {
+    applyFilters();
+  }, [debouncedSearchTerm, filters, invoices, applyFilters]);
+
+  // Debounce search term to avoid excessive filtering
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300); // 300ms delay
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   // Close dropdown when clicking outside
   useEffect(() => {

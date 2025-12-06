@@ -397,7 +397,7 @@ const calculateGSTBreakdown = (invoice) => {
             </label>
             <div className="relative invoice-type-dropdown">
               <div
-                className="w-full border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer min-h-[32px] flex flex-wrap gap-1 items-center"
+                className="w-full border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer min-h-8 flex flex-wrap gap-1 items-center"
                 onClick={() => setDropdownOpen(!dropdownOpen)}
               >
                 {filters.invoiceType.length > 0 ? (

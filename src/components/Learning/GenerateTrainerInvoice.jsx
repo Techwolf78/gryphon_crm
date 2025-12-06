@@ -32,7 +32,7 @@ function GenerateTrainerInvoice() {
   const [businessNameFilter, setBusinessNameFilter] = useState("");
   const [downloadingInvoice, setDownloadingInvoice] = useState(null);
   const [pdfStatus, setPdfStatus] = useState({});
-  const [invoiceFilter, setInvoiceFilter] = useState('all');
+  const [invoiceFilter, setInvoiceFilter] = useState('active');
   const [exporting, setExporting] = useState(false);
   const [filtersDropdownOpen, setFiltersDropdownOpen] = useState(false);
   const filtersBtnRef = useRef();
@@ -189,7 +189,7 @@ function GenerateTrainerInvoice() {
                     businessName: formData.businessName || "",
                     projectCode: formData.projectCode || "",
                     formId: formId,
-                    collegeName: (formData.businessName || "").split('/')[0]?.trim() || "Unknown College",
+                    collegeName: formData.collegeName || (formData.businessName || "").split('/')[0]?.trim() || "Unknown College",
                     startDate,
                     endDate,
                     topics: Array.from(allTopics), // All aggregated topics
@@ -396,64 +396,61 @@ function GenerateTrainerInvoice() {
         return finalTrainer;
       });
 
-      // 🔥 OPTIMIZED: Batch invoice status checks to reduce Firebase calls
-      // Check invoice status for each trainer
-      const updatedTrainersList = await Promise.all(
-        collegePhaseBasedTrainers.map(async (trainer) => {
-          try {
-            let totalInvoiceCount = 0;
-            let latestInvoice = null;
-            let invoiceStatus = null;
+      // 🔥 OPTIMIZED: Single bulk invoice query to reduce Firebase reads
+      // Get all invoices at once instead of individual queries per trainer
+      const allInvoicesQuery = query(collection(db, "invoices"));
+      const allInvoicesSnap = await getDocs(allInvoicesQuery);
 
-            // 🚀 OPTIMIZED: Use more specific queries to reduce data transfer
-            const invoiceQuery = trainer.isMerged
-              ? query(
-                  collection(db, "invoices"),
-                  where("trainerId", "==", trainer.trainerId),
-                  where("collegeName", "==", trainer.collegeName),
-                  where("phase", "==", trainer.phase),
-                  limit(5) // Limit to recent invoices only
-                )
-              : query(
-                  collection(db, "invoices"),
-                  where("trainerId", "==", trainer.trainerId),
-                  where("collegeName", "==", trainer.collegeName),
-                  where("phase", "==", trainer.phase),
-                  where("projectCode", "==", trainer.projectCode),
-                  limit(5) // Limit to recent invoices only
-                );
+      // Create a map of trainer keys to invoice data for fast lookup
+      const invoiceMap = new Map();
+      allInvoicesSnap.docs.forEach(doc => {
+        const data = doc.data();
+        // Create key matching the trainer lookup logic
+        const key = `${data.trainerId}_${data.collegeName}_${data.phase}`;
+        if (!invoiceMap.has(key)) {
+          invoiceMap.set(key, []);
+        }
+        invoiceMap.get(key).push(data);
+      });
 
-            const querySnapshot = await getDocs(invoiceQuery);
-            totalInvoiceCount = querySnapshot.size;
+      // Now check invoice status for each trainer using the map
+      const updatedTrainersList = collegePhaseBasedTrainers.map((trainer) => {
+        try {
+          // Use the same key as used in invoice queries
+          const key = `${trainer.trainerId}_${trainer.collegeName}_${trainer.phase}`;
 
-            if (totalInvoiceCount > 0) {
-              // Find the most recent invoice (first doc due to orderBy desc)
-              const latestDoc = querySnapshot.docs[0];
-              latestInvoice = latestDoc.data();
-              invoiceStatus = latestInvoice.status || "generated";
-            }
+          const trainerInvoices = invoiceMap.get(key) || [];
+          const totalInvoiceCount = trainerInvoices.length;
 
-            const trainerWithInvoiceStatus = {
-              ...trainer,
-              hasExistingInvoice: totalInvoiceCount > 0,
-              invoiceCount: totalInvoiceCount,
-              invoiceStatus: invoiceStatus,
-              invoiceData: latestInvoice, // Store full invoice data for remarks display
-            };
-            
-            return trainerWithInvoiceStatus;
-          } catch (trainerError) {
-            console.error(`🚨 Error processing trainer ${trainer.trainerName}:`, trainerError);
-            return {
-              ...trainer,
-              hasExistingInvoice: false,
-              invoiceCount: 0,
-              invoiceStatus: null,
-              invoiceData: null,
-            };
+          let latestInvoice = null;
+          let invoiceStatus = null;
+
+          if (totalInvoiceCount > 0) {
+            // Find the most recent invoice (assuming they're ordered by creation, take first)
+            latestInvoice = trainerInvoices[0];
+            invoiceStatus = latestInvoice.status || "generated";
           }
-        })
-      );
+
+          const trainerWithInvoiceStatus = {
+            ...trainer,
+            hasExistingInvoice: totalInvoiceCount > 0,
+            invoiceCount: totalInvoiceCount,
+            invoiceStatus: invoiceStatus,
+            invoiceData: latestInvoice, // Store full invoice data for remarks display
+          };
+
+          return trainerWithInvoiceStatus;
+        } catch (trainerError) {
+          console.error(`🚨 Error processing trainer ${trainer.trainerName}:`, trainerError);
+          return {
+            ...trainer,
+            hasExistingInvoice: false,
+            invoiceCount: 0,
+            invoiceStatus: null,
+            invoiceData: null,
+          };
+        }
+      });
 
       setTrainerData(updatedTrainersList);
 
@@ -900,8 +897,13 @@ function GenerateTrainerInvoice() {
     try {
       let allInvoices = [];
 
-      if (trainer.isMerged) {
-        // For merged trainings, get the merged invoice
+      // First, try to use cached invoice data from trainer object
+      if (trainer.invoiceData) {
+        allInvoices = [{ id: 'cached', ...trainer.invoiceData }];
+      }
+
+      // If no cached data or we need to check for multiple invoices, do a targeted query
+      if (allInvoices.length === 0 || trainer.invoiceCount > 1) {
         const q = query(
           collection(db, "invoices"),
           where("trainerId", "==", trainer.trainerId),
@@ -910,22 +912,7 @@ function GenerateTrainerInvoice() {
         );
 
         const querySnapshot = await getDocs(q);
-        querySnapshot.forEach(doc => {
-          allInvoices.push({ id: doc.id, ...doc.data() });
-        });
-      } else {
-        // Original logic for non-merged trainings
-        const q = query(
-          collection(db, "invoices"),
-          where("trainerId", "==", trainer.trainerId),
-          where("collegeName", "==", trainer.collegeName),
-          where("phase", "==", trainer.phase)
-        );
-
-        const querySnapshot = await getDocs(q);
-        querySnapshot.forEach(doc => {
-          allInvoices.push({ id: doc.id, ...doc.data() });
-        });
+        allInvoices = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       }
 
       if (allInvoices.length > 0) {

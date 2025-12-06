@@ -57,6 +57,19 @@ function CollegeSelection({
     }
   };
 
+  const selectAllColleges = () => {
+    const allColleges = availableColleges.filter(c => c !== "Other");
+    const isAllSelected = allColleges.every(c => selectedColleges.includes(c));
+    if (isAllSelected) {
+      // Deselect all colleges, keep Other if selected
+      setSelectedColleges(selectedColleges.filter(c => c === "Other"));
+    } else {
+      // Select all colleges, keep Other if selected
+      const newSelected = [...new Set([...selectedColleges, ...allColleges])];
+      setSelectedColleges(newSelected);
+    }
+  };
+
   const handleOtherCollegesChange = (e) => {
     setOtherCollegesInput(e.target.value);
 
@@ -262,6 +275,18 @@ function CollegeSelection({
           </button>
         </div>
       </div>
+
+      {/* Select All Button */}
+      {availableColleges.length > 0 && (
+        <div className="flex justify-start mb-2">
+          <button
+            onClick={selectAllColleges}
+            className="text-xs text-blue-600 hover:text-blue-800 hover:underline cursor-pointer bg-transparent border-none"
+          >
+            {availableColleges.filter(c => c !== "Other").every(c => selectedColleges.includes(c)) ? 'Deselect All' : 'Select All'}
+          </button>
+        </div>
+      )}
 
       {availableColleges.length > 0 ? (
         <div className="space-y-4">
