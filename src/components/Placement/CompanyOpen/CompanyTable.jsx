@@ -13,7 +13,8 @@ import CompanyDropdownActions from "./CompanyDropdownActions";
 import StudentDataView from "./StudentDataView";
 import StudentSelectionModal from "./StudentSelectionModal";
 import { formatSalary, formatStipend } from "../../../utils/salaryUtils.js";
-
+import { collection, query, where, getDocs } from "firebase/firestore";
+import { db } from "../../../firebase";
 const borderColorMap = {
   complete: "border-l-4 border-green-500",
   ongoing: "border-l-4 border-amber-400",
@@ -302,7 +303,6 @@ function CompanyTable({
       // First round - all students are eligible
       return companyStudents;
     }
-
     // For subsequent rounds, only students selected in previous round are eligible
     const previousRoundStudents = roundStudents[companyId]?.[roundIndex - 1];
     if (!previousRoundStudents || previousRoundStudents.length === 0) {
@@ -331,12 +331,13 @@ function CompanyTable({
       );
     });
   }, [roundStudents, filteredCompanies]);
-
-// ✅ FIXED: handleOpenStudentModal - Always open modal and load students if needed
+// ✅ UPDATED: handleOpenStudentModal - Filter out already placed students TOO
 const handleOpenStudentModal = React.useCallback(async (eligibleStudents, roundName, currentSelected, companyId, roundIndex) => {
   // Find the company object from filteredCompanies
   const company = filteredCompanies.find(c => c.id === companyId);
   
+  if (!company) return;
+
   // Ensure students are loaded for this company
   let companyStudents = companyStudentsData[companyId];
   if (!companyStudents && company) {
@@ -353,9 +354,11 @@ const handleOpenStudentModal = React.useCallback(async (eligibleStudents, roundN
   }
   
   // Get eligible students for this round (use fresh data if available)
-  let finalEligibleStudents = companyStudents ? getStudentsForRound(companyId, roundIndex, companyStudents) : eligibleStudents;
+  let finalEligibleStudents = companyStudents ? 
+    getStudentsForRound(companyId, roundIndex, companyStudents) : 
+    eligibleStudents;
 
-  // Only include matched students in the modal (fallback to companyMatchStats if matchStatus not defined)
+  // Step 1: Filter out unmatched students
   finalEligibleStudents = finalEligibleStudents.filter((s) => {
     if (s.matchStatus) return s.matchStatus !== 'unmatched';
     const unmatched = companyMatchStats[companyId]?.unmatched || [];
@@ -363,8 +366,52 @@ const handleOpenStudentModal = React.useCallback(async (eligibleStudents, roundN
     const unmatchedKeys = new Set(unmatched.map(u => ((u.email || u.studentName || '') + '').toLowerCase().trim()));
     return !unmatchedKeys.has(key);
   });
-  
-  // ✅ Always open modal
+
+  // ✅ Step 2: Filter out already placed students (FIXED - check placedStudents collection)
+  if (company.college && finalEligibleStudents.length > 0) {
+    try {
+      // Fetch placed students for this college
+      const placedQuery = query(
+        collection(db, 'placedStudents'),
+        where('college', '==', company.college)
+      );
+      
+      const placedSnapshot = await getDocs(placedQuery);
+      const placedStudents = placedSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      // Create a Set of placed student emails and names for quick lookup
+      const placedEmails = new Set(placedStudents.map(p => (p.email || '').toLowerCase().trim()));
+      const placedNames = new Set(placedStudents.map(p => (p.studentName || '').toLowerCase().trim()));
+
+      // Filter out already placed students
+      finalEligibleStudents = finalEligibleStudents.filter(student => {
+        const studentEmail = (student.email || '').toLowerCase().trim();
+        const studentName = (student.studentName || '').toLowerCase().trim();
+        
+        // Check if student is already placed by email OR name
+        const isAlreadyPlaced = 
+          (studentEmail && placedEmails.has(studentEmail)) || 
+          (studentName && placedNames.has(studentName));
+        
+        return !isAlreadyPlaced;
+      });
+
+    } catch (error) {
+      console.error("Error checking placed students:", error);
+    }
+  }
+
+  // ✅ Add isAlreadyPlaced flag to each student for the modal
+  finalEligibleStudents = finalEligibleStudents.map(student => ({
+    ...student,
+    isAlreadyPlaced: false, // Since we filtered them out, all are not placed
+    placementStatus: 'available'
+  }));
+
+  // ✅ Always open modal with filtered students
   setStudentModalData({
     isOpen: true,
     students: finalEligibleStudents,
@@ -374,6 +421,9 @@ const handleOpenStudentModal = React.useCallback(async (eligibleStudents, roundN
     roundIndex
   });
 }, [filteredCompanies, companyStudentsData, fetchCompanyStudents, getStudentsForRound, companyMatchStats]);
+
+// ✅ Add this import at the top of CompanyTable.jsx if not already present
+
 
 // ✅ FIXED: handleStudentSelection with useCallback
 const handleStudentSelection = React.useCallback(async (selectedStudents) => {
