@@ -53,6 +53,31 @@ const PHASE_LABELS = {
   "phase-3": "Phase 3",
 };
 
+const COLLEGE_CODE_MAPPING = {
+  "Sanjivani College Of Engineering": "SCOE",
+  "Indira College Of Engineering And Management": "ICEM",
+  "Indira Institute Of Management Pune": "IGI",
+  "Ramachandran International Institute Of Management": "RIIM",
+  "IFEEL - Institute For Future Education Entrepreneurship And Mangement": "IFEEL",
+  "P.R. Pote Patil College Of Engineering": "PRPCOE",
+  "D Y Patil Kolhapur , Bawada": "DYPB",
+  "Nagpur Institute Of Technology": "NIT",
+  "YSPM'S Yashoda Technical Campus": "YSPM",
+  "Shri Ramdeobaba College of Engineering and Management": "RCOEM",
+  "Sharda University": "SUD",
+  "Dnyanshree Institute of Engineering And Technology": "DIET",
+  "Ideal Institute Of Technology Kakinada": "IITK",
+  "International School Of Management Excellence": "ISME",
+  "Indira University - Pune": "IU",
+  "Mauli College Of Engineering And Technology": "MCOET",
+  "Sri Eshwar College Of Engineering": "SECE",
+  "Sharad Institute Of Technology": "SITCOE",
+  "Sanjivani University": "SU",
+  "India Global School Of Business": "IGSB",
+  "Indira Global School Of Business": "IGSB",
+  // Add more as needed
+};
+
 const STATUS_LABELS = {
   all: "All",
   "Not Started": "Not Started",
@@ -1663,12 +1688,12 @@ const InitiationDashboard = ({ onRowClick, onStartPhase, onRefresh }) => {
                 
                 // Check if this is a merged training (any phase has mergedColleges)
                 const mergedTraining = phases.find(p => p.mergedColleges);
-                let mergedCollegeNames = [];
+                let mergedCollegeCodes = [];
                 if (mergedTraining && Array.isArray(mergedTraining.mergedColleges)) {
-                  mergedCollegeNames = mergedTraining.mergedColleges.map(c => c.name || c.collegeName).filter(Boolean);
+                  mergedCollegeCodes = mergedTraining.mergedColleges.map(c => COLLEGE_CODE_MAPPING[c.collegeName] || c.collegeName).filter(Boolean);
                 }
                 const displayCollegeName = mergedTraining ? 
-                  `${college} (Merged: ${mergedCollegeNames.join(", ") || "Multiple Colleges"})` : 
+                  `${college} (Merged: ${mergedCollegeCodes.join(", ") || "Multiple Colleges"})` : 
                   college;
                 
                 return (

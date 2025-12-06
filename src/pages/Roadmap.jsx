@@ -1,55 +1,31 @@
 import React from "react";
-import { useNavigate } from "react-router-dom";
 
 const Roadmap = () => {
-  const navigate = useNavigate();
-
   return (
-    <div className="min-h-screen bg-white ">
-      <div className="mx-auto">
-        <div className="">
-          <button
-            onClick={() => navigate("/dashboard/marketing")}
-            className="flex items-center text-indigo-600 hover:text-indigo-800 font-medium"
-          >
-            <svg
-              className="w-5 h-5 mr-2"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M15 19l-7-7 7-7"
-              />
-            </svg>
-            Back to Marketing
-          </button>
-        </div>
-
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-gray-100">
+      <div className="w-full">
         <div className="overflow-x-auto">
-          <div className="min-w-[700px] md:min-w-[1400px] bg-white rounded-2xl shadow-2xl border border-gray-100 p-0 md:p-0">
-            {/* Gradient Header */}
-            <div className="rounded-t-2xl bg-linear-to-r from-blue-100 via-white to-amber-50 px-6 py-2 md:px-12 border-b border-gray-100 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="min-w-[600px] md:min-w-[1200px] bg-white rounded-3xl shadow-xl border border-slate-200/50 p-0 md:p-0 backdrop-blur-sm">
+            {/* Premium Header */}
+            <div className="rounded-t-3xl bg-gradient-to-r from-indigo-50 via-white to-cyan-50 px-4 py-1 md:px-8 border-b border-slate-200/60 flex flex-col md:flex-row md:items-center md:justify-between gap-1">
               <div>
-                <h4 className="text-2xl md:text-3xl font-bold mb-1 tracking-tight">
-                  <span className="text-black">SYNC</span>
-                  <span className="text-gray-900"> - Product Development Roadmap</span>
-                </h4>
-                <p className="text-gray-500 text-sm md:text-base font-medium">
-                  Transparent milestones, clear progress, and what's next.
+                <h1 className="text-2xl md:text-3xl font-bold mb-1 tracking-tight text-slate-900">
+                  <span className="bg-gradient-to-r from-indigo-600 to-cyan-600 bg-clip-text text-transparent">SYNC</span>
+                  <span className="text-slate-700"> - Product Development Roadmap (Gantt Chart)</span>
+                </h1>
+                <p className="text-slate-600 text-xs md:text-sm font-medium leading-tight">
+                  Transparent milestones, clear progress, and what's next in our journey.
                 </p>
               </div>
-              <div className="flex flex-wrap gap-3 items-center">
-                <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold shadow-sm">
+              <div className="flex flex-wrap gap-1 items-center">
+                <span className="inline-flex items-center gap-2 px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold shadow-sm border border-emerald-200/50 transition-colors hover:bg-emerald-100">
                   <svg
-                    className="w-4 h-4"
+                    className="w-5 h-5"
                     fill="none"
                     stroke="currentColor"
                     strokeWidth="2"
                     viewBox="0 0 24 24"
+                    aria-hidden="true"
                   >
                     <path
                       strokeLinecap="round"
@@ -59,13 +35,14 @@ const Roadmap = () => {
                   </svg>
                   Completed
                 </span>
-                <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-semibold shadow-sm">
+                <span className="inline-flex items-center gap-2 px-2 py-1 rounded-full bg-amber-50 text-amber-700 text-xs font-semibold shadow-sm border border-amber-200/50">
                   <svg
-                    className="w-4 h-4 animate-spin"
+                    className="w-5 h-5 animate-pulse"
                     fill="none"
                     stroke="currentColor"
                     strokeWidth="2"
                     viewBox="0 0 24 24"
+                    aria-hidden="true" 
                   >
                     <circle
                       cx="12"
@@ -77,33 +54,34 @@ const Roadmap = () => {
                   </svg>
                   In Progress
                 </span>
-                <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gray-100 text-gray-600 text-xs font-semibold shadow-sm">
+                <span className="inline-flex items-center gap-2 px-2 py-1 rounded-full bg-slate-50 text-slate-600 text-xs font-semibold shadow-sm border border-slate-200/50 transition-colors hover:bg-slate-100">
                   <svg
-                    className="w-4 h-4"
+                    className="w-5 h-5"
                     fill="none"
                     stroke="currentColor"
                     strokeWidth="2"
                     viewBox="0 0 24 24"
+                    aria-hidden="true"
                   >
                     <circle cx="12" cy="12" r="10" />
                     <path d="M12 8v4l2 2" />
                   </svg>
-                  Pending
+                  Planned
                 </span>
               </div>
             </div>
-            {/* Timeline */}
+            {/* Timeline Section */}
             <div className="px-4 py-2">
               {/* Months Header */}
-              <div className="flex items-center mb-2">
-                <div className="min-w-[120px] md:min-w-[180px]"></div>
-                <div className="flex-1 pl-12 grid grid-cols-7 gap-2">
+              <div className="flex items-center mb-4">
+                <div className="w-[120px] md:w-[160px]"></div>
+                <div className="flex-1 pl-8 grid grid-cols-7 gap-2">
                   {["Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].map(
-                    (m) => (
-                      <div key={m} className="flex flex-col items-center">
-                        <div className="flex items-center">
+                    (month, index) => (
+                      <div key={month} className="flex flex-col items-center">
+                        <div className="flex items-center mb-1">
                           <svg
-                            className="w-4 h-4 mr-1 text-gray-400"
+                            className="w-5 h-5 mr-2 text-slate-400"
                             fill="none"
                             stroke="currentColor"
                             strokeWidth="2"
@@ -116,33 +94,35 @@ const Roadmap = () => {
                             <line x1="16" y1="2" x2="16" y2="6" />
                           </svg>
                           <span
-                            className="text-xs md:text-sm text-gray-400 text-center font-semibold tracking-wide"
-                            aria-label={m}
+                            className="text-xs md:text-sm text-slate-500 font-semibold tracking-wide"
+                            aria-label={`Month: ${month} 2025`}
                           >
-                            {m}
+                            {month}
                           </span>
                         </div>
+                        <div className="w-full h-1 bg-slate-200 rounded-full"></div>
                       </div>
                     )
                   )}
                 </div>
               </div>
-              {/* Gantt Rows */}
-              <div className="space-y-6">
+              {/* Roadmap Items */}
+              <div className="space-y-2">
                 {[
                   {
                     label: "Sales Phase",
                     start: 0,
                     span: 2,
-                    color: "bg-green-500/80",
-                    status: "Completed (1 Jun-30 Jul)",
+                    color: "bg-gradient-to-r from-emerald-200 to-emerald-300",
+                    status: "Completed (1 Jun - 30 Jul)",
                     icon: (
                       <svg
-                        className="w-4 h-4 mr-2"
+                        className="w-5 h-5 mr-3"
                         fill="none"
                         stroke="currentColor"
                         strokeWidth="2"
                         viewBox="0 0 24 24"
+                        aria-hidden="true"
                       >
                         <path
                           strokeLinecap="round"
@@ -151,22 +131,24 @@ const Roadmap = () => {
                         />
                       </svg>
                     ),
-                    text: "text-white",
-                    desc: "Initial resource gathering, demos,<br />and onboarding of early contracts.",
+                    text: "text-slate-800",
+                    desc: "Initial resource gathering,<br>demos,<br>and onboarding of early contracts.",
+                    ariaDesc: "Sales Phase: Initial resource gathering, demos, and onboarding of early contracts. Completed from June 1 to July 30.",
                   },
                   {
                     label: "Initial Testing",
                     start: 0,
                     span: 2,
-                    color: "bg-green-400/80",
-                    status: "Completed (1 Jul-30 Jul)",
+                    color: "bg-gradient-to-r from-emerald-400 to-emerald-500",
+                    status: "Completed (25 Jun - 30 Jul)",
                     icon: (
                       <svg
-                        className="w-4 h-4 mr-2"
+                        className="w-5 h-5 mr-3"
                         fill="none"
                         stroke="currentColor"
                         strokeWidth="2"
                         viewBox="0 0 24 24"
+                        aria-hidden="true"
                       >
                         <path
                           strokeLinecap="round"
@@ -176,21 +158,23 @@ const Roadmap = () => {
                       </svg>
                     ),
                     text: "text-white",
-                    desc: "Alpha release, core feature validation, and bug fixes.",
+                    desc: "Alpha release,<br>core feature validation,<br>and bug fixes.",
+                    ariaDesc: "Initial Testing: Alpha release, core feature validation, and bug fixes. Completed from June 25 to July 30.",
                   },
                   {
                     label: "Learning & Development",
                     start: 1,
                     span: 3,
-                    color: "bg-green-500/80",
-                    status: "Completed (15 Jul-30 Sep)",
+                    color: "bg-gradient-to-r from-emerald-300 to-emerald-400",
+                    status: "Completed (15 Jul - 30 Sep)",
                     icon: (
                       <svg
-                        className="w-4 h-4 mr-2"
+                        className="w-5 h-5 mr-3"
                         fill="none"
                         stroke="currentColor"
                         strokeWidth="2"
                         viewBox="0 0 24 24"
+                        aria-hidden="true"
                       >
                         <path
                           strokeLinecap="round"
@@ -199,148 +183,155 @@ const Roadmap = () => {
                         />
                       </svg>
                     ),
-                    text: "text-white",
-                    desc: "Training Scheduler, trainer management, and invoice generation.",
+                    text: "text-slate-800",
+                    desc: "Training Scheduler,<br>trainer management,<br>and invoice generation.",
+                    ariaDesc: "Learning & Development: Training Scheduler, trainer management, and invoice generation. Completed from July 15 to September 30.",
                   },
                   {
                     label: "Comprehensive Testing (L&D)",
                     start: 3,
                     span: 2,
-                    color: "bg-amber-400/80",
-                    status: "In Progress (1 Sep-30 Oct)",
+                    color: "bg-gradient-to-r from-emerald-200 to-emerald-300",
+                    status: "Completed (1 Sep - 30 Oct)",
                     icon: (
                       <svg
-                        className="w-4 h-4 mr-2 animate-spin"
+                        className="w-5 h-5 mr-3"
                         fill="none"
                         stroke="currentColor"
                         strokeWidth="2"
                         viewBox="0 0 24 24"
+                        aria-hidden="true"
                       >
-                        <circle
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          strokeOpacity="0.3"
-                        />
-                        <path d="M12 2a10 10 0 0 1 10 10" />
+                        <path d="M20 6L9 17l-5-5" />
                       </svg>
                     ),
-                    text: "text-white",
-                    desc: "Comprehensive QA and fine-tuning processes.<br />Optimization and scalability.",
+                    text: "text-slate-800",
+                    desc: "Comprehensive QA and fine-tuning processes.<br>Optimization and scalability.",
+                    ariaDesc: "Comprehensive Testing (L&D): Comprehensive QA and fine-tuning processes. Optimization and scalability. Completed from September 1 to October 30.",
                   },
                   {
                     label: "HR",
                     start: 3,
                     span: 2,
-                    color: "bg-gray-200/80",
-                    status: "Pending (1 Sep-30 Oct)",
+                    color: "bg-gradient-to-r from-emerald-400 to-emerald-500",
+                    status: "Completed (15 Sep - 30 Oct)",
                     icon: (
                       <svg
-                        className="w-4 h-4 mr-2"
+                        className="w-5 h-5 mr-3"
                         fill="none"
                         stroke="currentColor"
                         strokeWidth="2"
                         viewBox="0 0 24 24"
+                        aria-hidden="true"
                       >
-                        <circle cx="12" cy="12" r="10" />
-                        <path d="M12 8v4l2 2" />
+                        <path d="M20 6L9 17l-5-5" />
                       </svg>
                     ),
-                    text: "text-gray-700",
-                    desc: "Trainer bill management and contract invoice processing.<br />Purchase order processing.",
+                    text: "text-white",
+                    desc: "Trainer bill management and contract invoice processing.<br>Purchase order processing.",
+                    ariaDesc: "HR: Trainer bill management and contract invoice processing. Purchase order processing. Completed from September 1 to October 30.",
                   },
                   {
                     label: "Placement Phase",
                     start: 4,
-                    span: 2,
-                    color: "bg-gray-200/80",
-                    status: "Pending (10 Oct-20 Nov)",
+                    span: 3,
+                    color: "bg-gradient-to-r from-emerald-50 to-emerald-100",
+                    status: "Completed (10 Oct - 5 Dec)",
                     icon: (
                       <svg
-                        className="w-4 h-4 mr-2"
+                        className="w-5 h-5 mr-3"
                         fill="none"
                         stroke="currentColor"
                         strokeWidth="2"
                         viewBox="0 0 24 24"
+                        aria-hidden="true"
                       >
-                        <circle cx="12" cy="12" r="10" />
-                        <path d="M12 8v4l2 2" />
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M5 13l4 4L19 7"
+                        />
                       </svg>
                     ),
-                    text: "text-gray-700",
-                    desc: "Student placements with companies, interviews, and onboarding support",
+                    text: "text-slate-800",
+                    desc: "Student placements with companies,<br>interviews,<br>and onboarding support.",
+                    ariaDesc: "Placement Phase: Student placements with companies, interviews, and onboarding support. Completed from October 10 to December 5.",
                   },
                   {
                     label: "Digital Marketing",
-                    start: 5,
-                    span: 2,
-                    color: "bg-gray-500/80",
-                    status: "Pending (25 Nov-15 Dec)",
+                    start: 6,
+                    span: 1,
+                    color: "bg-gradient-to-r from-amber-400 to-amber-500",
+                    status: "In Progress (15 Dec - 25 Dec)",
                     icon: (
                       <svg
-                        className="w-4 h-4 mr-2"
+                        className="w-5 h-5 mr-3"
                         fill="none"
                         stroke="currentColor"
                         strokeWidth="2"
                         viewBox="0 0 24 24"
+                        aria-hidden="true"
                       >
                         <circle cx="12" cy="12" r="10" />
                         <path d="M12 8v4l2 2" />
                       </svg>
                     ),
                     text: "text-white",
-                    desc: "Launch of task tracking system, analytics, and reporting.",
+                    desc: "Launch of task tracking system,<br>analytics,<br>and reporting.",
+                    ariaDesc: "Digital Marketing: Launch of task tracking system, analytics, and reporting. In Progress from December 15 to December 25.",
                   },
-                ].map((row, idx, arr) => (
-                  <React.Fragment key={row.label}>
-                    <div className="flex items-center group">
-                      <div className="min-w-[120px] md:min-w-[180px] flex-1 md:flex-none flex flex-col">
-                        <span className="text-sm md:text-base font-semibold text-gray-800 flex items-center mb-1">
-                          {row.icon}
-                          {row.label}
+                ].map((item, idx, arr) => (
+                  <React.Fragment key={item.label}>
+                    <div className="flex items-center group" role="row">
+                      <div className="w-[140px] md:w-[180px] flex-1 md:flex-none flex flex-col pr-4">
+                        <span className="text-sm md:text-base font-semibold text-slate-800 flex items-center mb-1">
+                          {item.label}
                         </span>
                         <span
-                          className="text-xs text-gray-400 font-normal leading-tight hidden md:block"
-                          dangerouslySetInnerHTML={{ __html: row.desc }}
+                          className="text-xs text-slate-500 font-normal leading-tight hidden md:block"
+                          dangerouslySetInnerHTML={{ __html: item.desc }}
                         ></span>
                       </div>
-                      <div className="flex-1 pl-12 grid grid-cols-7 gap-2">
-                        {[...Array(row.start)].map((_, idx) => (
-                          <div key={idx}></div>
+                      <div className="flex-1 pl-8 grid grid-cols-7 gap-2" role="grid">
+                        {[...Array(item.start)].map((_, idx) => (
+                          <div key={idx} className="h-8"></div>
                         ))}
                         <div
-                          className={`col-span-${row.span} ${row.color} rounded-xl h-7 md:h-9 flex items-center justify-center px-3 shadow transition-all duration-200 ${row.text} font-semibold text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 ring-inset ring-1 ring-black/5 group-hover:scale-[1.03]`}
+                          className={`col-span-${item.span} ${item.color} rounded-xl h-8 md:h-10 flex items-center justify-center px-2 shadow-lg transition-all duration-300 ${item.text} font-semibold text-xs md:text-sm focus:outline-none focus:ring-4 focus:ring-indigo-300 hover:shadow-xl hover:scale-105 cursor-pointer ${item.label === "Initial Testing" || item.label === "HR" ? "ml-16" : ""}`}
                           tabIndex={0}
-                          aria-label={`${row.label} ${row.status}`}
-                          role="status"
+                          aria-label={item.ariaDesc}
+                          role="gridcell"
                         >
-                          <span className="sr-only md:not-sr-only">
-                            {row.status}
+                          <span className="sr-only md:not-sr-only truncate">
+                            {item.status}
                           </span>
                         </div>
-                        {[...Array(7 - row.start - row.span)].map(
+                        {[...Array(7 - item.start - item.span)].map(
                           (_, idx) => (
-                            <div key={idx}></div>
+                            <div key={idx} className="h-8"></div>
                           )
                         )}
                       </div>
                     </div>
                     {idx < arr.length - 1 && (
-                      <div className="border-t border-dashed border-gray-200 my-2"></div>
+                      <div className="border-t border-dashed border-slate-300 my-2"></div>
                     )}
                   </React.Fragment>
                 ))}
               </div>
-              {/* Subtle Divider */}
-              <div className="border-t border-dashed border-gray-200 mt-4 mb-2"></div>
               {/* Footer Note */}
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div className="text-xs text-gray-400">
-                  <span className="font-semibold text-gray-500">
-                    Note:
-                  </span>{" "}
-                  Timeline and milestones are subject to change based on
-                  user feedback and technical discoveries.
+              <div className="border-t border-dashed border-slate-300 mt-2 pt-2">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-1">
+                  <div className="text-xs text-slate-500">
+                    <span className="font-semibold text-slate-600">
+                      Note:
+                    </span>{" "}
+                    Timeline and milestones are subject to change based on
+                    user feedback and technical discoveries.
+                  </div>
+                  <div className="text-xs text-slate-400">
+                    Last updated: December 5, 2025
+                  </div>
                 </div>
               </div>
             </div>
