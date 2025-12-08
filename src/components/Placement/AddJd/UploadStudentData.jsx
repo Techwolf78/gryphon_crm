@@ -10,9 +10,14 @@ import {
   ExclamationIcon,
   CheckCircleIcon,
   ChevronRightIcon,
+  DocumentIcon,
+  ExternalLinkIcon,
+  RefreshIcon,
 } from "@heroicons/react/outline";
 import ExcelUploadModal from "./ExcelUploadModal";
 import * as XLSX from "xlsx";
+import { db } from "../../../firebase";
+import { doc, getDoc, setDoc, Timestamp } from "firebase/firestore";
 
 const UploadStudentData = () => {
   const [searchParams] = useSearchParams();
@@ -22,6 +27,12 @@ const UploadStudentData = () => {
   const [templateFields, setTemplateFields] = useState([]);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
+  const [isCreatingForm, setIsCreatingForm] = useState(false);
+  const [formResponseMessage, setFormResponseMessage] = useState("");
+  const [scriptUrl, setScriptUrl] = useState("https://script.google.com/macros/s/AKfycbzVrslbDJJPIMqWV9r8_550XGw1XKDYeqIlnHdK94j11n-kAB2c8w1O0D6yYrlQz9CzIA/exec");
+  const [storedFormUrl, setStoredFormUrl] = useState("");
+  const [storedEditUrl, setStoredEditUrl] = useState("");
+  const [isLoadingForm, setIsLoadingForm] = useState(false);
 
   // Upload list / job details state
   
@@ -324,6 +335,287 @@ const UploadStudentData = () => {
     }
   };
 
+  const handleCreateGoogleForm = () => {
+    if (templateFields.length === 0) {
+      alert("No template fields available. Please check the form configuration.");
+      return;
+    }
+
+    if (!scriptUrl.trim()) {
+      alert("Please configure your Apps Script URL");
+      return;
+    }
+
+    setIsCreatingForm(true);
+    setFormResponseMessage("");
+
+    // Prepare questions from template fields
+    const questions = templateFields.map((field) => ({
+      title: fieldLabels[field] || field,
+      type: "text",
+      options: [],
+      required: true,
+    }));
+
+    // Prepare form data
+    const formData = {
+      title: `${company || "Company"} - ${college || "College"} Student Data Form`,
+      description: `Student data submission form for ${designation || "Position"} at ${company || "Company"}. All fields are required.`,
+      questions: questions,
+    };
+
+    // Create unique callback name
+    const callbackName = "jsonp_callback_" + Date.now();
+
+    // Clean URL (remove any existing query parameters)
+    let cleanScriptUrl = scriptUrl.split("?")[0];
+
+    // Encode data as URL parameter
+    const encodedData = encodeURIComponent(JSON.stringify(formData));
+    const url = `${cleanScriptUrl}?data=${encodedData}&callback=${callbackName}`;
+
+    // Create script element
+    const script = document.createElement("script");
+    script.src = url;
+
+    // Define the callback function
+    window[callbackName] = (response) => {
+      // Clean up
+      document.head.removeChild(script);
+      delete window[callbackName];
+
+      setIsCreatingForm(false);
+
+      if (response.success) {
+        const message = `✅ Google Form Created Successfully!\n\n📋 Form Title: ${formData.title}\n🔗 Form URL: ${response.formUrl}\n✏️ Edit URL: ${response.editUrl}`;
+        setFormResponseMessage(message);
+
+        // Open form in new tab
+        window.open(response.formUrl, "_blank");
+
+        // Copy form URL to clipboard
+        navigator.clipboard
+          .writeText(response.formUrl)
+          .then(() => {
+            console.log("Form URL copied to clipboard");
+          })
+          .catch((err) => {
+            console.error("Failed to copy URL: ", err);
+          });
+      } else {
+        setFormResponseMessage(
+          `❌ Error: ${response.error || "Failed to create form"}`
+        );
+      }
+    };
+
+    // Set timeout for error handling
+    setTimeout(() => {
+      if (window[callbackName]) {
+        if (document.head.contains(script)) {
+          document.head.removeChild(script);
+        }
+        delete window[callbackName];
+        setIsCreatingForm(false);
+        setFormResponseMessage(
+          "❌ Request timed out. Please check your Apps Script URL and try again."
+        );
+      }
+    }, 30000); // 30 second timeout
+
+    // Error handling
+    script.onerror = () => {
+      if (document.head.contains(script)) {
+        document.head.removeChild(script);
+      }
+      if (window[callbackName]) delete window[callbackName];
+      setIsCreatingForm(false);
+      setFormResponseMessage(
+        "❌ Failed to connect to Apps Script. Please check your URL and internet connection."
+      );
+    };
+
+    // Add script to page
+    document.head.appendChild(script);
+  };
+
+  // Generate document ID from company and college
+  const generateFormDocId = () => {
+    const companySlug = (company || "company").toLowerCase().replace(/\s+/g, "_");
+    const collegeSlug = (college || "college").toLowerCase().replace(/\s+/g, "_");
+    return `form_${companySlug}_${collegeSlug}`;
+  };
+
+  // Save form URLs to Firestore
+  const saveFormToFirebase = async (formUrl, editUrl) => {
+    try {
+      const docId = generateFormDocId();
+      const docRef = doc(db, "PlacementForms", docId);
+
+      await setDoc(docRef, {
+        company,
+        college,
+        course,
+        formUrl,
+        editUrl,
+        templateFields,
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      });
+
+      setStoredFormUrl(formUrl);
+      setStoredEditUrl(editUrl);
+      return true;
+    } catch (error) {
+      console.error("Error saving form to Firebase:", error);
+      throw error;
+    }
+  };
+
+  // Retrieve form URLs from Firestore
+  const fetchFormFromFirebase = async () => {
+    try {
+      setIsLoadingForm(true);
+      const docId = generateFormDocId();
+      const docRef = doc(db, "PlacementForms", docId);
+      const docSnap = await getDoc(docRef);
+
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setStoredFormUrl(data.formUrl);
+        setStoredEditUrl(data.editUrl);
+        return data;
+      }
+      return null;
+    } catch (error) {
+      console.error("Error fetching form from Firebase:", error);
+      return null;
+    } finally {
+      setIsLoadingForm(false);
+    }
+  };
+
+  // Check for stored form on component mount
+  useEffect(() => {
+    if (college && company) {
+      fetchFormFromFirebase();
+    }
+  }, [college, company]);
+
+  // Update handleCreateGoogleForm to save to Firebase after success
+  const handleCreateGoogleFormWithStorage = () => {
+    if (templateFields.length === 0) {
+      alert("No template fields available. Please check the form configuration.");
+      return;
+    }
+
+    if (!scriptUrl.trim()) {
+      alert("Please configure your Apps Script URL");
+      return;
+    }
+
+    setIsCreatingForm(true);
+    setFormResponseMessage("");
+
+    // Prepare questions from template fields
+    const questions = templateFields.map((field) => ({
+      title: fieldLabels[field] || field,
+      type: "text",
+      options: [],
+      required: true,
+    }));
+
+    // Prepare form data
+    const formData = {
+      title: `${company || "Company"} - ${college || "College"} Student Data Form`,
+      description: `Student data submission form for ${designation || "Position"} at ${company || "Company"}. All fields are required.`,
+      questions: questions,
+    };
+
+    // Create unique callback name
+    const callbackName = "jsonp_callback_" + Date.now();
+
+    // Clean URL (remove any existing query parameters)
+    let cleanScriptUrl = scriptUrl.split("?")[0];
+
+    // Encode data as URL parameter
+    const encodedData = encodeURIComponent(JSON.stringify(formData));
+    const url = `${cleanScriptUrl}?data=${encodedData}&callback=${callbackName}`;
+
+    // Create script element
+    const script = document.createElement("script");
+    script.src = url;
+
+    // Define the callback function
+    window[callbackName] = async (response) => {
+      // Clean up
+      document.head.removeChild(script);
+      delete window[callbackName];
+
+      setIsCreatingForm(false);
+
+      if (response.success) {
+        try {
+          // Save to Firebase
+          await saveFormToFirebase(response.formUrl, response.editUrl);
+
+          const message = `✅ Google Form Created Successfully!\n\n📋 Form Title: ${formData.title}\n🔗 Form URL: ${response.formUrl}\n✏️ Edit URL: ${response.editUrl}\n\n💾 Saved to database`;
+          setFormResponseMessage(message);
+
+          // Open form in new tab
+          window.open(response.formUrl, "_blank");
+
+          // Copy form URL to clipboard
+          navigator.clipboard
+            .writeText(response.formUrl)
+            .then(() => {
+              console.log("Form URL copied to clipboard");
+            })
+            .catch((err) => {
+              console.error("Failed to copy URL: ", err);
+            });
+        } catch (error) {
+          const message = `✅ Google Form Created Successfully!\n\n📋 Form Title: ${formData.title}\n🔗 Form URL: ${response.formUrl}\n✏️ Edit URL: ${response.editUrl}\n\n⚠️ Note: Could not save to database`;
+          setFormResponseMessage(message);
+          console.error("Error saving to Firebase:", error);
+        }
+      } else {
+        setFormResponseMessage(
+          `❌ Error: ${response.error || "Failed to create form"}`
+        );
+      }
+    };
+
+    // Set timeout for error handling
+    setTimeout(() => {
+      if (window[callbackName]) {
+        if (document.head.contains(script)) {
+          document.head.removeChild(script);
+        }
+        delete window[callbackName];
+        setIsCreatingForm(false);
+        setFormResponseMessage(
+          "❌ Request timed out. Please check your Apps Script URL and try again."
+        );
+      }
+    }, 30000); // 30 second timeout
+
+    // Error handling
+    script.onerror = () => {
+      if (document.head.contains(script)) {
+        document.head.removeChild(script);
+      }
+      if (window[callbackName]) delete window[callbackName];
+      setIsCreatingForm(false);
+      setFormResponseMessage(
+        "❌ Failed to connect to Apps Script. Please check your URL and internet connection."
+      );
+    };
+
+    // Add script to page
+    document.head.appendChild(script);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8">
       <div className="max-w-6xl mx-auto px-4">
@@ -592,7 +884,160 @@ const UploadStudentData = () => {
                   </div>
                   <ChevronRightIcon className="h-5 w-5" />
                 </button>
+
+                {/* Show Form URL if available, otherwise show Generate button */}
+                {storedFormUrl ? (
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(storedFormUrl);
+                      alert("Form URL copied to clipboard!");
+                    }}
+                    className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-xl shadow-md transition-all duration-300 hover:shadow-lg"
+                  >
+                    <div className="flex items-center flex-1 min-w-0">
+                      <ExternalLinkIcon className="h-6 w-6 mr-3 flex-shrink-0" />
+                      <div className="text-left min-w-0">
+                        <p className="font-semibold">Copy Form Link</p>
+                        <p className="text-sm text-blue-100 truncate">
+                          {storedFormUrl.substring(0, 50)}...
+                        </p>
+                      </div>
+                    </div>
+                    <ChevronRightIcon className="h-5 w-5 flex-shrink-0 ml-2" />
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleCreateGoogleFormWithStorage}
+                    disabled={isCreatingForm || templateFields.length === 0}
+                    className={`w-full flex items-center justify-between p-4 rounded-xl shadow-md transition-all duration-300 hover:shadow-lg ${
+                      isCreatingForm || templateFields.length === 0
+                        ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                        : "bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white"
+                    }`}
+                  >
+                    <div className="flex items-center">
+                      <DocumentIcon className="h-6 w-6 mr-3" />
+                      <div className="text-left">
+                        <p className="font-semibold">
+                          {isCreatingForm ? "Creating Form..." : "Generate Google Form"}
+                        </p>
+                        <p className={`text-sm ${isCreatingForm || templateFields.length === 0 ? "text-gray-500" : "text-orange-100"}`}>
+                          {templateFields.length === 0
+                            ? "No template fields"
+                            : `${templateFields.length} questions`}
+                        </p>
+                      </div>
+                    </div>
+                    <ChevronRightIcon className="h-5 w-5" />
+                  </button>
+                )}
               </div>
+
+              {/* Stored Form URLs - Show if available */}
+              {storedFormUrl && storedEditUrl && (
+                <div className="mt-6 p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border-2 border-green-200">
+                  <div className="flex items-center mb-4">
+                    <CheckCircleIcon className="h-6 w-6 text-green-600 mr-2" />
+                    <h3 className="font-semibold text-green-800">
+                      Google Form Already Created
+                    </h3>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="bg-white p-3 rounded-lg">
+                      <p className="text-xs text-gray-500 mb-1">Form URL</p>
+                      <div className="flex items-center justify-between gap-2">
+                        <a
+                          href={storedFormUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-blue-600 hover:underline truncate flex-1"
+                        >
+                          {storedFormUrl}
+                        </a>
+                        <button
+                          onClick={() =>
+                            navigator.clipboard.writeText(storedFormUrl)
+                          }
+                          className="text-gray-500 hover:text-gray-700 flex-shrink-0"
+                          title="Copy to clipboard"
+                        >
+                          📋
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="bg-white p-3 rounded-lg">
+                      <p className="text-xs text-gray-500 mb-1">Edit URL</p>
+                      <div className="flex items-center justify-between gap-2">
+                        <a
+                          href={storedEditUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-blue-600 hover:underline truncate flex-1"
+                        >
+                          {storedEditUrl}
+                        </a>
+                        <button
+                          onClick={() =>
+                            navigator.clipboard.writeText(storedEditUrl)
+                          }
+                          className="text-gray-500 hover:text-gray-700 flex-shrink-0"
+                          title="Copy to clipboard"
+                        >
+                          📋
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2 pt-2">
+                      <button
+                        onClick={() => window.open(storedFormUrl, "_blank")}
+                        className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm rounded-lg transition-colors"
+                      >
+                        <ExternalLinkIcon className="h-4 w-4" />
+                        Open Form
+                      </button>
+                      <button
+                        onClick={() => window.open(storedEditUrl, "_blank")}
+                        className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-purple-500 hover:bg-purple-600 text-white text-sm rounded-lg transition-colors"
+                      >
+                        <ExternalLinkIcon className="h-4 w-4" />
+                        Edit Form
+                      </button>
+                      <button
+                        onClick={() => fetchFormFromFirebase()}
+                        disabled={isLoadingForm}
+                        className="flex items-center justify-center gap-1 px-3 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        <RefreshIcon className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Form Response Message */}
+              {formResponseMessage && (
+                <div className={`mt-4 p-4 rounded-lg ${
+                  formResponseMessage.includes("✅")
+                    ? "bg-green-50 border border-green-200"
+                    : "bg-red-50 border border-red-200"
+                }`}>
+                  {formResponseMessage.split("\n").map((line, index) => (
+                    <p
+                      key={index}
+                      className={`text-sm ${
+                        formResponseMessage.includes("✅")
+                          ? "text-green-700"
+                          : "text-red-700"
+                      }`}
+                    >
+                      {line}
+                    </p>
+                  ))}
+                </div>
+              )}
 
               <div className="mt-6 pt-6 border-t">
                 <p className="text-sm text-gray-600 text-center">
