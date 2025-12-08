@@ -130,8 +130,7 @@ const CalendarSkeleton = () => (
   </div>
 );
 
-const TaskCard = ({ task, getRoleDisplay, getRoleColor, handleDelete, moveTask, onImageUpload, onImageDelete, onEditTask }) => {
-  const [isUploadingImage, setIsUploadingImage] = useState(false);
+const TaskCard = ({ task, getRoleDisplay, getRoleColor, handleDelete, moveTask, onImageDelete, onEditTask }) => {
   const [showImageModal, setShowImageModal] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
@@ -189,23 +188,6 @@ const TaskCard = ({ task, getRoleDisplay, getRoleColor, handleDelete, moveTask, 
     opacity: isDragging ? 0.5 : 1,
   };
 
-  const handleImageSelect = async (e) => {
-    const file = e.target.files[0];
-    if (file && onImageUpload) {
-      setIsUploadingImage(true);
-      try {
-        await onImageUpload(task.id, file);
-      } catch (error) {
-        console.error("Error uploading image:", error);
-        alert("Failed to upload image. Please try again.");
-      } finally {
-        setIsUploadingImage(false);
-      }
-    }
-    // Reset the input
-    e.target.value = '';
-  };
-
   const getStatusStyles = (status) => {
     switch (status) {
       case 'completed':
@@ -217,74 +199,88 @@ const TaskCard = ({ task, getRoleDisplay, getRoleColor, handleDelete, moveTask, 
     }
   };
 
-  const getActionButtons = (status) => {
+  const getActionButtons = (status, task, onEditTask) => {
+    const editButton = (
+      <button
+        onClick={() => onEditTask(task)}
+        className="px-2 py-1 text-xs text-gray-800 rounded-full hover:opacity-80 transition-colors font-medium shadow-sm"
+        style={{ backgroundColor: '#E6E6FA' }}
+      >
+        Edit
+      </button>
+    );
+
     switch (status) {
       case 'not_started':
         return (
-          <div className="flex gap-1">
+          <div className="flex gap-2">
             <button
               onClick={() => moveTask(task.id, 'in_progress')}
-              className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+              className="px-2 py-1 text-xs bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-colors font-medium shadow-sm"
             >
               Start
             </button>
             <button
               onClick={() => moveTask(task.id, 'cancelled')}
-              className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200"
+              className="px-2 py-1 text-xs bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors font-medium shadow-sm"
             >
               Cancel
             </button>
+            {editButton}
           </div>
         );
       case 'in_progress':
         return (
-          <div className="flex gap-1">
+          <div className="flex gap-2">
             <button
               onClick={() => moveTask(task.id, 'completed')}
-              className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200"
+              className="px-2 py-1 text-xs bg-green-500 text-white rounded-full hover:bg-green-600 transition-colors font-medium shadow-sm"
             >
               Complete
             </button>
             <button
               onClick={() => moveTask(task.id, 'not_started')}
-              className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+              className="px-2 py-1 text-xs bg-gray-500 text-white rounded-full hover:bg-gray-600 transition-colors font-medium shadow-sm"
             >
               Back
             </button>
+            {editButton}
           </div>
         );
       case 'completed':
         return (
-          <div className="flex gap-1">
+          <div className="flex gap-2">
             <button
               onClick={() => moveTask(task.id, 'in_progress')}
-              className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+              className="px-2 py-1 text-xs bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-colors font-medium shadow-sm"
             >
               Reopen
             </button>
             <button
               onClick={() => handleDelete(task.id)}
-              className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200"
+              className="px-2 py-1 text-xs bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors font-medium shadow-sm"
             >
               Delete
             </button>
+            {editButton}
           </div>
         );
       case 'cancelled':
         return (
-          <div className="flex gap-1">
+          <div className="flex gap-2">
             <button
               onClick={() => moveTask(task.id, 'not_started')}
-              className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+              className="px-2 py-1 text-xs bg-gray-500 text-white rounded-full hover:bg-gray-600 transition-colors font-medium shadow-sm"
             >
               Restore
             </button>
             <button
               onClick={() => handleDelete(task.id)}
-              className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200"
+              className="px-2 py-1 text-xs bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors font-medium shadow-sm"
             >
               Delete
             </button>
+            {editButton}
           </div>
         );
       default:
@@ -298,36 +294,8 @@ const TaskCard = ({ task, getRoleDisplay, getRoleColor, handleDelete, moveTask, 
       style={style}
       {...listeners}
       {...attributes}
-      className="bg-white p-2 rounded-md shadow-sm border border-gray-100 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow relative"
+      className="bg-white p-2 rounded-2xl shadow-lg cursor-grab active:cursor-grabbing hover:shadow-xl transition-all duration-200 relative"
     >
-      {/* Attach Image Button */}
-      <div className="absolute top-1 right-1 flex gap-1">
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            onEditTask(task);
-          }}
-          className="cursor-pointer p-1 rounded-full hover:bg-gray-100 transition-colors"
-          title="Edit task"
-        >
-          <FiEdit2 className="w-3 h-3 text-gray-500 hover:text-gray-700" />
-        </button>
-        <label className="cursor-pointer p-1 rounded-full hover:bg-gray-100 transition-colors">
-          <FiPaperclip className="w-3 h-3 text-gray-500 hover:text-gray-700" />
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleImageSelect}
-            className="hidden"
-            disabled={isUploadingImage}
-          />
-        </label>
-        {isUploadingImage && (
-          <div className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-        )}
-      </div>
-
       {task.images && task.images.length > 0 && (
         <div className="mb-1">
           {task.images.length === 1 ? (
@@ -412,26 +380,26 @@ const TaskCard = ({ task, getRoleDisplay, getRoleColor, handleDelete, moveTask, 
         {task.assignedTo || 'Unassigned'}
       </p>
       {task.role && (
-        <div className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${getRoleColor(task.role)} mb-1`}>
+        <div className={`inline-flex items-center px-1 py-0 rounded-full text-xs font-medium ${getRoleColor(task.role)} mb-1`}>
           👤 {getRoleDisplay(task.role)}
         </div>
       )}
-      {getActionButtons(task.status)}
+      {getActionButtons(task.status, task, onEditTask)}
     </div>
   );
 };
 
 const Column = ({ id, title, color, bgColor, tasks, children }) => {
-  const { setNodeRef, isOver } = useDroppable({
+  const { setNodeRef } = useDroppable({
     id,
   });
 
   return (
-    <div className={`${bgColor} rounded-lg p-2 min-h-[250px] transition-colors ${isOver ? 'ring-2 ring-blue-300 ring-opacity-50' : ''}`}>
-      <h3 className="font-medium text-gray-900 mb-2 flex items-center">
-        <div className={`w-2 h-2 ${color} rounded-full mr-2`}></div>
+    <div className={`${bgColor} rounded-2xl p-2 min-h-[200px] transition-colors shadow-sm`}>
+      <h3 className="font-semibold text-gray-900 mb-2 flex items-center text-sm">
+        <div className={`w-3 h-3 ${color} rounded-full mr-3`}></div>
         {title}
-        <span className={`ml-auto text-xs px-2 py-1 rounded-full ${
+        <span className={`ml-auto text-xs px-2 py-1 rounded-full font-medium ${
           color === 'bg-gray-400' ? 'bg-gray-200 text-gray-700' :
           color === 'bg-blue-500' ? 'bg-blue-200 text-blue-700' :
           color === 'bg-green-500' ? 'bg-green-200 text-green-700' :
@@ -440,14 +408,14 @@ const Column = ({ id, title, color, bgColor, tasks, children }) => {
           {tasks.length}
         </span>
       </h3>
-      <div ref={setNodeRef} className="space-y-1 min-h-[200px]">
+      <div ref={setNodeRef} className="space-y-1.5 min-h-[180px]">
         {children}
       </div>
     </div>
   );
 };
 
-const CalendarView = ({ tasks, userFilter, getRoleDisplay, getRoleColor, handleDelete, moveTask, onImageUpload, onImageDelete, onEditTask }) => {
+const CalendarView = ({ tasks, userFilter, getRoleDisplay, getRoleColor, handleDelete, moveTask, onImageDelete, onEditTask }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(null);
 
@@ -509,21 +477,21 @@ const CalendarView = ({ tasks, userFilter, getRoleDisplay, getRoleColor, handleD
   const days = getDaysInMonth(currentDate);
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+    <div className="bg-white rounded-2xl shadow-lg p-3">
       {/* Calendar Header */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-3">
         <button
           onClick={() => navigateMonth(-1)}
-          className="p-2 hover:bg-gray-100 rounded-md transition-colors"
+          className="p-1.5 hover:bg-gray-100 rounded-xl transition-colors"
         >
           ‹
         </button>
-        <h2 className="text-lg font-semibold text-gray-900">
+        <h2 className="text-base font-semibold text-gray-900">
           {formatMonthYear(currentDate)}
         </h2>
         <button
           onClick={() => navigateMonth(1)}
-          className="p-2 hover:bg-gray-100 rounded-md transition-colors"
+          className="p-1.5 hover:bg-gray-100 rounded-xl transition-colors"
         >
           ›
         </button>
@@ -542,7 +510,7 @@ const CalendarView = ({ tasks, userFilter, getRoleDisplay, getRoleColor, handleD
       <div className="grid grid-cols-7 gap-1">
         {days.map((date, index) => {
           if (!date) {
-            return <div key={index} className="p-2 bg-gray-50 rounded-md"></div>;
+            return <div key={index} className="p-3 bg-gray-50 rounded-xl"></div>;
           }
 
           const dayTasks = getTasksForDate(date);
@@ -552,10 +520,10 @@ const CalendarView = ({ tasks, userFilter, getRoleDisplay, getRoleColor, handleD
           return (
             <div
               key={index}
-              className={`min-h-[100px] p-2 border rounded-md cursor-pointer transition-colors ${
-                isToday ? 'bg-blue-50 border-blue-200' :
-                isSelected ? 'bg-blue-100 border-blue-300' :
-                'bg-white border-gray-200 hover:bg-gray-50'
+              className={`min-h-20 p-1.5 border border-gray-200 rounded-xl cursor-pointer transition-all duration-200 ${
+                isToday ? 'bg-blue-50 border-blue-300 shadow-sm' :
+                isSelected ? 'bg-blue-100 border-blue-400 shadow-md' :
+                'bg-white hover:bg-gray-50 hover:shadow-sm'
               }`}
               onClick={() => setSelectedDate(date)}
             >
@@ -590,7 +558,7 @@ const CalendarView = ({ tasks, userFilter, getRoleDisplay, getRoleColor, handleD
 
       {/* Selected Date Tasks */}
       {selectedDate && (
-        <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+        <div className="mt-3 p-3 bg-gray-50 rounded-2xl shadow-inner">
           <h3 className="text-sm font-medium text-gray-900 mb-2">
             Tasks for {selectedDate.toLocaleDateString('en-US', {
               weekday: 'long',
@@ -599,7 +567,7 @@ const CalendarView = ({ tasks, userFilter, getRoleDisplay, getRoleColor, handleD
               day: 'numeric'
             })}
           </h3>
-          <div className="space-y-2 max-h-60 overflow-y-auto">
+          <div className="space-y-2 max-h-48 overflow-y-auto">
             {getTasksForDate(selectedDate).map(task => (
               <TaskCard
                 key={task.id}
@@ -608,13 +576,12 @@ const CalendarView = ({ tasks, userFilter, getRoleDisplay, getRoleColor, handleD
                 getRoleColor={getRoleColor}
                 handleDelete={handleDelete}
                 moveTask={moveTask}
-                onImageUpload={onImageUpload}
                 onImageDelete={onImageDelete}
                 onEditTask={onEditTask}
               />
             ))}
             {getTasksForDate(selectedDate).length === 0 && (
-              <p className="text-sm text-gray-500 text-center py-4">No tasks for this date</p>
+              <p className="text-xs text-gray-500 text-center py-4">No tasks for this date</p>
             )}
           </div>
         </div>
@@ -623,7 +590,7 @@ const CalendarView = ({ tasks, userFilter, getRoleDisplay, getRoleColor, handleD
   );
 };
 
-const TaskManager = () => {
+const TaskManager = ({ onBack }) => {
   const [tasks, setTasks] = useState([]);
   const [title, setTitle] = useState("");
   const [assignedTo, setAssignedTo] = useState("");
@@ -639,6 +606,14 @@ const TaskManager = () => {
   const [isLoading] = useState(true);
   const { user } = useAuth();
   const fileInputRef = useRef(null);
+
+  const roleAbbreviations = {
+    'Video Editor': 'VE',
+    'Graphic Designer': 'GD',
+    'Manager': 'MG',
+    'Developer': 'DEV',
+    'Content Writer': 'CW',
+  };
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -841,18 +816,6 @@ const TaskManager = () => {
     await persist(next);
   };
 
-  const handleImageUpload = async (taskId, file) => {
-    const imageUrl = await uploadImage(file);
-    const next = tasks.map(t => {
-      if (t.id === taskId) {
-        const currentImages = t.images || [];
-        return { ...t, images: [...currentImages, imageUrl] };
-      }
-      return t;
-    });
-    await persist(next);
-  };
-
   const handleImageDelete = async (taskId, imageIndex) => {
     const next = tasks.map(t => {
       if (t.id === taskId && t.images) {
@@ -865,23 +828,23 @@ const TaskManager = () => {
   };
 
   const getRoleDisplay = (role) => {
-    return role || "—";
+    return roleAbbreviations[role] || role || "—";
   };
 
   const getRoleColor = (role) => {
     switch (role) {
       case 'Video Editor':
-        return 'bg-purple-100 text-purple-800 border-purple-200';
+        return 'bg-purple-100 text-purple-800';
       case 'Graphic Designer':
-        return 'bg-pink-100 text-pink-800 border-pink-200';
+        return 'bg-pink-100 text-pink-800';
       case 'Manager':
-        return 'bg-blue-100 text-blue-800 border-blue-200';
+        return 'bg-blue-100 text-blue-800';
       case 'Developer':
-        return 'bg-green-100 text-green-800 border-green-200';
+        return 'bg-green-100 text-green-800';
       case 'Content Writer':
-        return 'bg-orange-100 text-orange-800 border-orange-200';
+        return 'bg-orange-100 text-orange-800';
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
@@ -917,8 +880,8 @@ const TaskManager = () => {
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="bg-linear-to-br from-slate-50 to-gray-100 min-h-screen p-1">
-        <div className="mx-auto">
+      <div className="bg-gray-50 min-h-screen p-1">
+        <div className="mx-auto w-auto">
           {isLoading ? (
             <>
               <div className="text-center mb-3">
@@ -940,12 +903,18 @@ const TaskManager = () => {
                     <p className="text-gray-600 text-xs">Organize and track your marketing tasks with ease</p>
                   </div>
                   <div className="flex items-center gap-3">
+                    <div className="hidden md:flex items-center space-x-1">
+                      <div className="flex items-center space-x-1 text-xs text-gray-500">
+                        <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></div>
+                        <span>Real-time updates</span>
+                      </div>
+                    </div>
                     <div className="flex items-center gap-2">
                       <label className="text-xs text-gray-600 font-medium">Filter by User:</label>
                       <select
                         value={userFilter}
                         onChange={(e) => setUserFilter(e.target.value)}
-                        className="px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white"
+                        className="px-2 py-1.5 text-xs border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white shadow-sm"
                       >
                         <option value="">All Users</option>
                         {getUniqueAssignees().map(assignee => (
@@ -953,12 +922,12 @@ const TaskManager = () => {
                         ))}
                       </select>
                     </div>
-                    <div className="flex items-center gap-1 bg-white rounded-md border border-gray-200 p-1">
+                    <div className="flex items-center gap-2 bg-white rounded-xl border border-gray-200 p-1 shadow-sm">
                       <button
                         onClick={() => setCurrentView("kanban")}
-                        className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                        className={`px-2 py-1 text-xs font-medium rounded-xl transition-colors ${
                           currentView === "kanban"
-                            ? "bg-blue-600 text-white"
+                            ? "bg-blue-500 text-white shadow-sm"
                             : "text-gray-600 hover:bg-gray-100"
                         }`}
                       >
@@ -966,26 +935,26 @@ const TaskManager = () => {
                       </button>
                       <button
                         onClick={() => setCurrentView("calendar")}
-                        className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                        className={`px-2 py-1 text-xs font-medium rounded-xl transition-colors ${
                           currentView === "calendar"
-                            ? "bg-blue-600 text-white"
+                            ? "bg-blue-500 text-white shadow-sm"
                             : "text-gray-600 hover:bg-gray-100"
                         }`}
                       >
                         Calendar
                       </button>
                     </div>
-                    <div className="hidden md:flex items-center space-x-1">
-                      <div className="flex items-center space-x-1 text-xs text-gray-500">
-                        <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></div>
-                        <span>Real-time updates</span>
-                      </div>
-                    </div>
+                    <button
+                      onClick={onBack}
+                      className="px-3 py-1.5 bg-black text-white rounded-full hover:bg-gray-800 transition-colors text-xs font-medium shadow-sm"
+                    >
+                      ← Back
+                    </button>
                   </div>
                 </div>
 
                 {/* Task Creation Form */}
-                <div className="bg-white rounded-md shadow-sm border border-gray-200 p-3 mb-2">
+                <div className="bg-white rounded-2xl shadow-lg p-3 mb-3">
                   <h2 className="text-base font-semibold text-gray-900 mb-2">Create New Task</h2>
                   <form onSubmit={handleAdd} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
                     <div className="sm:col-span-2">
@@ -993,7 +962,7 @@ const TaskManager = () => {
                         value={title}
                         onChange={(e)=>setTitle(e.target.value)}
                         placeholder="Task title..."
-                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                        className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-gray-50"
                         required
                       />
                     </div>
@@ -1001,7 +970,7 @@ const TaskManager = () => {
                       <select
                         value={role}
                         onChange={(e)=>setRole(e.target.value)}
-                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                        className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-gray-50"
                       >
                         <option value="">Select role (opt)</option>
                         <option value="Video Editor">Video Editor</option>
@@ -1016,7 +985,7 @@ const TaskManager = () => {
                         value={assignedTo}
                         onChange={(e)=>setAssignedTo(e.target.value)}
                         placeholder="Assignee..."
-                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                        className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-gray-50"
                       />
                     </div>
                     <div className="sm:col-span-2 lg:col-span-4 flex items-center gap-2">
@@ -1025,26 +994,26 @@ const TaskManager = () => {
                         type="file"
                         accept="image/*"
                         onChange={handleImageChange}
-                        className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:text-xs file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                        className="flex-1 px-2 py-1.5 text-xs border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors file:mr-2 file:py-1 file:px-2 file:rounded-xl file:border-0 file:text-xs file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 bg-gray-50"
                       />
                       {imagePreview && (
                         <button
                           type="button"
                           onClick={clearImage}
-                          className="px-2 py-1 bg-red-50 text-red-700 rounded text-xs hover:bg-red-100 transition-colors"
+                          className="px-2 py-1 bg-red-500 text-white rounded-full text-xs hover:bg-red-600 transition-colors shadow-sm"
                         >
                           ✕
                         </button>
                       )}
                     </div>
-                    <div className="sm:col-span-2 lg:col-span-4 flex items-center gap-2">
+                    <div className="sm:col-span-2 lg:col-span-4 flex items-center gap-3">
                       <button
                         type="submit"
                         disabled={uploadingImage}
-                        className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium text-sm"
+                        className="px-3 py-1.5 bg-blue-500 text-white rounded-full hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium text-xs shadow-sm"
                       >
                         {uploadingImage ? (
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-2">
                             <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                             Uploading...
                           </div>
@@ -1055,7 +1024,7 @@ const TaskManager = () => {
                       <button
                         type="button"
                         onClick={()=>{setTitle(""); setAssignedTo(""); setRole(""); clearImage()}}
-                        className="px-3 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors font-medium text-sm"
+                        className="px-3 py-1.5 bg-gray-500 text-white rounded-full hover:bg-gray-600 transition-colors font-medium text-xs shadow-sm"
                       >
                         Reset
                       </button>
@@ -1063,7 +1032,7 @@ const TaskManager = () => {
                         <img
                           src={imagePreview}
                           alt="Preview"
-                          className="w-12 h-12 object-cover rounded border border-gray-200 shadow-sm"
+                          className="w-10 h-10 object-cover rounded-xl border border-gray-200 shadow-sm"
                         />
                       )}
                     </div>
@@ -1091,7 +1060,6 @@ const TaskManager = () => {
                           getRoleColor={getRoleColor}
                           handleDelete={handleDelete}
                           moveTask={moveTask}
-                          onImageUpload={handleImageUpload}
                           onImageDelete={handleImageDelete}
                           onEditTask={handleEditTask}
                         />
@@ -1113,7 +1081,6 @@ const TaskManager = () => {
                           getRoleColor={getRoleColor}
                           handleDelete={handleDelete}
                           moveTask={moveTask}
-                          onImageUpload={handleImageUpload}
                           onImageDelete={handleImageDelete}
                           onEditTask={handleEditTask}
                         />
@@ -1135,7 +1102,6 @@ const TaskManager = () => {
                           getRoleColor={getRoleColor}
                           handleDelete={handleDelete}
                           moveTask={moveTask}
-                          onImageUpload={handleImageUpload}
                           onImageDelete={handleImageDelete}
                           onEditTask={handleEditTask}
                         />
@@ -1157,7 +1123,6 @@ const TaskManager = () => {
                           getRoleColor={getRoleColor}
                           handleDelete={handleDelete}
                           moveTask={moveTask}
-                          onImageUpload={handleImageUpload}
                           onImageDelete={handleImageDelete}
                           onEditTask={handleEditTask}
                         />
@@ -1173,7 +1138,6 @@ const TaskManager = () => {
                   getRoleColor={getRoleColor}
                   handleDelete={handleDelete}
                   moveTask={moveTask}
-                  onImageUpload={handleImageUpload}
                   onImageDelete={handleImageDelete}
                   onEditTask={handleEditTask}
                 />
@@ -1190,7 +1154,6 @@ const TaskManager = () => {
               getRoleColor={getRoleColor}
               handleDelete={handleDelete}
               moveTask={moveTask}
-              onImageUpload={handleImageUpload}
               onImageDelete={handleImageDelete}
               onEditTask={handleEditTask}
             />

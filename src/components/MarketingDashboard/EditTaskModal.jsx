@@ -145,33 +145,33 @@ const EditTaskModal = ({ task, isOpen, onClose, onSave }) => {
 
   return (
     <div className="fixed inset-0  bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-54 p-4">
-      <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
+      <div className="bg-white rounded-xl shadow-2xl max-w-xl w-full max-h-[85vh] overflow-hidden">
         {/* Header */}
-        <div className="bg-linear-to-r from-blue-600 to-blue-700 px-6 py-4">
+        <div className="bg-linear-to-r from-blue-600 to-blue-700 px-4 py-3">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-bold text-white">Edit Task</h2>
-              <p className="text-blue-100 text-sm mt-1">Update task details and manage attachments</p>
+              <h2 className="text-lg font-bold text-white">Edit Task</h2>
+              <p className="text-blue-100 text-xs mt-1">Update task details and manage attachments</p>
             </div>
             <button
               onClick={onClose}
-              className="text-white hover:bg-white/20 rounded-full p-2 transition-colors"
+              className="text-white hover:bg-white/20 rounded-full p-1.5 transition-colors"
             >
-              <FiX className="w-5 h-5" />
+              <FiX className="w-4 h-4" />
             </button>
           </div>
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
-          <div className="space-y-6">
+        <div className="p-4 overflow-y-auto max-h-[calc(85vh-120px)]">
+          <div className="space-y-4">
             {/* Basic Information Section */}
-            <div className="bg-gray-50 rounded-lg p-4">
-              <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
-                <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
+            <div className="bg-gray-50 rounded-lg p-3">
+              <h3 className="text-xs font-semibold text-gray-900 mb-2 flex items-center">
+                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mr-2"></div>
                 Basic Information
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Task Title *
@@ -180,7 +180,7 @@ const EditTaskModal = ({ task, isOpen, onClose, onSave }) => {
                     type="text"
                     value={formData.title}
                     onChange={(e) => handleInputChange('title', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white"
+                    className="w-full px-2 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-sm"
                     placeholder="Enter task title..."
                   />
                 </div>
@@ -192,7 +192,7 @@ const EditTaskModal = ({ task, isOpen, onClose, onSave }) => {
                     type="text"
                     value={formData.assignedTo}
                     onChange={(e) => handleInputChange('assignedTo', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white"
+                    className="w-full px-2 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-sm"
                     placeholder="Assignee name..."
                   />
                 </div>
@@ -203,7 +203,7 @@ const EditTaskModal = ({ task, isOpen, onClose, onSave }) => {
                   <select
                     value={formData.role}
                     onChange={(e) => handleInputChange('role', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white"
+                    className="w-full px-2 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-sm"
                   >
                     <option value="">Select role (optional)</option>
                     <option value="Video Editor">Video Editor</option>
@@ -217,12 +217,12 @@ const EditTaskModal = ({ task, isOpen, onClose, onSave }) => {
             </div>
 
             {/* Dates Section */}
-            <div className="bg-gray-50 rounded-lg p-4">
-              <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
-                <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+            <div className="bg-gray-50 rounded-lg p-3">
+              <h3 className="text-xs font-semibold text-gray-900 mb-2 flex items-center">
+                <div className="w-1.5 h-1.5 bg-green-500 rounded-full mr-2"></div>
                 Timeline
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Start Date
@@ -231,7 +231,7 @@ const EditTaskModal = ({ task, isOpen, onClose, onSave }) => {
                     type="date"
                     value={formatDateForInput(formData.startDate)}
                     onChange={(e) => handleInputChange('startDate', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white"
+                    className="w-full px-2 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-sm"
                   />
                 </div>
                 <div>
@@ -242,16 +242,16 @@ const EditTaskModal = ({ task, isOpen, onClose, onSave }) => {
                     type="date"
                     value={formatDateForInput(formData.dueDate)}
                     onChange={(e) => handleInputChange('dueDate', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white"
+                    className="w-full px-2 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-sm"
                   />
                 </div>
               </div>
             </div>
 
             {/* Images Section */}
-            <div className="bg-gray-50 rounded-lg p-4">
-              <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
-                <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
+            <div className="bg-gray-50 rounded-lg p-3">
+              <h3 className="text-xs font-semibold text-gray-900 mb-2 flex items-center">
+                <div className="w-1.5 h-1.5 bg-purple-500 rounded-full mr-2"></div>
                 Attachments
               </h3>
 
@@ -259,13 +259,13 @@ const EditTaskModal = ({ task, isOpen, onClose, onSave }) => {
               {formData.images && formData.images.length > 0 && (
                 <div className="mb-4">
                   <p className="text-sm text-gray-600 mb-2">Current Images:</p>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                     {formData.images.map((image, index) => (
                       <div key={index} className="relative group">
                         <img
                           src={image}
                           alt={`Attachment ${index + 1}`}
-                          className="w-full h-20 object-cover rounded-lg border border-gray-200"
+                          className="w-full h-16 object-cover rounded-lg border border-gray-200"
                         />
                         <button
                           onClick={() => removeExistingImage(index)}
@@ -283,13 +283,13 @@ const EditTaskModal = ({ task, isOpen, onClose, onSave }) => {
               {imagePreviews.length > 0 && (
                 <div className="mb-4">
                   <p className="text-sm text-gray-600 mb-2">New Images:</p>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                     {imagePreviews.map((preview, index) => (
                       <div key={index} className="relative group">
                         <img
                           src={preview.preview}
                           alt={`New ${index + 1}`}
-                          className="w-full h-20 object-cover rounded-lg border border-gray-200"
+                          className="w-full h-16 object-cover rounded-lg border border-gray-200"
                         />
                         <button
                           onClick={() => removeImagePreview(index)}
@@ -316,16 +316,16 @@ const EditTaskModal = ({ task, isOpen, onClose, onSave }) => {
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploadingImages}
-                  className="flex items-center gap-2 px-4 py-2 bg-white border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center gap-2 px-3 py-1.5 bg-white border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {uploadingImages ? (
                     <>
-                      <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                      <div className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
                       <span className="text-sm text-gray-600">Uploading...</span>
                     </>
                   ) : (
                     <>
-                      <FiPaperclip className="w-4 h-4 text-gray-500" />
+                      <FiPaperclip className="w-3 h-3 text-gray-500" />
                       <span className="text-sm text-gray-600">Add Images</span>
                     </>
                   )}
@@ -336,27 +336,27 @@ const EditTaskModal = ({ task, isOpen, onClose, onSave }) => {
         </div>
 
         {/* Footer */}
-        <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
-          <div className="flex items-center justify-end gap-3">
+        <div className="bg-gray-50 px-4 py-3 border-t border-gray-200">
+          <div className="flex items-center justify-end gap-2">
             <button
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
             >
               Cancel
             </button>
             <button
               onClick={handleSave}
               disabled={uploadingImages}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+              className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
             >
               {uploadingImages ? (
                 <>
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                   Saving...
                 </>
               ) : (
                 <>
-                  <FiEdit2 className="w-4 h-4" />
+                  <FiEdit2 className="w-3 h-3" />
                   Save Changes
                 </>
               )}

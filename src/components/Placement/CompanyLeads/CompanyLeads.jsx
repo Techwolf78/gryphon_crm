@@ -32,7 +32,9 @@ import { logPlacementActivity, AUDIT_ACTIONS } from "../../../utils/placementAud
 import ViewToggle from "./ViewToggle";
 import * as XLSX from 'xlsx-js-style';
 import { saveAs } from 'file-saver';
-import CompanyLeadDeleteModal from './CompanyLeadDeleteModal';
+// import BatchSplitModal from "./BatchSplitModal";
+
+import CompanyLeadDeleteModal from "./CompanyLeadDeleteModal";
 
   // Utility function to handle Firestore index errors
   const handleFirestoreIndexError = (error, operation = "operation") => {
@@ -132,6 +134,9 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
   // Export modal state
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportStatuses, setExportStatuses] = useState(['hot', 'warm', 'called', 'onboarded']); // Default selected statuses (cold only available for myleads)
+
+  // Batch Split modal state
+  // const [showBatchSplitModal, setShowBatchSplitModal] = useState(false);
 
   // Selected leads for permanent deletion in deleted tab
   const [selectedDeletedLeads, setSelectedDeletedLeads] = useState([]);
@@ -1225,10 +1230,41 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
 
         if (updated) {
           // Save back to Firestore
-          await setDoc(batchDocRef, {
-            ...batchData,
-            companies: encodedCompanies,
-          });
+          try {
+            await setDoc(batchDocRef, {
+              ...batchData,
+              companies: encodedCompanies,
+            });
+          } catch (error) {
+            if (error.message && error.message.includes('size exceeds')) {
+              // Split the batch due to size limit
+              const totalCompanies = encodedCompanies.length;
+              const mid = Math.floor(totalCompanies / 2);
+              const firstHalf = encodedCompanies.slice(0, mid);
+              const secondHalf = encodedCompanies.slice(mid);
+
+              // Create new batch
+              const newBatchId = `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+              const newBatchData = {
+                companies: firstHalf,
+                createdAt: new Date().toISOString(),
+              };
+              await setDoc(doc(db, "companyleads", newBatchId), newBatchData);
+
+              // Update old batch with second half
+              const updatedBatchData = {
+                ...batchData,
+                companies: secondHalf,
+              };
+              await setDoc(batchDocRef, updatedBatchData);
+
+              // Refresh data to update batchIds and local state
+              fetchLeads();
+              console.log('Batch split due to size limit');
+            } else {
+              throw error;
+            }
+          }
         }
       }
 
@@ -1474,10 +1510,41 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
       }
 
       // Save back to Firestore
-      await setDoc(batchDocRef, {
-        ...batchData,
-        companies: encodedCompanies,
-      });
+      try {
+        await setDoc(batchDocRef, {
+          ...batchData,
+          companies: encodedCompanies,
+        });
+      } catch (error) {
+        if (error.message && error.message.includes('size exceeds')) {
+          // Split the batch due to size limit
+          const totalCompanies = encodedCompanies.length;
+          const mid = Math.floor(totalCompanies / 2);
+          const firstHalf = encodedCompanies.slice(0, mid);
+          const secondHalf = encodedCompanies.slice(mid);
+
+          // Create new batch
+          const newBatchId = `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          const newBatchData = {
+            companies: firstHalf,
+            createdAt: new Date().toISOString(),
+          };
+          await setDoc(doc(db, "companyleads", newBatchId), newBatchData);
+
+          // Update old batch with second half
+          const updatedBatchData = {
+            ...batchData,
+            companies: secondHalf,
+          };
+          await setDoc(batchDocRef, updatedBatchData);
+
+          // Refresh data to update batchIds and local state
+          fetchLeads();
+          console.log('Batch split due to size limit');
+        } else {
+          throw error;
+        }
+      }
 
       // Map Firestore field names back to UI field names for local state update
       const uiFieldUpdates = {
@@ -1609,10 +1676,41 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
 
         if (updated) {
           // Save back to Firestore
-          await setDoc(batchDocRef, {
-            ...batchData,
-            companies: encodedCompanies,
-          });
+          try {
+            await setDoc(batchDocRef, {
+              ...batchData,
+              companies: encodedCompanies,
+            });
+          } catch (error) {
+            if (error.message && error.message.includes('size exceeds')) {
+              // Split the batch due to size limit
+              const totalCompanies = encodedCompanies.length;
+              const mid = Math.floor(totalCompanies / 2);
+              const firstHalf = encodedCompanies.slice(0, mid);
+              const secondHalf = encodedCompanies.slice(mid);
+
+              // Create new batch
+              const newBatchId = `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+              const newBatchData = {
+                companies: firstHalf,
+                createdAt: new Date().toISOString(),
+              };
+              await setDoc(doc(db, "companyleads", newBatchId), newBatchData);
+
+              // Update old batch with second half
+              const updatedBatchData = {
+                ...batchData,
+                companies: secondHalf,
+              };
+              await setDoc(batchDocRef, updatedBatchData);
+
+              // Refresh data to update batchIds and local state
+              fetchLeads();
+              console.log('Batch split due to size limit');
+            } else {
+              throw error;
+            }
+          }
         }
       }
 
@@ -1719,10 +1817,41 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
 
         if (updated) {
           // Save back to Firestore
-          await setDoc(batchDocRef, {
-            ...batchData,
-            companies: encodedCompanies,
-          });
+          try {
+            await setDoc(batchDocRef, {
+              ...batchData,
+              companies: encodedCompanies,
+            });
+          } catch (error) {
+            if (error.message && error.message.includes('size exceeds')) {
+              // Split the batch due to size limit
+              const totalCompanies = encodedCompanies.length;
+              const mid = Math.floor(totalCompanies / 2);
+              const firstHalf = encodedCompanies.slice(0, mid);
+              const secondHalf = encodedCompanies.slice(mid);
+
+              // Create new batch
+              const newBatchId = `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+              const newBatchData = {
+                companies: firstHalf,
+                createdAt: new Date().toISOString(),
+              };
+              await setDoc(doc(db, "companyleads", newBatchId), newBatchData);
+
+              // Update old batch with second half
+              const updatedBatchData = {
+                ...batchData,
+                companies: secondHalf,
+              };
+              await setDoc(batchDocRef, updatedBatchData);
+
+              // Refresh data to update batchIds and local state
+              fetchLeads();
+              console.log('Batch split due to size limit');
+            } else {
+              throw error;
+            }
+          }
         }
       }
 
@@ -2171,6 +2300,19 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
                   Bulk Assign
                 </button>
               )}
+              {/* {user && (user?.departments?.includes("admin") || 
+                         user?.departments?.includes("Admin") || 
+                         user?.department === "admin" || 
+                         user?.department === "Admin" ||
+                         user?.role === "admin" || 
+                         user?.role === "Admin") && (
+                <button
+                  onClick={() => setShowBatchSplitModal(true)}
+                  className="px-3 py-1 bg-red-600 text-white rounded-lg font-semibold flex items-center justify-center hover:bg-red-700 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 shadow-md text-xs h-full"
+                >
+                  Split Batches
+                </button>
+              )} */}
             </div>
           </div>
 
@@ -2422,10 +2564,41 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
               }
 
               // Save back to Firestore
-              await setDoc(batchDocRef, {
-                ...batchData,
-                companies: encodedCompanies,
-              });
+              try {
+                await setDoc(batchDocRef, {
+                  ...batchData,
+                  companies: encodedCompanies,
+                });
+              } catch (error) {
+                if (error.message && error.message.includes('size exceeds')) {
+                  // Split the batch due to size limit
+                  const totalCompanies = encodedCompanies.length;
+                  const mid = Math.floor(totalCompanies / 2);
+                  const firstHalf = encodedCompanies.slice(0, mid);
+                  const secondHalf = encodedCompanies.slice(mid);
+
+                  // Create new batch
+                  const newBatchId = `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                  const newBatchData = {
+                    companies: firstHalf,
+                    createdAt: new Date().toISOString(),
+                  };
+                  await setDoc(doc(db, "companyleads", newBatchId), newBatchData);
+
+                  // Update old batch with second half
+                  const updatedBatchData = {
+                    ...batchData,
+                    companies: secondHalf,
+                  };
+                  await setDoc(batchDocRef, updatedBatchData);
+
+                  // Refresh data to update batchIds and local state
+                  fetchLeads();
+                  console.log('Batch split due to size limit');
+                } else {
+                  throw error;
+                }
+              }
 
               // Update local state
               setLeads(
@@ -2639,6 +2812,14 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
           </div>
         </div>
       )}
+
+      {/* <BatchSplitModal
+        showBatchSplitModal={showBatchSplitModal}
+        setShowBatchSplitModal={setShowBatchSplitModal}
+        fetchLeads={fetchLeads}
+        showToast={showToast}
+        user={user}
+      /> */}
 
       <CompanyLeadDeleteModal
         isOpen={deleteModalOpen}

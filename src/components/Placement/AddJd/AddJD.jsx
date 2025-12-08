@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { XIcon } from "@heroicons/react/outline";
-import { toast } from 'react-toastify';
+import { toast } from "react-toastify";
 import { db } from "../../../firebase";
 import {
   collection,
@@ -18,7 +18,6 @@ import CollegeSelection from "./CollegeSelection";
 import TemplateDownloadModal from "./TemplateDownloadModal";
 import ExcelUploadModal from "./ExcelUploadModal";
 
-// EmailJS configuration
 const EMAILJS_CONFIG = {
   SERVICE_ID: "service_sl0i7kr",
   TEMPLATE_ID: "template_q0oarab",
@@ -187,10 +186,12 @@ function AddJD({ show, onClose, company, fetchCompanies }) {
   const handleSave = async () => {
     if (!validateStep1()) return;
 
-    setSaveStatus('saving');
+    setSaveStatus("saving");
     try {
       // Compute total salary
-      const totalSalary = (parseFloat(formData.fixedSalary) || 0) + (parseFloat(formData.variableSalary) || 0);
+      const totalSalary =
+        (parseFloat(formData.fixedSalary) || 0) +
+        (parseFloat(formData.variableSalary) || 0);
       const updatedFormData = { ...formData, salary: totalSalary.toString() };
 
       if (company && company.id) {
@@ -200,7 +201,7 @@ function AddJD({ show, onClose, company, fetchCompanies }) {
           updatedAt: serverTimestamp(),
         });
         toast.success("Company updated successfully!");
-        setSaveStatus('saved');
+        setSaveStatus("saved");
         setTimeout(() => {
           setSaveStatus(null);
           onClose(); // Close modal after successful update
@@ -213,7 +214,7 @@ function AddJD({ show, onClose, company, fetchCompanies }) {
           createdAt: serverTimestamp(),
         });
         toast.success("Company saved successfully!");
-        setSaveStatus('saved');
+        setSaveStatus("saved");
         setTimeout(() => setSaveStatus(null), 3000);
       }
 
@@ -429,7 +430,58 @@ function AddJD({ show, onClose, company, fetchCompanies }) {
         })
         .join("");
 
+      // Format salary and stipend values for display
+      const formatSalaryValue = (value) => {
+        if (!value || value === 0 || value === "0") return "Not Specified";
+        const num = parseFloat(value);
+        if (num >= 100000) {
+          return `₹${(num / 100000).toFixed(1)} LPA`;
+        }
+        return `₹${num.toLocaleString()}`;
+      };
+
+      const formatStipendValue = (value) => {
+        if (!value || value === 0 || value === "0") return "Not Specified";
+        const num = parseFloat(value);
+        return `₹${num.toLocaleString()}/month`;
+      };
+
+      const fixedSalaryDisplay = formatSalaryValue(formData.fixedSalary);
+      const variableSalaryDisplay = formatSalaryValue(formData.variableSalary);
+      const totalSalaryDisplay = formatSalaryValue(formData.salary);
+      const stipendDisplay = formatStipendValue(formData.stipend);
+      // --- BEGIN: Salary / Stipend HTML section (add here) ---
+      const salarySectionHTML =
+        formData.jobType === "Internship" || formData.jobType === "Int + PPO"
+          ? `
+      <p><strong>Stipend:</strong> ${stipendDisplay}${
+              formData.internshipDuration
+                ? ` <span>(${formData.internshipDuration})</span>`
+                : ""
+            }</p>
+      <p><strong>Fixed Salary:</strong> ${fixedSalaryDisplay}</p>
+      <p><strong>Variable Salary:</strong> ${variableSalaryDisplay}</p>
+      <p><strong>Total CTC:</strong> ${totalSalaryDisplay}</p>
+    `
+          : `
+      <p><strong>Fixed Salary:</strong> ${fixedSalaryDisplay}</p>
+      <p><strong>Variable Salary:</strong> ${variableSalaryDisplay}</p>
+      <p><strong>Total CTC:</strong> ${totalSalaryDisplay}</p>
+    `;
+      // --- END ---
+
       // Send individual emails to each college
+      const fileNames =
+        jobFiles && jobFiles.length
+          ? jobFiles.map((file) => file.name || file)
+          : [];
+
+      const jobFilesHTML = fileNames.length
+        ? `<p><strong>Job Files:</strong><ul>${fileNames
+            .map((fn) => `<li>${fn}</li>`)
+            .join("")}</ul></p>`
+        : "<p><strong>Job Files:</strong> Not provided</p>";
+
       const emailPromises = collegesWithTPO
         .filter(({ tpoEmail }) => tpoEmail && tpoEmail.trim() !== "")
         .map(async ({ college, tpoEmail }) => {
@@ -439,7 +491,21 @@ function AddJD({ show, onClose, company, fetchCompanies }) {
             company_website: formData.companyWebsite || "Not provided",
             job_designation: formData.jobDesignation,
             job_location: formData.jobLocation,
-            salary: formData.salary,
+
+            // Salary Fields
+            fixed_salary: fixedSalaryDisplay,
+            variable_salary: variableSalaryDisplay,
+            total_salary: totalSalaryDisplay,
+            stipend: stipendDisplay,
+
+            // HTML block for salary/stipend
+            salary_section: salarySectionHTML,
+
+            salary_info:
+              formData.jobType === "Internship" || formData.jobType === "Int + PPO"
+                ? `Stipend: ${stipendDisplay} | Fixed: ${fixedSalaryDisplay} | Variable: ${variableSalaryDisplay} | Total: ${totalSalaryDisplay}`
+                : `Fixed: ${fixedSalaryDisplay} | Variable: ${variableSalaryDisplay} | Total: ${totalSalaryDisplay}`,
+
             job_type: formData.jobType,
             mode_of_interview: formData.modeOfInterview,
             course: formData.course,
@@ -447,6 +513,13 @@ function AddJD({ show, onClose, company, fetchCompanies }) {
             Gender: formData.gender,
             marks_criteria: formData.marksCriteria,
             backlog_criteria: formData.backlogCriteria,
+            other_criteria: formData.otherCriteria || "None",
+            internship_duration: formData.internshipDuration || "Not specified",
+            mode_of_work: formData.modeOfWork || "Not specified",
+            joining_period: formData.joiningPeriod || "Not specified",
+            company_open_date: formData.companyOpenDate || "Not specified",
+            source: formData.source || "Not specified",
+            coordinator: formData.coordinator || "Not specified",
             college_count: validEmails.length,
             college_name: college,
             template_fields: templateFieldsHTML,
@@ -455,6 +528,7 @@ function AddJD({ show, onClose, company, fetchCompanies }) {
               .map((round) => `<li>${round}</li>`)
               .join(""),
 
+            // ✅ FIXED: Complete URL with ALL job details parameters
             upload_link: `${
               window.location.origin
             }/upload-student-data?college=${encodeURIComponent(
@@ -463,11 +537,52 @@ function AddJD({ show, onClose, company, fetchCompanies }) {
               formData.companyName
             )}&course=${encodeURIComponent(
               formData.course
-            )}&fields=${encodeURIComponent(JSON.stringify(templateFields))}`,
+            )}&fields=${encodeURIComponent(
+              JSON.stringify(templateFields)
+            )}&companyWebsite=${encodeURIComponent(
+              formData.companyWebsite || ""
+            )}&designation=${encodeURIComponent(
+              formData.jobDesignation || ""
+            )}&jobType=${encodeURIComponent(
+              formData.jobType || ""
+            )}&jobLocation=${encodeURIComponent(
+              formData.jobLocation || ""
+            )}&fixedSalary=${encodeURIComponent(
+              formData.fixedSalary || ""
+            )}&variableSalary=${encodeURIComponent(
+              formData.variableSalary || ""
+            )}&totalCTC=${encodeURIComponent(
+              formData.salary || ""
+            )}&modeOfInterview=${encodeURIComponent(
+              formData.modeOfInterview || ""
+            )}&passingYear=${encodeURIComponent(
+              formData.passingYear || ""
+            )}&genderEligibility=${encodeURIComponent(
+              formData.gender || ""
+            )}&marksCriteria=${encodeURIComponent(
+              formData.marksCriteria || ""
+            )}&backlogCriteria=${encodeURIComponent(
+              formData.backlogCriteria || ""
+            )}&jobDescription=${encodeURIComponent(
+              formData.jobDescription || ""
+            )}`,
+
+            company_files_link: `${
+              window.location.origin
+            }/company-files?company=${encodeURIComponent(
+              formData.companyName
+            )}&college=${encodeURIComponent(college)}`,
             coordinator_name: formData.coordinator,
             coordinator_phone: "+91-9876543210",
             bcc: tpoEmail,
+            job_description: formData.jobDescription || "Not specified",
+            job_description_html: formData.jobDescription
+              ? `<p><strong>Job Description:</strong><br>${formData.jobDescription}</p>`
+              : "<p><strong>Job Description:</strong> Not specified</p>",
+            job_files: fileNames.join(", "),
+            job_files_html: jobFilesHTML,
           };
+
           return emailjs.send(
             EMAILJS_CONFIG.SERVICE_ID,
             EMAILJS_CONFIG.TEMPLATE_ID,
@@ -520,7 +635,9 @@ function AddJD({ show, onClose, company, fetchCompanies }) {
       const collegesToSubmit = selectedColleges.filter((c) => c !== "Other");
 
       // Compute total salary
-      const totalSalary = (parseFloat(formData.fixedSalary) || 0) + (parseFloat(formData.variableSalary) || 0);
+      const totalSalary =
+        (parseFloat(formData.fixedSalary) || 0) +
+        (parseFloat(formData.variableSalary) || 0);
       const updatedFormData = { ...formData, salary: totalSalary.toString() };
 
       const collegesWithTPO = collegesToSubmit.map((college) => ({
@@ -535,7 +652,7 @@ function AddJD({ show, onClose, company, fetchCompanies }) {
           college,
           tpoEmail: getCollegeEmail(college),
           templateFields: selectedTemplateFields, // ✅ Save selected columns
-          jobFiles: jobFiles.map((file) => file.name),
+          jobFiles: jobFiles.map((file) => file.name || file),
           updatedAt: serverTimestamp(),
         };
 
@@ -576,7 +693,11 @@ function AddJD({ show, onClose, company, fetchCompanies }) {
         companyName: company.companyName || company.name || "",
         companyWebsite: company.companyUrl || company.companyWebsite || "",
         course: company.course || "",
-        specialization: Array.isArray(company.specialization) ? company.specialization : (company.specialization ? [company.specialization] : []),
+        specialization: Array.isArray(company.specialization)
+          ? company.specialization
+          : company.specialization
+          ? [company.specialization]
+          : [],
         passingYear: company.passingYear || "",
         gender: company.gender || "",
         marksCriteria: company.marksCriteria || "",
@@ -588,7 +709,11 @@ function AddJD({ show, onClose, company, fetchCompanies }) {
         fixedSalary: company.fixedSalary || "",
         variableSalary: company.variableSalary || "",
         salary: company.salary || "",
-        hiringRounds: Array.isArray(company.hiringRounds) ? company.hiringRounds : (company.hiringRounds ? [company.hiringRounds] : []),
+        hiringRounds: Array.isArray(company.hiringRounds)
+          ? company.hiringRounds
+          : company.hiringRounds
+          ? [company.hiringRounds]
+          : [],
         internshipDuration: company.internshipDuration || "",
         stipend: company.stipend || "",
         modeOfInterview: company.modeOfInterview || "",
@@ -601,6 +726,10 @@ function AddJD({ show, onClose, company, fetchCompanies }) {
         status: company.status || "ongoing",
         createdAt: company.createdAt || serverTimestamp(),
       }));
+      // If company has jobFiles (from DB as array of strings), set state for display
+      if (company.jobFiles && company.jobFiles.length) {
+        setJobFiles(company.jobFiles);
+      }
     } else if (!show) {
       // Reset form when modal closes
       setFormData({
@@ -631,6 +760,7 @@ function AddJD({ show, onClose, company, fetchCompanies }) {
         status: "ongoing",
         createdAt: serverTimestamp(),
       });
+      setJobFiles([]);
       setCurrentStep(1);
       setSelectedColleges([]);
       setFormErrors({});
@@ -663,7 +793,11 @@ function AddJD({ show, onClose, company, fetchCompanies }) {
         {/* Modal Header */}
         <div className="bg-linear-to-r from-blue-600 to-indigo-700 px-6 py-4 flex justify-between items-center">
           <h2 className="text-xl font-semibold text-white">
-            {currentStep === 1 ? (company ? "Edit JD Form" : "Add JD Form") : "Select Colleges"}
+            {currentStep === 1
+              ? company
+                ? "Edit JD Form"
+                : "Add JD Form"
+              : "Select Colleges"}
           </h2>
           <button
             onClick={onClose}
@@ -672,7 +806,7 @@ function AddJD({ show, onClose, company, fetchCompanies }) {
             <XIcon className="h-5 w-5" />
           </button>
         </div>
-{/* code */}
+        {/* code */}
         {currentStep === 1 ? (
           <>
             <div className="p-6 overflow-y-auto max-h-[calc(100vh-180px)]">
@@ -681,6 +815,8 @@ function AddJD({ show, onClose, company, fetchCompanies }) {
                 setFormData={setFormData}
                 formErrors={formErrors}
                 handleFileChange={handleFileChange}
+                jobFiles={jobFiles}
+                setJobFiles={setJobFiles}
                 onClose={onClose}
                 placementUsers={placementUsers}
                 isLoadingUsers={isLoadingUsers}
@@ -698,10 +834,14 @@ function AddJD({ show, onClose, company, fetchCompanies }) {
                 {company && (
                   <button
                     onClick={handleSave}
-                    disabled={saveStatus === 'saving' || saveStatus === 'saved'}
+                    disabled={saveStatus === "saving" || saveStatus === "saved"}
                     className="px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'saved' ? 'Saved!' : 'Update'}
+                    {saveStatus === "saving"
+                      ? "Saving..."
+                      : saveStatus === "saved"
+                      ? "Saved!"
+                      : "Update"}
                   </button>
                 )}
                 <button

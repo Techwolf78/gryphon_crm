@@ -104,66 +104,68 @@ const MarketingDashboard = () => {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <div className="w-full flex-1">
-        <div className="flex items-center justify-between mb-2">
-          <div>
-            <h1 className="text-3xl font-bold text-blue-600">Marketing Dashboard</h1>
-            <p className="text-sm text-gray-600 mt-1">Add and manage contracts for marketing-related services.</p>
+        {active !== SECTION.TASKS && (
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <h1 className="text-3xl font-bold text-blue-600">Marketing Dashboard</h1>
+              <p className="text-sm text-gray-600 mt-1">Add and manage contracts for marketing-related services.</p>
+            </div>
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-1">
+              <nav className="flex space-x-1">
+                <button
+                  onClick={() => setActive(SECTION.CONTRACTS)}
+                  className={`py-2 px-4 rounded-md font-medium text-sm transition-colors ${
+                    active === SECTION.CONTRACTS
+                      ? "bg-[#1C39BB] text-white shadow-sm"
+                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                  }`}
+                >
+                  Contracts
+                </button>
+                <button
+                  onClick={() => setActive(SECTION.ANALYTICS)}
+                  className={`py-2 px-4 rounded-md font-medium text-sm transition-colors ${
+                    active === SECTION.ANALYTICS
+                      ? "bg-[#1C39BB] text-white shadow-sm"
+                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                  }`}
+                >
+                  Analytics
+                </button>
+                <button
+                  onClick={() => setActive(SECTION.ADMISSIONS)}
+                  className={`py-2 px-4 rounded-md font-medium text-sm transition-colors ${
+                    active === SECTION.ADMISSIONS
+                      ? "bg-[#1C39BB] text-white shadow-sm"
+                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                  }`}
+                >
+                  Admissions
+                </button>
+                <button
+                  onClick={() => setActive(SECTION.TASKS)}
+                  className={`py-2 px-6 rounded-md font-medium text-sm transition-colors ${
+                    active === SECTION.TASKS
+                      ? "bg-[#1C39BB] text-white shadow-sm"
+                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                  }`}
+                >
+                  Task Manager
+                </button>
+                <button
+                  onClick={() => setActive(SECTION.BUDGET)}
+                  className={`py-2 px-4 rounded-md font-medium text-sm transition-colors ${
+                    active === SECTION.BUDGET
+                      ? "bg-[#1C39BB] text-white shadow-sm"
+                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                  }`}
+                >
+                  Budget
+                </button>
+              </nav>
+            </div>
           </div>
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-1">
-            <nav className="flex space-x-1">
-              <button
-                onClick={() => setActive(SECTION.CONTRACTS)}
-                className={`py-2 px-4 rounded-md font-medium text-sm transition-colors ${
-                  active === SECTION.CONTRACTS
-                    ? "bg-[#1C39BB] text-white shadow-sm"
-                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                }`}
-              >
-                Contracts
-              </button>
-              <button
-                onClick={() => setActive(SECTION.ANALYTICS)}
-                className={`py-2 px-4 rounded-md font-medium text-sm transition-colors ${
-                  active === SECTION.ANALYTICS
-                    ? "bg-[#1C39BB] text-white shadow-sm"
-                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                }`}
-              >
-                Analytics
-              </button>
-              <button
-                onClick={() => setActive(SECTION.ADMISSIONS)}
-                className={`py-2 px-4 rounded-md font-medium text-sm transition-colors ${
-                  active === SECTION.ADMISSIONS
-                    ? "bg-[#1C39BB] text-white shadow-sm"
-                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                }`}
-              >
-                Admissions
-              </button>
-              <button
-                onClick={() => setActive(SECTION.TASKS)}
-                className={`py-2 px-6 rounded-md font-medium text-sm transition-colors ${
-                  active === SECTION.TASKS
-                    ? "bg-[#1C39BB] text-white shadow-sm"
-                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                }`}
-              >
-                Task Manager
-              </button>
-              <button
-                onClick={() => setActive(SECTION.BUDGET)}
-                className={`py-2 px-4 rounded-md font-medium text-sm transition-colors ${
-                  active === SECTION.BUDGET
-                    ? "bg-[#1C39BB] text-white shadow-sm"
-                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                }`}
-              >
-                Budget
-              </button>
-            </nav>
-          </div>
-        </div>
+        )}
 
         <div className="space-y-6">
           {active === SECTION.CONTRACTS && (
@@ -249,7 +251,7 @@ const MarketingDashboard = () => {
 
           {active === SECTION.TASKS && (
             <div className="bg-white rounded-xl p-4 shadow-sm">
-              <TaskManager contracts={contracts} />
+              <TaskManager contracts={contracts} onBack={() => setActive(SECTION.CONTRACTS)} />
             </div>
           )}
 

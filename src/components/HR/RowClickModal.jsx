@@ -400,46 +400,27 @@ const RowClickModal = ({ installment, invoice, onClose }) => {
                     </td>
                   </tr>
 
-                  {/* Cash Invoice ke liye GST zero dikhao */}
-                  {invoice?.invoiceType === "Cash Invoice" ? (
-                    <>
-                      <tr>
-                        <td className="border border-gray-300 px-4 py-2 font-semibold">
-                          CGST @ 0%
-                        </td>
-                        <td className="border border-gray-300 px-4 py-2 text-right">
-                          0.00
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="border border-gray-300 px-4 py-2 font-semibold">
-                          SGST @ 0%
-                        </td>
-                        <td className="border border-gray-300 px-4 py-2 text-right">
-                          0.00
-                        </td>
-                      </tr>
-                    </>
-                  ) : (
-                    <>
-                      <tr>
-                        <td className="border border-gray-300 px-4 py-2 font-semibold">
-                          Add: CGST @ 9%
-                        </td>
-                        <td className="border border-gray-300 px-4 py-2 text-right">
-                          {(amounts.gstAmount / 2).toLocaleString("en-IN", {
-                            minimumFractionDigits: 2,
-                          })}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="border border-gray-300 px-4 py-2 font-semibold">
-                          Add: SGST @ 9%
-                        </td>
-                        <td className="border border-gray-300 px-4 py-2 text-right">
-                          {(amounts.gstAmount / 2).toLocaleString("en-IN", {
-                            minimumFractionDigits: 2,
-                          })}
+                  {/* GST breakdown */}
+                  <tr>
+                    <td className="border border-gray-300 px-4 py-2 font-semibold">
+                      Add: CGST @ 9%
+                    </td>
+                    <td className="border border-gray-300 px-4 py-2 text-right">
+                      {(amounts.gstAmount / 2).toLocaleString("en-IN", {
+                        minimumFractionDigits: 2,
+                      })}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 px-4 py-2 font-semibold">
+                      Add: SGST @ 9%
+                    </td>
+                    <td className="border border-gray-300 px-4 py-2 text-right">
+                      {(amounts.gstAmount / 2).toLocaleString("en-IN", {
+                        minimumFractionDigits: 2,
+                      })}
+                    </td>
+                  </tr>
                         </td>
                       </tr>
                     </>

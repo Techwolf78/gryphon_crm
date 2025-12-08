@@ -3,9 +3,9 @@ import { db } from "../firebase";
 import { doc, setDoc, collection, getDocs, query, orderBy } from "firebase/firestore";
 
 // Smart batching utility to find the next available batch number and check existing batches
-const getNextBatchInfo = async () => {
+const getNextBatchInfo = async (chunkSize = 1000) => {
   try {
-    console.log("🔍 Checking existing batches in Firestore...");
+    console.log("Checking existing batches in Firestore...");
 
     // Query all batch documents ordered by batch number (assuming batch_1, batch_2, etc.)
     const batchesQuery = query(collection(db, "companyleads"), orderBy("__name__"));
@@ -29,29 +29,29 @@ const getNextBatchInfo = async () => {
       }
     });
 
-    console.log(`� Found ${highestBatchNumber} existing batches. Last batch: ${lastBatchId}`);
+    console.log(`Found ${highestBatchNumber} existing batches. Last batch: ${lastBatchId}`);
 
-    // Check if the last batch has space (<999 records)
+    // Check if the last batch has space (<chunkSize records)
     let shouldCreateNewBatch = true;
     let nextBatchNumber = highestBatchNumber + 1;
 
     if (lastBatchData && lastBatchData.companies) {
       const lastBatchSize = lastBatchData.companies.length;
-      console.log(`📏 Last batch (${lastBatchId}) has ${lastBatchSize} records`);
+      console.log(`Last batch (${lastBatchId}) has ${lastBatchSize} records`);
 
-      if (lastBatchSize < 999) {
+      if (lastBatchSize < chunkSize) {
         // Last batch has space, we can append to it
         shouldCreateNewBatch = false;
         nextBatchNumber = highestBatchNumber;
-        console.log(`✅ Will append to existing batch_${nextBatchNumber} (${lastBatchSize}/999 records)`);
+        console.log(`Will append to existing batch_${nextBatchNumber} (${lastBatchSize}/${chunkSize} records)`);
       } else {
         // Last batch is full, create new batch
-        console.log(`� Last batch is full (${lastBatchSize}/999), will create batch_${nextBatchNumber}`);
+        console.log(`Last batch is full (${lastBatchSize}/${chunkSize}), will create batch_${nextBatchNumber}`);
       }
     } else if (highestBatchNumber === 0) {
       // No existing batches, start from 1
       nextBatchNumber = 1;
-      console.log("🆕 No existing batches found, starting from batch_1");
+      console.log("No existing batches found, starting from batch_1");
     }
 
     return {
@@ -61,9 +61,9 @@ const getNextBatchInfo = async () => {
       lastBatchId: shouldCreateNewBatch ? null : lastBatchId
     };
   } catch (error) {
-    console.error("❌ Error checking existing batches:", error);
+    console.error("Error checking existing batches:", error);
     // If we can't check existing batches, start from batch_1
-    console.log("⚠️ Could not check existing batches, starting from batch_1");
+    console.log("Could not check existing batches, starting from batch_1");
     return {
       nextBatchNumber: 1,
       shouldCreateNewBatch: true,
@@ -75,24 +75,24 @@ const getNextBatchInfo = async () => {
 
 // Utility function to handle Firestore index errors
 const handleFirestoreIndexError = (error, operation = "operation") => {
-  console.error(`❌ Firestore Index Error in ${operation}:`, error);
+  console.error(`Firestore Index Error in ${operation}:`, error);
 
   if (error.message && error.message.includes('index')) {
-    console.error("🔍 Firestore Index Error Detected!");
-    console.error("💡 To fix this, create the required index:");
+    console.error("Firestore Index Error Detected!");
+    console.error("To fix this, create the required index:");
 
     // Try to extract index URL from error message
     const indexUrlMatch = error.message.match(/https:\/\/console\.firebase\.google\.com[^\s]*/);
     if (indexUrlMatch) {
-      console.log("🔗 %cClick here to create index", "color: blue; text-decoration: underline; cursor: pointer; font-weight: bold;", indexUrlMatch[0]);
-      console.log("📋 Or copy this URL: " + indexUrlMatch[0]);
+      console.log("Click here to create index", "color: blue; text-decoration: underline; cursor: pointer; font-weight: bold;", indexUrlMatch[0]);
+      console.log("Or copy this URL: " + indexUrlMatch[0]);
 
       // Make the link clickable in some browsers
-      console.log("🚨 After creating the index, refresh the page to retry the " + operation + ".");
+      console.log("After creating the index, refresh the page to retry the " + operation + ".");
     } else {
-      console.error("❓ Could not extract index URL from error.");
-      console.log("🔗 Go to: https://console.firebase.google.com/project/YOUR_PROJECT_ID/firestore/indexes");
-      console.log("📝 Replace YOUR_PROJECT_ID with your actual Firebase project ID");
+      console.error("Could not extract index URL from error.");
+      console.log("Go to: https://console.firebase.google.com/project/YOUR_PROJECT_ID/firestore/indexes");
+      console.log("Replace YOUR_PROJECT_ID with your actual Firebase project ID");
     }
   }
 };
@@ -107,13 +107,13 @@ const handleFirestoreIndexError = (error, operation = "operation") => {
 // 8. Add 500ms delay between batches to prevent overwhelming Firestore write stream
 // 9. Log progress: "✅ Uploaded batch_1 (1500 records)"
 // 10. Handle 58,000 records safely without exceeding Firestore limits
-export const uploadCompaniesFromExcel = async (file, onProgress = null, assigneeId = null) => {
+export const uploadCompaniesFromExcel = async (file, onProgress = null, assigneeId = null, targetBatchId = null) => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
 
     reader.onload = async (e) => {
       try {
-        console.log("📂 Reading Excel file...");
+        console.log("Reading Excel file...");
 
         // 1. Read the Excel file using xlsx library
         const data = new Uint8Array(e.target.result);
@@ -123,8 +123,8 @@ export const uploadCompaniesFromExcel = async (file, onProgress = null, assignee
 
         // Convert to JSON, filter out empty rows
         const rawJsonData = XLSX.utils.sheet_to_json(worksheet);
-        console.log("🔍 Raw Excel data (first 3 rows):", rawJsonData.slice(0, 3));
-        console.log("📋 Available columns:", rawJsonData.length > 0 ? Object.keys(rawJsonData[0]) : "No data rows");
+        console.log("Raw Excel data (first 3 rows):", rawJsonData.slice(0, 3));
+        console.log("Available columns:", rawJsonData.length > 0 ? Object.keys(rawJsonData[0]) : "No data rows");
 
         const jsonData = rawJsonData.filter(row => {
           // Check for CompanyName with different possible variations
@@ -132,12 +132,12 @@ export const uploadCompaniesFromExcel = async (file, onProgress = null, assignee
           return companyName && companyName.toString().trim() !== '';
         });
 
-        console.log(`📊 Found ${jsonData.length} company records in Excel file`);
+        console.log(`Found ${jsonData.length} company records in Excel file`);
 
         // If no companies found, provide helpful error message
         if (jsonData.length === 0) {
-          console.error("❌ No valid company records found in Excel file!");
-          console.error("💡 Please ensure your Excel file has:");
+          console.error("No valid company records found in Excel file!");
+          console.error("Please ensure your Excel file has:");
           console.error("   - Column headers in the first row");
           console.error("   - 'CompanyName' or 'Company Name' column with company names");
           console.error("   - At least one row of data below the headers");
@@ -191,7 +191,7 @@ export const uploadCompaniesFromExcel = async (file, onProgress = null, assignee
           return company;
         });
 
-        console.log("🔄 Converting companies to Base64 encoded JSON strings...");
+        console.log("Converting companies to Base64 encoded JSON strings...");
 
         // 3. Encode each company object as Base64 JSON string (Unicode-safe)
         const encodedCompanies = companies.map(company => {
@@ -201,65 +201,152 @@ export const uploadCompaniesFromExcel = async (file, onProgress = null, assignee
           return btoa(uriEncoded);
         });
 
-        console.log(`✨ Encoded ${encodedCompanies.length} companies as Base64 strings`);
+        console.log(`Encoded ${encodedCompanies.length} companies as Base64 strings`);
 
-        // 4. Get smart batching information
-        const batchInfo = await getNextBatchInfo();
-        const { nextBatchNumber, shouldCreateNewBatch, lastBatchData, lastBatchId } = batchInfo;
-
-        console.log(`🎯 Smart batching: Starting from batch_${nextBatchNumber}, Create new: ${shouldCreateNewBatch}`);
-
-        // 5. Handle batching logic with batch size limit
+        // 4. Handle batching logic
+        const chunkSize = 500; // Batch size limit reduced to stay under 1MB document size
         let batchesToUpload = [];
-        let currentBatchNumber = nextBatchNumber;
-        const chunkSize = 1000; // Batch size limit
 
-        if (!shouldCreateNewBatch && lastBatchData) {
-          // Append to existing batch
-          const existingCompanies = lastBatchData.companies || [];
-          const availableSpace = chunkSize - existingCompanies.length;
+        if (targetBatchId) {
+          // User specified target batch
+          console.log(`User specified target batch: ${targetBatchId}`);
 
-          console.log(`📎 Appending to existing batch_${currentBatchNumber} (${existingCompanies.length}/${chunkSize} used, ${availableSpace} available)`);
-
-          // Split new companies to fill existing batch and create new ones if needed
-          const companiesForExistingBatch = encodedCompanies.slice(0, availableSpace);
-          const remainingCompanies = encodedCompanies.slice(availableSpace);
-
-          // Update existing batch with additional companies
-          const updatedBatchData = {
-            companies: [...existingCompanies, ...companiesForExistingBatch]
-          };
-
-          batchesToUpload.push({
-            batchId: lastBatchId,
-            data: updatedBatchData,
-            isUpdate: true
+          // Check if target batch exists
+          const targetBatchSnap = await getDocs(query(collection(db, "companyleads"), orderBy("__name__")));
+          let targetBatchData = null;
+          targetBatchSnap.forEach(doc => {
+            if (doc.id === targetBatchId) {
+              targetBatchData = doc.data();
+            }
           });
 
-          // Create additional batches for remaining companies
-          for (let i = 0; i < remainingCompanies.length; i += chunkSize) {
-            currentBatchNumber++;
-            const chunk = remainingCompanies.slice(i, i + chunkSize);
+          if (targetBatchData) {
+            // Append to existing batch
+            const existingCompanies = targetBatchData.companies || [];
+            const availableSpace = chunkSize - existingCompanies.length;
+
+            console.log(`Appending to specified batch ${targetBatchId} (${existingCompanies.length}/${chunkSize} used, ${availableSpace} available)`);
+
+            if (availableSpace > 0) {
+              // Add as many as possible to existing batch
+              const companiesForExistingBatch = encodedCompanies.slice(0, availableSpace);
+              const remainingCompanies = encodedCompanies.slice(availableSpace);
+
+              const updatedBatchData = {
+                companies: [...existingCompanies, ...companiesForExistingBatch]
+              };
+
+              batchesToUpload.push({
+                batchId: targetBatchId,
+                data: updatedBatchData,
+                isUpdate: true
+              });
+
+              // Create additional batches for remaining companies
+              let currentBatchNumber = parseInt(targetBatchId.match(/batch_(\d+)/)[1]);
+              for (let i = 0; i < remainingCompanies.length; i += chunkSize) {
+                currentBatchNumber++;
+                const chunk = remainingCompanies.slice(i, i + chunkSize);
+                batchesToUpload.push({
+                  batchId: `batch_${currentBatchNumber}`,
+                  data: { companies: chunk },
+                  isUpdate: false
+                });
+              }
+            } else {
+              // Batch is full, create new batches starting from next number
+              let currentBatchNumber = parseInt(targetBatchId.match(/batch_(\d+)/)[1]);
+              for (let i = 0; i < encodedCompanies.length; i += chunkSize) {
+                currentBatchNumber++;
+                const chunk = encodedCompanies.slice(i, i + chunkSize);
+                batchesToUpload.push({
+                  batchId: `batch_${currentBatchNumber}`,
+                  data: { companies: chunk },
+                  isUpdate: false
+                });
+              }
+            }
+          } else {
+            // Target batch doesn't exist, create it
+            console.log(`Creating new batch ${targetBatchId}`);
+            const chunk = encodedCompanies.slice(0, chunkSize);
+            const remainingCompanies = encodedCompanies.slice(chunkSize);
+
             batchesToUpload.push({
-              batchId: `batch_${currentBatchNumber}`,
+              batchId: targetBatchId,
               data: { companies: chunk },
               isUpdate: false
             });
+
+            // Create additional batches if needed
+            let currentBatchNumber = parseInt(targetBatchId.match(/batch_(\d+)/)[1]);
+            for (let i = 0; i < remainingCompanies.length; i += chunkSize) {
+              currentBatchNumber++;
+              const chunk = remainingCompanies.slice(i, i + chunkSize);
+              batchesToUpload.push({
+                batchId: `batch_${currentBatchNumber}`,
+                data: { companies: chunk },
+                isUpdate: false
+              });
+            }
           }
         } else {
-          // Create new batches from scratch
-          for (let i = 0; i < encodedCompanies.length; i += chunkSize) {
-            const chunk = encodedCompanies.slice(i, i + chunkSize);
+          // Auto smart batching
+          const batchInfo = await getNextBatchInfo(chunkSize);
+          const { nextBatchNumber, shouldCreateNewBatch, lastBatchData, lastBatchId } = batchInfo;
+
+          console.log(`Smart batching: Starting from batch_${nextBatchNumber}, Create new: ${shouldCreateNewBatch}`);
+
+          let currentBatchNumber = nextBatchNumber;
+
+          if (!shouldCreateNewBatch && lastBatchData) {
+            // Append to existing batch
+            const existingCompanies = lastBatchData.companies || [];
+            const availableSpace = chunkSize - existingCompanies.length;
+
+            console.log(`Appending to existing batch_${currentBatchNumber} (${existingCompanies.length}/${chunkSize} used, ${availableSpace} available)`);
+
+            // Split new companies to fill existing batch and create new ones if needed
+            const companiesForExistingBatch = encodedCompanies.slice(0, availableSpace);
+            const remainingCompanies = encodedCompanies.slice(availableSpace);
+
+            // Update existing batch with additional companies
+            const updatedBatchData = {
+              companies: [...existingCompanies, ...companiesForExistingBatch]
+            };
+
             batchesToUpload.push({
-              batchId: `batch_${currentBatchNumber}`,
-              data: { companies: chunk },
-              isUpdate: false
+              batchId: lastBatchId,
+              data: updatedBatchData,
+              isUpdate: true
             });
-            currentBatchNumber++;
+
+            // Create additional batches for remaining companies
+            for (let i = 0; i < remainingCompanies.length; i += chunkSize) {
+              currentBatchNumber++;
+              const chunk = remainingCompanies.slice(i, i + chunkSize);
+              batchesToUpload.push({
+                batchId: `batch_${currentBatchNumber}`,
+                data: { companies: chunk },
+                isUpdate: false
+              });
+            }
+          } else {
+            // Create new batches from scratch
+            for (let i = 0; i < encodedCompanies.length; i += chunkSize) {
+              const chunk = encodedCompanies.slice(i, i + chunkSize);
+              batchesToUpload.push({
+                batchId: `batch_${currentBatchNumber}`,
+                data: { companies: chunk },
+                isUpdate: false
+              });
+              currentBatchNumber++;
+            }
           }
+
         }
 
-        console.log(`📦 Prepared ${batchesToUpload.length} batch operations (${batchesToUpload.filter(b => b.isUpdate).length} updates, ${batchesToUpload.filter(b => !b.isUpdate).length} new) with ${chunkSize} companies per batch`);
+        console.log(`Prepared ${batchesToUpload.length} batch operations (${batchesToUpload.filter(b => b.isUpdate).length} updates, ${batchesToUpload.filter(b => !b.isUpdate).length} new) with ${chunkSize} companies per batch`);
 
         // 6. Upload batches
         const totalBatches = batchesToUpload.length;
@@ -279,12 +366,12 @@ export const uploadCompaniesFromExcel = async (file, onProgress = null, assignee
             } catch (error) {
               retryCount++;
               if (retryCount > maxRetries) {
-                console.error(`❌ Failed to ${isUpdate ? 'update' : 'upload'} ${batchId} after ${maxRetries} retries:`, error);
+                console.log(`Failed to ${isUpdate ? 'update' : 'upload'} ${batchId} after ${maxRetries} retries:`, error);
                 throw error; // Re-throw to stop the entire upload
               }
 
               const delay = Math.pow(2, retryCount) * 1000; // Exponential backoff: 1s, 2s, 4s
-              console.log(`⚠️ ${isUpdate ? 'Update' : 'Upload'} failed for ${batchId}, retrying in ${delay}ms (attempt ${retryCount}/${maxRetries})`);
+              console.log(`${isUpdate ? 'Update' : 'Upload'} failed for ${batchId}, retrying in ${delay}ms (attempt ${retryCount}/${maxRetries})`);
               await new Promise(resolve => setTimeout(resolve, delay));
             }
           }
@@ -299,16 +386,16 @@ export const uploadCompaniesFromExcel = async (file, onProgress = null, assignee
 
           // Log upload progress
           const recordCount = data.companies.length;
-          console.log(`${isUpdate ? '🔄 Updated' : '✅ Uploaded'} ${batchId} (${recordCount} records) - ${uploadedBatches}/${totalBatches} batches complete`);
+          console.log(`${isUpdate ? 'Updated' : 'Uploaded'} ${batchId} (${recordCount} records) - ${uploadedBatches}/${totalBatches} batches complete`);
 
           // Add delay between batches to prevent overwhelming Firestore write stream
           if (uploadedBatches < totalBatches) { // Don't delay after the last batch
-            console.log(`⏳ Waiting 2000ms before next batch...`);
+            console.log(`Waiting 2000ms before next batch...`);
             await new Promise(resolve => setTimeout(resolve, 2000));
           }
         }
 
-        console.log(`🎉 Successfully uploaded ${encodedCompanies.length} companies in ${totalBatches} batches to Firestore!`);
+        console.log(`Successfully uploaded ${encodedCompanies.length} companies in ${totalBatches} batches to Firestore!`);
         resolve({
           totalCompanies: encodedCompanies.length,
           totalBatches,
@@ -320,14 +407,14 @@ export const uploadCompaniesFromExcel = async (file, onProgress = null, assignee
         });
 
       } catch (error) {
-        console.error("❌ Error during Excel upload:", error);
+        console.error("Error during Excel upload:", error);
         handleFirestoreIndexError(error, "Excel upload");
         reject(error);
       }
     };
 
     reader.onerror = (error) => {
-      console.error("❌ Error reading file:", error);
+      console.error("Error reading file:", error);
       reject(error);
     };
 
