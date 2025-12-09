@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { XIcon, UploadIcon } from '@heroicons/react/outline';
 import { db } from '../../../firebase';
 import { doc, setDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -8,6 +8,17 @@ const ExcelUploadModal = ({ show, onClose, college, companyName }) => {
   const [uploadedFile, setUploadedFile] = useState(null);
   const [validationResults, setValidationResults] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
+
+  // Auto-populate file when modal shows and window.autoUploadFile exists
+  useEffect(() => {
+    if (show && window.autoUploadFile) {
+      const file = window.autoUploadFile;
+      setUploadedFile(file);
+      validateExcelFile(file);
+      // Clear the stored file after using it
+      window.autoUploadFile = null;
+    }
+  }, [show]);
 
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
