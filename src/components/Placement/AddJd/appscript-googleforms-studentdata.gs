@@ -108,6 +108,25 @@ function createForm(e) {
       options: questionData.options || []
     };
   });
+
+  // Apply form settings if provided
+  if (data.settings) {
+    if (data.settings.collectEmail) {
+      form.setCollectEmail(true);
+    }
+    if (data.settings.limitToOneResponse) {
+      form.setLimitOneResponsePerUser(true);
+    }
+    if (data.settings.allowEditAfterSubmit) {
+      form.setAllowResponseEdits(true);
+    }
+    if (data.settings.showProgressBar) {
+      form.setProgressBar(true);
+    }
+    if (data.settings.shuffleQuestions !== undefined) {
+      form.setShuffleQuestions(data.settings.shuffleQuestions);
+    }
+  }
   
   // Get form URLs
   const formUrl = form.getPublishedUrl();

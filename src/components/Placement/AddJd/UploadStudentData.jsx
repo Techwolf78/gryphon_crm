@@ -356,12 +356,6 @@ const UploadStudentData = () => {
           {/* Right Column - Quick Actions */}
           <div className="space-y-6">
             {/* Quick Actions Panel */}
-            <QuickActionsPanel
-              onDownloadTemplate={downloadTemplate}
-              onShowUploadModal={() => setShowUploadModal(true)}
-            />
-
-            {/* Google Form Manager - Handles form creation and response fetching */}
             <GoogleFormManager
               college={college}
               company={company}
@@ -375,106 +369,117 @@ const UploadStudentData = () => {
               onSetShowResponses={setShowResponses}
               onSetIsFetchingResponses={setIsFetchingResponses}
             />
+            <QuickActionsPanel
+              onDownloadTemplate={downloadTemplate}
+              onShowUploadModal={() => setShowUploadModal(true)}
+            />
+
+            {/* Google Form Manager - Handles form creation and response fetching */}
+            
           </div>
         </div>
 
         {/* Responses Section (Full Width) */}
-        {showResponses && (
-          <div className="mt-6 bg-white rounded-2xl shadow-lg p-6">
-            <div className="flex items-center justify-between mb-4">
+        {showResponses && responses.length > 0 && (
+          <div id="responses-section" className="mt-6 bg-white rounded-2xl shadow-lg p-4 md:p-6">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
               <div className="flex items-center">
-                <svg className="h-6 w-6 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="h-6 w-6 text-blue-600 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
-                <h3 className="text-xl font-bold text-gray-800">Form Responses</h3>
+                <h3 className="text-lg md:text-xl font-bold text-gray-800">Form Responses</h3>
               </div>
-              <div className="flex items-center gap-4">
-                <div className="text-right">
-                  <p className="text-sm text-gray-600">Total Responses</p>
-                  <p className="text-2xl font-bold text-blue-600">{responses.length}</p>
+              <div className="flex flex-row md:flex-row md:items-center gap-4">
+                <div>
+                  <p className="text-xs sm:text-sm text-gray-600">Total Responses</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-blue-600">{responses.length}</p>
                 </div>
-                <button
-                  onClick={() => {
-                    const ws = XLSX.utils.json_to_sheet(
-                      responses.map((response) => {
-                        const row = {};
-                        if (responseSummary?.questionStats) {
-                          Object.keys(responseSummary.questionStats).forEach((question) => {
-                            const answer = response.answers?.[question];
-                            if (Array.isArray(answer?.answer)) {
-                              row[question] = answer.answer.join(", ");
-                            } else {
-                              row[question] = answer?.answer || "-";
-                            }
-                          });
-                        }
-                        return row;
-                      })
-                    );
-                    const wb = XLSX.utils.book_new();
-                    XLSX.utils.book_append_sheet(wb, ws, "Responses");
-                    XLSX.writeFile(wb, "form-responses.xlsx");
-                  }}
-                  className="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors"
-                >
-                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  Download
-                </button>
-                <button
-                  onClick={() => {
-                    try {
-                      const responseData = responses.map((response) => {
-                        const row = {};
-                        if (responseSummary?.questionStats) {
-                          Object.keys(responseSummary.questionStats).forEach((question) => {
-                            const answer = response.answers?.[question];
-                            if (Array.isArray(answer?.answer)) {
-                              row[question] = answer.answer.join(", ");
-                            } else {
-                              row[question] = answer?.answer || "-";
-                            }
-                          });
-                        }
-                        return row;
-                      });
-                      const ws = XLSX.utils.json_to_sheet(responseData);
+                <div className="flex gap-2 justify-end">
+                  <button
+                    onClick={() => {
+                      const ws = XLSX.utils.json_to_sheet(
+                        responses.map((response) => {
+                          const row = {};
+                          if (responseSummary?.questionStats) {
+                            Object.keys(responseSummary.questionStats).forEach((question) => {
+                              const answer = response.answers?.[question];
+                              if (Array.isArray(answer?.answer)) {
+                                row[question] = answer.answer.join(", ");
+                              } else {
+                                row[question] = answer?.answer || "-";
+                              }
+                            });
+                          }
+                          return row;
+                        })
+                      );
                       const wb = XLSX.utils.book_new();
                       XLSX.utils.book_append_sheet(wb, ws, "Responses");
-                      const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-                      const blob = new Blob([wbout], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-                      const file = new File([blob], "form-responses.xlsx", { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-                      window.autoUploadFile = file;
-                      setShowUploadModal(true);
-                    } catch (error) {
-                      console.error("Error preparing responses:", error);
-                      alert("❌ Error preparing responses: " + error.message);
-                    }
-                  }}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
-                >
-                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
-                  Submit
-                </button>
+                      XLSX.writeFile(wb, "form-responses.xlsx");
+                    }}
+                    className="flex flex-col items-center gap-1 p-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded transition-all duration-200"
+                    title="Download responses as Excel file"
+                  >
+                    <svg className="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    <span className="text-xs font-medium">Download</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      try {
+                          const responseData = responses.map((response) => {
+                            const row = {};
+                            if (responseSummary?.questionStats) {
+                              Object.keys(responseSummary.questionStats).forEach((question) => {
+                                const answer = response.answers?.[question];
+                                if (Array.isArray(answer?.answer)) {
+                                  row[question] = answer.answer.join(", ");
+                                } else {
+                                  row[question] = answer?.answer || "-";
+                                }
+                              });
+                            }
+                            return row;
+                          });
+                          const ws = XLSX.utils.json_to_sheet(responseData);
+                          const wb = XLSX.utils.book_new();
+                          XLSX.utils.book_append_sheet(wb, ws, "Responses");
+                          const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+                          const blob = new Blob([wbout], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+                          const file = new File([blob], "form-responses.xlsx", { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+                          window.autoUploadFile = file;
+                          setShowUploadModal(true);
+                        } catch (error) {
+                          console.error("Error preparing responses:", error);
+                          alert("❌ Error preparing responses: " + error.message);
+                        }
+                      }}
+                      className="flex flex-col items-center gap-1 p-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded transition-all duration-200"
+                      title="Submit responses to the system"
+                    >
+                      <svg className="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                      </svg>
+                      <span className="text-xs font-medium">Submit</span>
+                    </button>
+                </div>
               </div>
             </div>
 
             {/* Responses Table with Scrollbar */}
             {responses.length > 0 ? (
-              <div className="bg-white rounded-lg overflow-hidden border border-gray-200">
+              <div className="bg-white rounded-lg overflow-hidden border border-gray-200 overflow-x-auto">
                 <div className="overflow-y-auto max-h-96">
-                  <table className="w-full text-sm">
+                  <table className="w-full text-xs sm:text-sm">
                     <thead className="bg-gray-100 border-b border-gray-200 sticky top-0">
                       <tr>
-                        <th className="px-4 py-3 text-left font-semibold text-gray-700">#</th>
+                        <th className="px-2 sm:px-4 py-2 sm:py-3 text-left font-semibold text-gray-700 flex-shrink-0">#</th>
                         {responseSummary?.questionStats &&
                           Object.keys(responseSummary.questionStats).map((question) => (
-                            <th key={question} className="px-4 py-3 text-left font-semibold text-gray-700 whitespace-nowrap">
-                              {question.substring(0, 25)}
-                              {question.length > 25 ? "..." : ""}
+                            <th key={question} className="px-2 sm:px-4 py-2 sm:py-3 text-left font-semibold text-gray-700 whitespace-nowrap">
+                              {question.substring(0, 20)}
+                              {question.length > 20 ? "..." : ""}
                             </th>
                           ))}
                       </tr>
@@ -482,7 +487,7 @@ const UploadStudentData = () => {
                     <tbody>
                       {responses.map((response, index) => (
                         <tr key={response.id || index} className="border-b border-gray-200 hover:bg-gray-50 transition-colors">
-                          <td className="px-4 py-3 font-medium text-gray-600">{index + 1}</td>
+                          <td className="px-2 sm:px-4 py-2 sm:py-3 font-medium text-gray-600 flex-shrink-0">{index + 1}</td>
                           {responseSummary?.questionStats &&
                             Object.keys(responseSummary.questionStats).map((question) => {
                               const answer = response.answers?.[question];
@@ -497,9 +502,9 @@ const UploadStudentData = () => {
                                 displayText = "-";
                               }
                               return (
-                                <td key={question} className="px-4 py-3 text-gray-700" title={displayText}>
+                                <td key={question} className="px-2 sm:px-4 py-2 sm:py-3 text-gray-700" title={displayText}>
                                   <div className="truncate max-w-xs">
-                                    {displayText.length > 50 ? displayText.substring(0, 50) + "..." : displayText}
+                                    {displayText.length > 30 ? displayText.substring(0, 30) + "..." : displayText}
                                   </div>
                                 </td>
                               );
@@ -511,9 +516,9 @@ const UploadStudentData = () => {
                 </div>
               </div>
             ) : !isFetchingResponses ? (
-              <div className="bg-white p-6 rounded-lg text-center">
-                <p className="text-gray-600 mb-2">📭 No responses yet for this form.</p>
-                <p className="text-sm text-gray-500">Share your form URL to collect responses, then refresh to see them here.</p>
+              <div className="bg-white p-4 sm:p-6 rounded-lg text-center">
+                <p className="text-gray-600 mb-2 text-sm sm:text-base">📭 No responses yet for this form.</p>
+                <p className="text-xs sm:text-sm text-gray-500">Share your form URL to collect responses, then refresh to see them here.</p>
               </div>
             ) : null}
           </div>

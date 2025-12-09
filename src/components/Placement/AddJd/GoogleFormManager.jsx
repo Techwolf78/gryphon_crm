@@ -4,6 +4,8 @@ import {
   ChartBarIcon,
   DocumentDownloadIcon,
   UploadIcon,
+  QuestionMarkCircleIcon,
+  DuplicateIcon,
 } from "@heroicons/react/outline";
 import { db, auth } from "../../../firebase";
 import { doc, getDoc, setDoc, Timestamp } from "firebase/firestore";
@@ -77,8 +79,9 @@ const GoogleFormManager = ({
   const [toastMessage, setToastMessage] = useState("");
   const [toastType, setToastType] = useState("success");
   const [scriptUrl] = useState(
-    "https://script.google.com/macros/s/AKfycbxI9F4DRHFdwOiJBX3ByDPnqPB_ySkTX4NTYjByArF9V3NDXyRDUXbkO4eSQDGYFTY/exec"
+    "https://script.google.com/macros/s/AKfycbweWJ9LuJjEOGgpW3udXrwGfgv4U_nOLZMOKizp69G0yVoQTCH6ywVaFHPbgCx_z-JD/exec"
   );
+  const [helpModalOpen, setHelpModalOpen] = useState(null);
 
   // Generate document ID from company and college
   const generateFormDocId = () => {
@@ -200,6 +203,13 @@ const GoogleFormManager = ({
       title: `${company || "Company"} - ${college || "College"} Student Data Form`,
       description: `Student data submission form for ${designation || "Position"} at ${company || "Company"}. All fields are required.`,
       questions: questions,
+      settings: {
+        collectEmail: false,
+        limitToOneResponse: true,
+        allowEditAfterSubmit: true,
+        showProgressBar: true,
+        shuffleQuestions: false,
+      },
     };
 
     // Create unique callback name
@@ -387,9 +397,21 @@ const GoogleFormManager = ({
         
         onSetResponses(response.responses || []);
         onSetResponseSummary(response.summary);
-        alert(
-          `✅ Successfully fetched ${response.responses?.length || 0} responses!`
-        );
+        
+        const responseCount = response.responses?.length || 0;
+        if (responseCount === 0) {
+          alert("📭 No responses yet for this form.\n\nShare your form URL to collect responses, then refresh to see them here.");
+        } else {
+          alert(`✅ Successfully fetched ${responseCount} responses!`);
+          
+          // Scroll to responses section after a short delay
+          setTimeout(() => {
+            const responsesSection = document.getElementById("responses-section");
+            if (responsesSection) {
+              responsesSection.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+          }, 500);
+        }
       } else {
         const errorMsg = response?.error || "Unknown error - check browser console";
         console.error("Error response:", response);
@@ -477,9 +499,75 @@ const GoogleFormManager = ({
         </div>
       )}
 
-      {/* Quick Actions Card - Form Management */}
-      <div className="bg-white rounded-2xl shadow-lg p-6">
-        <h2 className="text-xl font-bold text-gray-800 mb-6">Form Management</h2>
+      {/* Help Modal - Form Management */}
+      {helpModalOpen === "formManagement" && (
+        <div className="fixed inset-0 backdrop-blur-lg z-40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 animate-fadeIn">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-800 flex items-center">
+                <QuestionMarkCircleIcon className="h-6 w-6 mr-2 text-blue-500" />
+                Form Management Help
+              </h3>
+              <button
+                onClick={() => setHelpModalOpen(null)}
+                className="text-gray-400 hover:text-gray-600 text-2xl font-bold"
+              >
+                ×
+              </button>
+            </div>
+            <div className="space-y-4 text-gray-700">
+              <div>
+                <h4 className="font-semibold text-gray-800 mb-2">📋 Create Google Form</h4>
+                <p className="text-sm">Automatically generates a Google Form with template fields. The form will be created with all required fields and saved to your database.</p>
+              </div>
+              <div>
+                <h4 className="font-semibold text-gray-800 mb-2">📋 Copy Form Link</h4>
+                <p className="text-sm">Once a form is created, use this button to copy the shareable link. You can then distribute it to students.</p>
+              </div>
+              <div>
+                <h4 className="font-semibold text-gray-800 mb-2">📊 Fetch Responses</h4>
+                <p className="text-sm">Retrieve all submitted responses from the Google Form. Responses are displayed with summary statistics.</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setHelpModalOpen(null)}
+              className="w-full mt-6 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 rounded-lg transition-colors"
+            >
+              Got it!
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Form Management Card */}
+      <div className="bg-white rounded-2xl shadow-lg pb-6 px-6 pt-3">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-xl font-bold text-gray-800">Form Management</h2>
+          <div className="flex items-center gap-2">
+            {storedFormUrl && (
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(storedFormUrl);
+                  alert("✅ Form URL copied to clipboard!");
+                }}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors group relative"
+                title = "Copy link"
+              >
+                <DuplicateIcon className="h-6 w-6 text-gray-600 hover:text-gray-800" />
+                <span className = "text-xs">Copy</span>
+              </button>
+            )}
+            <button
+              onClick={() => setHelpModalOpen("formManagement")}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              title="View help for Form Management"
+            >
+              <QuestionMarkCircleIcon className="h-6 w-6 text-gray-600 hover:text-gray-800" />
+               <span className = "text-xs">Help</span>
+            </button>
+           
+          </div>
+        </div>
 
         <div className="space-y-6">
           {/* Generate/Copy Form Button */}
@@ -507,22 +595,8 @@ const GoogleFormManager = ({
               {!isCreatingForm && <div className="text-purple-100">→</div>}
             </button>
           ) : (
-            <button
-              onClick={() => {
-                navigator.clipboard.writeText(storedFormUrl);
-                alert("✅ Form URL copied to clipboard!");
-              }}
-              className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-xl shadow-md transition-all duration-300 hover:shadow-lg"
-            >
-              <div className="flex items-center">
-                <DocumentIcon className="h-6 w-6 mr-3" />
-                <div className="text-left">
-                  <p className="font-semibold">Copy Form Link</p>
-                  <p className="text-sm text-green-100">Share with students</p>
-                </div>
-              </div>
-              <div className="text-green-100">✓</div>
-            </button>
+            // Form created - only show fetch responses button
+            null
           )}
           {/* Fetch Responses Button */}
           {storedEditUrl && (
