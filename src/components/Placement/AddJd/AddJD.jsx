@@ -19,9 +19,9 @@ import TemplateDownloadModal from "./TemplateDownloadModal";
 import ExcelUploadModal from "./ExcelUploadModal";
 
 const EMAILJS_CONFIG = {
-  SERVICE_ID: "service_sl0i7kr",
-  TEMPLATE_ID: "template_q0oarab",
-  PUBLIC_KEY: "V5rET66jxvg4gqulO",
+  SERVICE_ID: "service_pskknsn",
+  TEMPLATE_ID: "template_p2as3pp",
+  PUBLIC_KEY: "zEVWxxT-QvGIrhvTV",
 };
 
 // Academic year calculation helper
