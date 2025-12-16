@@ -4,6 +4,7 @@ import { PlusIcon, CloudUploadIcon } from "@heroicons/react/outline";
 import AddLeads from "./AddLeads";
 import BulkUploadModal from "./BulkUploadModal";
 import BulkAssignModal from "./BulkAssignModal";
+import ExcelUploadDelete from "./ExcelUploadDelete";
 import AddJD from "../AddJd/AddJD"; // ✅ adjust the relative path
 
 import {
@@ -61,6 +62,7 @@ function CompanyLeads() {
   const [selectedLead, setSelectedLead] = useState(null);
   const [showLeadDetails, setShowLeadDetails] = useState(false);
   const [showBulkUploadForm, setShowBulkUploadForm] = useState(false);
+  const [showExcelScanner, setShowExcelScanner] = useState(false);
 
   // Bulk Assign modal state
   const [showBulkAssignModal, setShowBulkAssignModal] = useState(false);
@@ -2289,7 +2291,23 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
                   className="px-3 py-1 bg-blue-600 text-white rounded-lg font-semibold flex items-center justify-center hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-md text-xs h-full"
                 >
                   <CloudUploadIcon className="h-3 w-3 mr-1" />
-                  Bulk Upload
+                  
+                </button>
+              )}
+              {user && (user?.departments?.includes("admin") || 
+                         user?.departments?.includes("Admin") || 
+                         user?.department === "admin" || 
+                         user?.department === "Admin" ||
+                         user?.role === "admin" || 
+                         user?.role === "Admin") && (
+                <button
+                  onClick={() => setShowExcelScanner(true)}
+                  className="px-3 py-1 bg-red-600 text-white rounded-lg font-semibold flex items-center justify-center hover:bg-red-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 shadow-md text-xs h-full"
+                >
+                  <svg className="h-3 w-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                  
                 </button>
               )}
               {user && (user?.role === "Director" || user?.role === "Head") && !viewMyLeadsOnly && (
@@ -2633,6 +2651,28 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         allUsers={allUsers}
         currentUser={user}
       />
+
+      {/* Excel Scanner Modal */}
+      {showExcelScanner && (
+        <div className="fixed inset-0 z-54 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-4xl rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh]">
+            <div className="bg-linear-to-r from-green-600 to-green-700 px-6 py-4 flex justify-between items-center shrink-0">
+              <h2 className="text-xl font-semibold text-white">Excel Upload Scanner</h2>
+              <button
+                onClick={() => setShowExcelScanner(false)}
+                className="text-white hover:text-gray-200 focus:outline-none"
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6">
+              <ExcelUploadDelete />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Bulk Assign Modal */}
       <BulkAssignModal
