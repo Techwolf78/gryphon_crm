@@ -153,7 +153,7 @@ export const uploadCompaniesFromExcel = async (file, onProgress = null, assignee
             name: row['CompanyName'] || row['Company Name'] || row['companyName'] || row['company_name'] || '',
             contactPerson: row['ContactPerson'] || row['Contact Person'] || row['contactPerson'] || row['contact_person'] || '',
             designation: row['Designation'] || row['designation'] || '',
-            phone: row['Phone'] || row['phone'] || row['Phone Number'] || row['phone_number'] || '',
+            phone: String(row['Phone'] || row['phone'] || row['Phone Number'] || row['phone_number'] || ''),
             companyUrl: row['CompanyUrl'] || row['Company URL'] || row['Company Url'] || row['companyUrl'] || row['company_url'] || '',
             linkedinUrl: row['LinkedinUrl'] || row['LinkedIn URL'] || row['LinkedIn Url'] || row['linkedinUrl'] || row['linkedin_url'] || '',
             // Additional fields that may be in Excel
