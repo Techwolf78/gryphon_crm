@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { FaEllipsisV } from "react-icons/fa";
+import { REMARKS_TEMPLATES } from "../../../utils/constants";
 
 const statusColorMap = {
   hot: "text-blue-600 hover:bg-blue-50",
@@ -133,8 +134,18 @@ function LeadsTable({
       return dateB - dateA;
     });
 
-    // Return the remarks of the most recent follow-up
-    return sortedFollowups[0].remarks || 'No remarks';
+    const latest = sortedFollowups[0];
+
+    // If there's a template, return the template label
+    if (latest.template) {
+      const template = REMARKS_TEMPLATES.find(t => t.value === latest.template);
+      if (template) {
+        return template.label;
+      }
+    }
+
+    // Otherwise, return the remarks
+    return latest.remarks || 'No remarks';
   };
 
   // Helper functions to concatenate contact information
@@ -180,17 +191,6 @@ function LeadsTable({
       });
     }
     return emails.length > 0 ? emails.join(', ') : 'N/A';
-  };
-
-  const getAllLinkedIns = (lead) => {
-    const linkedins = [];
-    if (lead.pocLinkedin && lead.pocLinkedin.trim()) linkedins.push(lead.pocLinkedin.trim());
-    if (lead.contacts && lead.contacts.length > 0) {
-      lead.contacts.forEach(contact => {
-        if (contact.linkedin && contact.linkedin.trim()) linkedins.push(contact.linkedin.trim());
-      });
-    }
-    return linkedins.length > 0 ? linkedins.join(', ') : 'N/A';
   };
 
   const handleActionClick = (leadId, e) => {
@@ -527,20 +527,24 @@ function LeadsTable({
                                             ))}
                                         </div>
 
-                                        <div className="border-t border-gray-200/50 my-2 mx-2"></div>
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            onDeleteLead(lead.id);
-                                            closeDropdown();
-                                          }}
-                                          className="flex items-center w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50/80 hover:text-red-700 transition-all duration-200 group"
-                                        >
-                                          <svg className="w-4 h-4 mr-3 text-red-400 group-hover:text-red-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                          </svg>
-                                          Delete Lead
-                                        </button>
+                                        {(activeTab === 'cold' || activeTab === 'called') && (
+                                          <>
+                                            <div className="border-t border-gray-200/50 my-2 mx-2"></div>
+                                            <button
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                onDeleteLead(lead.id);
+                                                closeDropdown();
+                                              }}
+                                              className="flex items-center w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50/80 hover:text-red-700 transition-all duration-200 group"
+                                            >
+                                              <svg className="w-4 h-4 mr-3 text-red-400 group-hover:text-red-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                              </svg>
+                                              Mark as Dead
+                                            </button>
+                                          </>
+                                        )}
                                       </div>
                                     </div>
                                   )}
@@ -788,20 +792,24 @@ function LeadsTable({
                                   ))}
                               </div>
 
-                              <div className="border-t border-gray-200/50 my-2 mx-2"></div>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onDeleteLead(lead.id);
-                                  closeDropdown();
-                                }}
-                                className="flex items-center w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50/80 hover:text-red-700 transition-all duration-200 group"
-                              >
-                                <svg className="w-4 h-4 mr-3 text-red-400 group-hover:text-red-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
-                                Delete Lead
-                              </button>
+                              {(activeTab === 'cold' || activeTab === 'called') && (
+                                <>
+                                  <div className="border-t border-gray-200/50 my-2 mx-2"></div>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onDeleteLead(lead.id);
+                                      closeDropdown();
+                                    }}
+                                    className="flex items-center w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50/80 hover:text-red-700 transition-all duration-200 group"
+                                  >
+                                    <svg className="w-4 h-4 mr-3 text-red-400 group-hover:text-red-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                    Mark as Dead
+                                  </button>
+                                </>
+                              )}
                             </div>
                           </div>
                         )}

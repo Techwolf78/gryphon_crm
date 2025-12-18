@@ -35,7 +35,7 @@ import * as XLSX from 'xlsx-js-style';
 import { saveAs } from 'file-saver';
 // import BatchSplitModal from "./BatchSplitModal";
 
-import CompanyLeadDeleteModal from "./CompanyLeadDeleteModal";
+
 
   // Utility function to handle Firestore index errors
   const handleFirestoreIndexError = (error, operation = "operation") => {
@@ -48,7 +48,7 @@ function CompanyLeads() {
   const [activeTab, setActiveTab] = useState(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const tab = urlParams.get('tab');
-    if (tab && ['hot', 'warm', 'cold', 'called', 'onboarded', 'deleted'].includes(tab)) {
+    if (tab && ['hot', 'warm', 'cold', 'called', 'onboarded', 'dead'].includes(tab)) {
       return tab;
     }
     const saved = localStorage.getItem("companyLeadsActiveTab");
@@ -140,11 +140,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
   // Batch Split modal state
   // const [showBatchSplitModal, setShowBatchSplitModal] = useState(false);
 
-  // Selected leads for permanent deletion in deleted tab
-  const [selectedDeletedLeads, setSelectedDeletedLeads] = useState([]);
 
-  // Delete progress state - moved to modal
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
 
   // Debounced search term for performance
   const [debouncedSearchTerm] = useDebounce(searchTerm, 500);
@@ -152,13 +148,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
   // Debounced search logging with longer delay to avoid logging every keystroke
   const [debouncedSearchForLogging] = useDebounce(searchTerm, 2000);
 
-  // Check if user is admin
-  const isAdmin = user && (user?.departments?.includes("admin") || 
-                           user?.departments?.includes("Admin") || 
-                           user?.department === "admin" || 
-                           user?.department === "Admin" ||
-                           user?.role === "admin" || 
-                           user?.role === "Admin");
+
 
   // Log search activity when debounced search changes
   useEffect(() => {
@@ -896,7 +886,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
           if (activeTab === "cold") return lead.coldAt;
           if (activeTab === "hot") return lead.hotAt;
           if (activeTab === "onboarded") return lead.onboardedAt;
-          if (activeTab === "deleted") return lead.deletedAt;
+          if (activeTab === "dead") return lead.deadAt;
           return lead.updatedAt;
         };
 
@@ -993,30 +983,48 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
     // Group by date based on status
     const grouped = leadsToGroup.reduce((acc, lead) => {
       try {
+        // Check for upcoming follow-ups first
+        let upcomingFollowUpDate = null;
+        if (lead.followups && Array.isArray(lead.followups)) {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const upcomingFollowUps = lead.followups
+            .filter(f => f.date && new Date(f.date) >= today)
+            .sort((a, b) => new Date(a.date) - new Date(b.date));
+          if (upcomingFollowUps.length > 0) {
+            upcomingFollowUpDate = upcomingFollowUps[0].createdAt;
+          }
+        }
+
         let dateField;
         
-        // Determine which date field to use based on status
-        if (activeTab === "called" || activeTab === "dialed") {
-          // For called leads, use calledAt (when they were marked as called)
-          dateField = lead.calledAt;
-        } else if (activeTab === "warm") {
-          // For warm leads, use warmAt (when they were marked as warm)
-          dateField = lead.warmAt;
-        } else if (activeTab === "cold") {
-          // For cold leads, use coldAt (when they were marked as cold)
-          dateField = lead.coldAt;
-        } else if (activeTab === "hot") {
-          // For hot leads, use hotAt (when they were marked as hot)
-          dateField = lead.hotAt;
-        } else if (activeTab === "onboarded") {
-          // For onboarded leads, use onboardedAt (when they were marked as onboarded)
-          dateField = lead.onboardedAt;
-        } else if (activeTab === "deleted") {
-          // For deleted leads, use deletedAt (when they were marked as deleted)
-          dateField = lead.deletedAt;
+        // If there's an upcoming follow-up, use that date for grouping
+        if (upcomingFollowUpDate) {
+          dateField = upcomingFollowUpDate;
         } else {
-          // For other statuses, use updatedAt (when they were last updated to this status)
-          dateField = lead.updatedAt;
+          // Determine which date field to use based on status
+          if (activeTab === "called" || activeTab === "dialed") {
+            // For called leads, use calledAt (when they were marked as called)
+            dateField = lead.calledAt;
+          } else if (activeTab === "warm") {
+            // For warm leads, use warmAt (when they were marked as warm)
+            dateField = lead.warmAt;
+          } else if (activeTab === "cold") {
+            // For cold leads, use coldAt (when they were marked as cold)
+            dateField = lead.coldAt;
+          } else if (activeTab === "hot") {
+            // For hot leads, use hotAt (when they were marked as hot)
+            dateField = lead.hotAt;
+          } else if (activeTab === "onboarded") {
+            // For onboarded leads, use onboardedAt (when they were marked as onboarded)
+            dateField = lead.onboardedAt;
+          } else if (activeTab === "deleted") {
+            // For deleted leads, use deletedAt (when they were marked as deleted)
+            dateField = lead.deletedAt;
+          } else {
+            // For other statuses, use updatedAt (when they were last updated to this status)
+            dateField = lead.updatedAt;
+          }
         }
         
         let date;
@@ -1071,7 +1079,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
 
   // Group leads by status for tab counts (filtered by current view mode)
   const leadsByStatus = useMemo(() => {
-    const counts = { hot: 0, warm: 0, cold: 0, called: 0, onboarded: 0, deleted: 0 };
+    const counts = { hot: 0, warm: 0, cold: 0, called: 0, onboarded: 0, dead: 0 };
 
     // Apply the same view mode filtering as fetchLeads
     let teamMemberIds = [];
@@ -1176,8 +1184,8 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
               updatedCompany.hotAt = new Date().toISOString();
             } else if (newStatus === "onboarded") {
               updatedCompany.onboardedAt = new Date().toISOString();
-            } else if (newStatus === "deleted") {
-              updatedCompany.deletedAt = new Date().toISOString();
+            } else if (newStatus === "dead") {
+              updatedCompany.deadAt = new Date().toISOString();
             }
             // Unicode-safe encoding: encodeURIComponent + btoa
             const updatedJsonString = JSON.stringify(updatedCompany);
@@ -1219,8 +1227,8 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
               updatedCompany.hotAt = new Date().toISOString();
             } else if (newStatus === "onboarded") {
               updatedCompany.onboardedAt = new Date().toISOString();
-            } else if (newStatus === "deleted") {
-              updatedCompany.deletedAt = new Date().toISOString();
+            } else if (newStatus === "dead") {
+              updatedCompany.deadAt = new Date().toISOString();
             }
             // Unicode-safe encoding: encodeURIComponent + btoa
             const updatedJsonString = JSON.stringify(updatedCompany);
@@ -1285,12 +1293,12 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
       const coldAtData = newStatus === "cold" ? { coldAt: new Date().toISOString() } : {};
       const hotAtData = newStatus === "hot" ? { hotAt: new Date().toISOString() } : {};
       const onboardedAtData = newStatus === "onboarded" ? { onboardedAt: new Date().toISOString() } : {};
-      const deletedAtData = newStatus === "deleted" ? { deletedAt: new Date().toISOString() } : {};
+      const deadAtData = newStatus === "dead" ? { deadAt: new Date().toISOString() } : {};
 
       setLeads((prevLeads) =>
         prevLeads.map((l) =>
           l.id === leadId
-            ? { ...l, status: newStatus, updatedAt: new Date().toISOString(), ...localAssignmentData, ...calledAtData, ...warmAtData, ...coldAtData, ...hotAtData, ...onboardedAtData, ...deletedAtData, isTransitioning: false }
+            ? { ...l, status: newStatus, updatedAt: new Date().toISOString(), ...localAssignmentData, ...calledAtData, ...warmAtData, ...coldAtData, ...hotAtData, ...onboardedAtData, ...deadAtData, isTransitioning: false }
             : l
         )
       );
@@ -1607,7 +1615,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
       if (!lead || !lead.batchId) return;
 
       // Confirm deletion - now it's actually marking as deleted
-      if (!window.confirm(`Are you sure you want to mark this lead as deleted? It will be moved to the Deleted tab.`)) {
+      if (!window.confirm(`Are you sure you want to mark this lead as dead? It will be moved to the Dead tab.`)) {
         return;
       }
 
@@ -1618,7 +1626,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         action: AUDIT_ACTIONS.DELETE_LEAD,
         companyId: leadId,
         companyName: lead.companyName || lead.name || "Unknown Company",
-        details: `Marked lead as deleted`,
+        details: `Marked lead as dead`,
         sessionId: sessionStorage.getItem('sessionId') || 'unknown'
       });
 
@@ -1664,8 +1672,8 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
 
             const updatedCompany = {
               ...decodedCompany,
-              status: "deleted",
-              deletedAt: new Date().toISOString(),
+              status: "dead",
+              deadAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
             };
             // Unicode-safe encoding: encodeURIComponent + btoa
@@ -1716,26 +1724,17 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         }
       }
 
-      // Update local state - change status to "deleted" instead of removing
+      // Update local state - change status to "dead" instead of removing
       setLeads((prevLeads) =>
         prevLeads.map((l) =>
           l.id === leadId
-            ? { ...l, status: "deleted", deletedAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
+            ? { ...l, status: "dead", deadAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
             : l
         )
       );
 
-      // Switch to "deleted" tab if user is admin
-      const isAdmin = user?.departments?.includes("admin") || 
-                     user?.departments?.includes("Admin") || 
-                     user?.department === "admin" || 
-                     user?.department === "Admin" ||
-                     user?.role === "admin" || 
-                     user?.role === "Admin";
-      
-      if (isAdmin) {
-        setActiveTab("deleted");
-      }
+      // Switch to "dead" tab
+      setActiveTab("dead");
     } catch (error) {
       handleFirestoreIndexError(error, "lead deletion");
       alert("Failed to mark the lead as deleted. Please try again.");
@@ -1904,7 +1903,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
   }, [todayFollowUps, user]);
 
   // Export leads report function
-  const exportLeadsReport = useCallback((viewMode = 'myteam', selectedStatuses = ['hot', 'warm', 'called', 'onboarded', 'deleted']) => {
+  const exportLeadsReport = useCallback((viewMode = 'myteam', selectedStatuses = ['hot', 'warm', 'called', 'onboarded', 'dead']) => {
     try {
       // Filter leads based on view mode
       let filteredLeads = leads;
@@ -2357,44 +2356,11 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
             }}
             setActiveTab={setActiveTab}
             leadsByStatus={leadsByStatus}
-            user={user}
           />
         </>
       )}
 
-      {/* Multi-select controls for deleted tab - only show for admins */}
-      {activeTab === 'deleted' && isAdmin && !showFollowUpsDashboard && (
-        <div className="flex items-center justify-between mb-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              checked={selectedDeletedLeads.length === filteredLeads.length && filteredLeads.length > 0}
-              onChange={(e) => {
-                if (e.target.checked) {
-                  setSelectedDeletedLeads(filteredLeads.map(l => l.id));
-                } else {
-                  setSelectedDeletedLeads([]);
-                }
-              }}
-              className="mr-3 w-4 h-4 text-red-600 bg-gray-100 border-gray-300 rounded focus:ring-red-500"
-            />
-            <span className="text-sm font-medium text-gray-700">
-              Select All ({filteredLeads.length})
-            </span>
-          </div>
-          <button
-            onClick={() => {
-              if (selectedDeletedLeads.length > 0) {
-                setDeleteModalOpen(true);
-              }
-            }}
-            disabled={selectedDeletedLeads.length === 0}
-            className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            Delete Permanently ({selectedDeletedLeads.length})
-          </button>
-        </div>
-      )}
+
 
       {/* Conditionally render LeadsTable or FollowupDashboard */}
       {showFollowUpsDashboard ? (
@@ -2447,9 +2413,9 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
           allUsers={allUsers}
           formatDate={formatDate}
           order={true}
-          showCheckboxes={activeTab === 'deleted' && isAdmin}
-          selectedLeads={selectedDeletedLeads}
-          onSelectionChange={setSelectedDeletedLeads}
+          showCheckboxes={false}
+          selectedLeads={[]}
+          onSelectionChange={() => {}}
         />
       )}
 
@@ -2861,20 +2827,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         user={user}
       /> */}
 
-      <CompanyLeadDeleteModal
-        isOpen={deleteModalOpen}
-        onClose={() => {
-          setDeleteModalOpen(false);
-        }}
-        selectedLeads={selectedDeletedLeads}
-        allLeads={leads}
-        user={user}
-        onDeleteComplete={() => {
-          // Refresh data and clear selection after deletion
-          fetchLeads();
-          setSelectedDeletedLeads([]);
-        }}
-      />
+
 
     </div>    
   );

@@ -24,6 +24,7 @@ const LeadsTable = lazy(() => import("../components/Sales/LeadTable"));
 const LeadFilters = lazy(() => import("../components/Sales/LeadFilters"));
 const SalesTour = lazy(() => import("../components/tours/SalesTour"));
 const BudgetDashboard = lazy(() => import("../components/Budget/BudgetDashboard"));
+const LeadTransferModal = lazy(() => import("../components/Sales/LeadTransferModal"));
 
 // Loading component for lazy loaded components
 const ComponentLoader = () => (
@@ -96,6 +97,7 @@ function Sales() {
   const [isViewModeLoading, setIsViewModeLoading] = useState(true);
   const [closedLeadsCount, setClosedLeadsCount] = useState(0); // Add this state
   const [showBudget, setShowBudget] = useState(false);
+  const [showTransferModal, setShowTransferModal] = useState(false);
 
   // Persist view mode to localStorage
   useEffect(() => {
@@ -750,6 +752,27 @@ function Sales() {
                 </svg>
                 Budget
               </button>
+              {(() => {
+                const userData = Object.values(users).find(
+                  (u) => u.uid === currentUser?.uid
+                );
+                return userData?.department === "Admin" ? (
+                  <button
+                    onClick={() => setShowTransferModal(true)}
+                    className="bg-white text-purple-600 border border-purple-300 px-3 py-1.5 rounded-lg font-medium hover:bg-purple-50 transition-colors shadow-sm flex items-center"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-4 w-4 mr-2"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                    >
+                      <path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zM16 7a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1V7z" />
+                    </svg>
+                    Transfer Leads
+                  </button>
+                ) : null;
+              })()}
             </div>
           </div>
 
@@ -963,6 +986,15 @@ function Sales() {
 
       <Suspense fallback={<ComponentLoader />}>
         <SalesTour userId={currentUser?.uid} />
+      </Suspense>
+
+      <Suspense fallback={<ComponentLoader />}>
+        <LeadTransferModal
+          show={showTransferModal}
+          onClose={() => setShowTransferModal(false)}
+          users={users}
+          leads={leads}
+        />
       </Suspense>
     </div>
   );

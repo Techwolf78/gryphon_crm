@@ -41,14 +41,14 @@ const statusColorMap = {
       inactive: "bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200"
     }
   },
-  deleted: {
-    bg: "bg-blue-50",
-    text: "text-blue-600",
-    border: "border-blue-300",
-    activeBg: "bg-blue-100",
+  dead: {
+    bg: "bg-red-50",
+    text: "text-red-600",
+    border: "border-red-300",
+    activeBg: "bg-red-100",
     tab: {
-      active: "bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg",
-      inactive: "bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200"
+      active: "bg-gradient-to-r from-red-600 to-red-700 text-white shadow-lg",
+      inactive: "bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
     }
   }
 };
@@ -59,33 +59,20 @@ const tabLabels = {
   cold: "Cold",
   called: "Called",
   onboarded: "Onboarded",
-  deleted: "Deleted"
+  dead: "Dead"
 };
 
-const LeadStatusTabs = ({ activeTab, setActiveTab, leadsByStatus = {}, user }) => {
+const LeadStatusTabs = ({ activeTab, setActiveTab, leadsByStatus = {} }) => {
   // Get available tabs based on user permissions
   const getAvailableTabs = () => {
-    const baseTabs = ['hot', 'warm', 'cold', 'called', 'onboarded'];
-    // Only show deleted tab for admin department users or admin role
-    const isAdmin = user?.departments?.includes("admin") || 
-                   user?.departments?.includes("Admin") || 
-                   user?.department === "admin" || 
-                   user?.department === "Admin" ||
-                   user?.role === "admin" || 
-                   user?.role === "Admin";
-    
-    if (isAdmin) {
-      baseTabs.push('deleted');
-    }
+    const baseTabs = ['hot', 'warm', 'cold', 'called', 'onboarded', 'dead'];
     return baseTabs;
   };
 
   const availableTabs = getAvailableTabs();
 
   return (
-    <div className={`grid gap-x-4 gap-y-1 mb-3 pt-2 w-full ${
-      availableTabs.length === 6 ? 'grid-cols-2 md:grid-cols-6' : 'grid-cols-2 md:grid-cols-5'
-    }`}>
+    <div className={`grid gap-x-4 gap-y-1 mb-3 pt-2 w-full grid-cols-2 md:grid-cols-6`}>
       {availableTabs.map((key) => (
         <button
           key={key}
@@ -108,8 +95,8 @@ const LeadStatusTabs = ({ activeTab, setActiveTab, leadsByStatus = {}, user }) =
                 ? "ring-blue-500"
                 : key === "onboarded"
                 ? "ring-blue-400"
-                : key === "deleted"
-                ? "ring-blue-400"
+                : key === "dead"
+                ? "ring-red-400"
                 : "ring-gray-500"
               : ""
           }`}
