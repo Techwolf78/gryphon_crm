@@ -1115,7 +1115,9 @@ if (selectedUserId) {
         ...doc.data(),
       }));
 
-      const filteredUsers = usersData;
+      const filteredUsers = usersData.filter(user => 
+        user.department?.toLowerCase() === "sales" || user.department === "Admin"
+      );
       setUsers(filteredUsers);
     } catch (error) {
       console.error("Error fetching users:", error);

@@ -15,7 +15,7 @@ const LeadsHeader = ({ searchTerm, setSearchTerm, onAddLead, onBulkUpload }) => 
       <div className="flex gap-1 shrink-0">
         <button
           onClick={onAddLead}
-          className="px-3 py-1 bg-linear-to-r from-blue-600 to-indigo-700 text-white rounded-lg font-semibold flex items-center justify-center hover:from-blue-700 hover:to-indigo-800 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-md transition-all duration-200 text-xs"
+          className="px-3 py-1 bg-linear-to-r from-blue-600 to-blue-700 text-white rounded-lg font-semibold flex items-center justify-center hover:from-blue-700 hover:to-blue-800 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-md transition-all duration-200 text-xs"
         >
           <PlusIcon className="h-3 w-3 mr-1" />
           Add Company

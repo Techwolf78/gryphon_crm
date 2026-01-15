@@ -8,13 +8,15 @@ const PHASE_LABELS = {
   "phase-1": "Phase 1",
   "phase-2": "Phase 2",
   "phase-3": "Phase 3",
+  "JD": "JD",
 };
 
 const DOMAIN_COLORS = {
   Technical: "bg-blue-100 border-blue-300 text-blue-800",
-  "Soft Skills": "bg-green-100 border-green-300 text-green-800",
+  "Soft skills": "bg-green-100 border-green-300 text-green-800",
   Aptitude: "bg-purple-100 border-purple-300 text-purple-800",
   Tools: "bg-yellow-100 border-yellow-300 text-yellow-800",
+  JD: "border-blue-400 bg-blue-50",
 };
 
 function formatDate(input) {
@@ -23,11 +25,7 @@ function formatDate(input) {
   let date;
 
   // Handle Firestore Timestamp
-  if (
-    typeof input === "object" &&
-    input !== null &&
-    typeof input.toDate === "function"
-  ) {
+  if (typeof input === "object" && input !== null && typeof input.toDate === "function") {
     date = input.toDate();
   }
   // Handle timestamp (number)
@@ -62,7 +60,7 @@ function getTimingForSlot(slot, training) {
   const { collegeStartTime, lunchStartTime, lunchEndTime, collegeEndTime } =
     training || {};
 
-  if (s.includes("AM & PM")) {
+  if (s.includes("AM & PM") || (s.includes("AM") && s.includes("PM"))) {
     if (collegeStartTime && collegeEndTime)
       return `${collegeStartTime} - ${collegeEndTime}`;
     return "AM & PM";
@@ -176,7 +174,7 @@ function CollegeSummaryReport({
                     const dates = [];
                     const startDate = new Date(trainer.startDate);
                     const endDate = new Date(trainer.endDate);
-                    const excludeDays = trainingData?.excludeDays || "None";
+                    const excludeDays = phaseData?.excludeDays || "None";
                     let current = new Date(startDate);
 
                     while (current <= endDate) {
@@ -211,7 +209,7 @@ function CollegeSummaryReport({
 
                     dates.forEach((date, index) => {
                       const hoursForDay = hoursArray[index] || 0;
-                      const dailyCost = hoursForDay * (trainer.perHourCost || 0);
+                      const dailyCost = Math.round(hoursForDay * (trainer.perHourCost || 0));
 
                       dailyScheduleData.push({
                         date: date,
@@ -267,6 +265,16 @@ function CollegeSummaryReport({
       return row;
     });
 
+    // Add total row
+    const totalRow = ["Total"];
+    domainArray.forEach(domain => {
+      const totalForDomain = Array.from(batchCodes).reduce((sum, batchCode) => {
+        return sum + (batchHoursByDomain[batchCode][domain] || 0);
+      }, 0);
+      totalRow.push(totalForDomain > 0 ? totalForDomain.toString() : "-");
+    });
+    batchTableData.push(totalRow);
+
     // Create table headers
     const tableHeaders = ["Batch Code", ...domainArray];
 
@@ -320,6 +328,30 @@ function CollegeSummaryReport({
       });
       yPosition = doc.lastAutoTable.finalY + 8;
     }
+
+    // Calculate total labor cost
+    const totalCost = dailyScheduleData.reduce((sum, item) => {
+      const costStr = item.dailyCost;
+      if (costStr && costStr !== "-") {
+        const cost = parseFloat(costStr.replace('₹', ''));
+        return sum + (isNaN(cost) ? 0 : cost);
+      }
+      return sum;
+    }, 0);
+
+    // Calculate total hours
+    const totalHours = dailyScheduleData.reduce((sum, item) => {
+      return sum + parseFloat(item.hours || 0);
+    }, 0);
+
+    // Add gap (1 row equivalent)
+    yPosition += 10;
+
+    // Add total hours and cost in same row
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text(`Total Hours: ${totalHours.toFixed(2)}    Total Cost: ₹${totalCost.toFixed(2)}`, marginLeft, yPosition);
+    yPosition += 8;
 
     // Footer
     const pageCount = doc.internal.getNumberOfPages();
@@ -442,7 +474,7 @@ function CollegeSummaryReport({
                     const dates = [];
                     const startDate = new Date(trainer.startDate);
                     const endDate = new Date(trainer.endDate);
-                    const excludeDays = trainingData?.excludeDays || "None";
+                    const excludeDays = phaseData?.excludeDays || "None";
                     let current = new Date(startDate);
 
                     while (current <= endDate) {
@@ -477,7 +509,7 @@ function CollegeSummaryReport({
 
                     dates.forEach((date, index) => {
                       const hoursForDay = hoursArray[index] || 0;
-                      const dailyCost = hoursForDay * (trainer.perHourCost || 0);
+                      const dailyCost = Math.round(hoursForDay * (trainer.perHourCost || 0));
 
                       dailyScheduleDataExcel.push({
                         domain: domainInfo.domain,
@@ -532,6 +564,16 @@ function CollegeSummaryReport({
       allData.push(row);
     });
 
+    // Add total row for batch table
+    const totalRowExcel = [{ v: "Total", s: tableHeaderStyle }];
+    domainArrayExcel.forEach(domain => {
+      const totalForDomain = Array.from(batchCodesExcel).reduce((sum, batchCode) => {
+        return sum + (batchHoursByDomainExcel[batchCode][domain] || 0);
+      }, 0);
+      totalRowExcel.push({ v: totalForDomain > 0 ? totalForDomain.toString() : "-", s: dataStyle });
+    });
+    allData.push(totalRowExcel);
+
     allData.push([""]);
 
     // Daily Schedule Headers
@@ -568,6 +610,40 @@ function CollegeSummaryReport({
       ]);
     });
 
+    // Calculate total labor cost
+    const totalCostExcel = dailyScheduleDataExcel.reduce((sum, item) => {
+      const costStr = item.dailyCost;
+      if (costStr && costStr !== "-") {
+        const cost = parseFloat(costStr.replace('₹', ''));
+        return sum + (isNaN(cost) ? 0 : cost);
+      }
+      return sum;
+    }, 0);
+
+    // Calculate total hours
+    const totalHoursExcel = dailyScheduleDataExcel.reduce((sum, item) => {
+      return sum + parseFloat(item.hours || 0);
+    }, 0);
+
+    // Add blank row for gap
+    allData.push([""]);
+
+    // Add total row with both totals
+    allData.push([
+      { v: "", s: dataStyle },
+      { v: "", s: dataStyle },
+      { v: "", s: dataStyle },
+      { v: "", s: dataStyle },
+      { v: "", s: dataStyle },
+      { v: "", s: dataStyle },
+      { v: "Total Hours", s: tableHeaderStyle },
+      { v: totalHoursExcel.toFixed(2), s: dataStyle },
+      { v: "", s: dataStyle },
+      { v: "", s: dataStyle },
+      { v: "Total Cost", s: tableHeaderStyle },
+      { v: `₹${totalCostExcel.toFixed(2)}`, s: costStyle }
+    ]);
+
     // Create the single sheet
     const worksheet = XLSX.utils.aoa_to_sheet(allData);
     
@@ -575,7 +651,8 @@ function CollegeSummaryReport({
     const colWidths = [];
     // Batch table columns (Batch Code + domains)
     const batchTableCols = 1 + Array.from(allDomainsExcel).length; // Batch Code + number of domains
-    for (let i = 0; i < batchTableCols; i++) {
+    colWidths.push({ width: 50 }); // Wider for header
+    for (let i = 1; i < batchTableCols; i++) {
       colWidths.push({ width: 15 }); // Fixed width for batch table columns
     }
     // Daily schedule columns

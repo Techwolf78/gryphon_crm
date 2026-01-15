@@ -78,6 +78,7 @@ function EditInvoiceModal({ trainer, onClose, onInvoiceUpdated, onToast }) {
           setInvoiceData({
             ...data,
             billingDate: data.billingDate || new Date().toISOString().split("T")[0],
+            gst: String(data.gst || 'NA'),
           });
         }
       } catch (error) {

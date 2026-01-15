@@ -4,8 +4,9 @@ import {
   Routes,
   Route,
   useLocation,
+  Navigate,
 } from "react-router-dom";
-import { AuthProvider } from "./context/AuthContext";
+import { AuthProvider, AuthContext } from "./context/AuthContext";
 import { NotificationsProvider } from "./context/NotificationsContext";
 import Navbar from "./components/Navbar";
 import ProtectedRoute from "./routes/ProtectedRoute";
@@ -49,6 +50,10 @@ const PublicInvoiceDetails = React.lazy(() =>
 const Maintenance = React.lazy(() => import("./pages/Maintenance"));
 const UploadStudentData = React.lazy(() => import("./components/Placement/AddJd/UploadStudentData")); // ✅ Space removed
 const Purchase = React.lazy(() => import("./pages/Purchase"));
+const Accountant = React.lazy(() => import("./pages/Accountant"));
+
+// Lazy load Intro page
+const Intro = React.lazy(() => import("./pages/Intro"));
 
 // Loading component
 const PageLoader = () => (
@@ -70,7 +75,10 @@ const AppContent = () => {
   // Routes where navbar should not appear
   const hideNavbarRoutes = ['/404', '/upload-student-data'];
 
-  if (isMaintenanceMode) {
+  // Component to handle dashboard redirection based on user department
+  const DashboardOrRedirect = () => {
+    return <Dashboard />;
+  };  if (isMaintenanceMode) {
     return (
       <Suspense fallback={<PageLoader />}>
         <Maintenance />
@@ -100,7 +108,7 @@ const AppContent = () => {
               </ProtectedRoute>
             }
           >
-            <Route index element={<Dashboard />} />
+            <Route index element={<DashboardOrRedirect />} />
             <Route path="profile" element={<UpdateProfile />} />
             <Route path="admin" element={<Admin />} />
             <Route path="sales" element={<Sales />} />
@@ -119,6 +127,8 @@ const AppContent = () => {
             <Route path="hr" element={<HR />} />
             <Route path="ca" element={<CA />} />
             <Route path="purchase" element={<Purchase />} />
+            <Route path="accounts/*" element={<Accountant />} />
+            <Route path="intro" element={<Intro />} />
           </Route>
 
           {/* Add the 404 route - catch all unmatched routes */}

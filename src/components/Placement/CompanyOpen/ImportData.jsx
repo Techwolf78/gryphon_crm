@@ -17,6 +17,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../../../firebase";
 import { getAuth } from "firebase/auth";
+import { normalizeSalaryForStorage, normalizeStipendForStorage } from "../../../utils/salaryUtils";
 
 const ImportData = ({ handleImportComplete }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -49,6 +50,9 @@ const ImportData = ({ handleImportComplete }) => {
     "Specialization": "specialization",
     "Job Type": "jobType",
     "Source": "source",
+    "Fixed Salary (LPA)": "fixedSalary",
+    "Variable Salary (LPA)": "variableSalary",
+    "Total Salary (LPA)": "salary",
     "Salary (LPA)": "salary",
     "Stipend (₹/month)": "stipend",
     "Job Location": "jobLocation",
@@ -223,8 +227,13 @@ const ImportData = ({ handleImportComplete }) => {
           specialization: company.specialization || "",
           jobType: company.jobType || "Full Time",
           source: company.source || "",
-          salary: company.salary ? Number(company.salary) : null,
-          stipend: company.stipend ? Number(company.stipend) : null,
+          fixedSalary: company.fixedSalary ? normalizeSalaryForStorage(company.fixedSalary) : "",
+          variableSalary: company.variableSalary ? normalizeSalaryForStorage(company.variableSalary) : "",
+          salary: company.salary ? normalizeSalaryForStorage(company.salary) : 
+                 (company.fixedSalary && company.variableSalary) ? 
+                 (parseFloat(normalizeSalaryForStorage(company.fixedSalary) || 0) + 
+                  parseFloat(normalizeSalaryForStorage(company.variableSalary) || 0)).toString() : "",
+          stipend: normalizeStipendForStorage(company.stipend),
           jobLocation: company.jobLocation || "",
           companyWebsite: company.companyWebsite || "",
           marksCriteria: company.marksCriteria || "",

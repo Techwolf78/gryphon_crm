@@ -12,6 +12,18 @@ import logo from "../assets/SYNC-logo-2.png";
 import compactLogo from "../assets/s-final.png";
 import collapseIcon from "../assets/sidebar-close.png";
 import expandIcon from "../assets/sidebar-open.png";
+import helpGif from "../assets/bubble-chat.gif";
+import hackerGif from "../assets/hacker.gif";
+import mortarboardGif from "../assets/mortarboard.gif";
+import lineChartGif from "../assets/line-chart.gif";
+import briefcaseGif from "../assets/briefcase.gif";
+import customerGif from "../assets/customer.gif";
+import checklistGif from "../assets/checklist.gif";
+import moneyBagGif from "../assets/money-bag.gif";
+import calculatorGif from "../assets/calculator.gif";
+import receiptGif from "../assets/receipt.gif";
+import dashboardGif from "../assets/dashboard.gif";
+import robotTalkingGif from "../assets/robot-talking.gif";
 import { MdOutlineCurrencyRupee } from "react-icons/md";
 import {
   FiHome,
@@ -27,66 +39,78 @@ import {
   FiShield,
   FiShoppingCart,
   FiBell,
+  FiFileText,
+  FiTerminal,
 } from "react-icons/fi";
+
+// Cache busting version for GIFs
+const gifVersion = '2';
 
 const roleLinks = {
   admin: [
-    { label: "Admin", path: "/dashboard/admin", icon: <FiUsers /> },
+    { label: "Admin", path: "/dashboard/admin", icon: <img src={`${hackerGif}?v=${gifVersion}`} alt="Admin" className="w-6 h-6" /> },
     {
       label: "Sales",
       path: "/dashboard/sales",
-      icon: <MdOutlineCurrencyRupee />,
+      icon: <img src={`${moneyBagGif}?v=${gifVersion}`} alt="Sales" className="w-6 h-6" />,
     },
     {
       label: "L & D",
       path: "/dashboard/learning-development",
-      icon: <FiBook />,
+      icon: <img src={`${mortarboardGif}?v=${gifVersion}`} alt="L & D" className="w-6 h-6" />,
     },
-    { label: "Placement", path: "/dashboard/placement", icon: <FiBriefcase /> },
-    { label: "D M", path: "/dashboard/marketing", icon: <FiTrendingUp /> },
-    { label: "CA", path: "/dashboard/ca", icon: <FiUserCheck /> },
-    { label: "HR", path: "/dashboard/hr", icon: <FiShield /> },
+    { label: "Placement", path: "/dashboard/placement", icon: <img src={`${briefcaseGif}?v=${gifVersion}`} alt="Placement" className="w-6 h-6" /> },
+    { label: "D M", path: "/dashboard/marketing", icon: <img src={`${lineChartGif}?v=${gifVersion}`} alt="D M" className="w-6 h-6" /> },
+    { label: "CA", path: "/dashboard/ca", icon: <img src={`${checklistGif}?v=${gifVersion}`} alt="CA" className="w-6 h-6" /> },
+    { label: "HR", path: "/dashboard/hr", icon: <img src={`${customerGif}?v=${gifVersion}`} alt="HR" className="w-6 h-6" /> },
+    { label: "Accounts", path: "/dashboard/accounts", icon: <img src={`${calculatorGif}?v=${gifVersion}`} alt="Accounts" className="w-6 h-6" /> },
     {
       label: "Purchase",
       path: "/dashboard/purchase",
-      icon: <FiShoppingCart />,
+      icon: <img src={`${receiptGif}?v=${gifVersion}`} alt="Purchase" className="w-6 h-6" />,
     },
   ],
   sales: [
     {
       label: "Sales",
       path: "/dashboard/sales",
-      icon: <MdOutlineCurrencyRupee />,
+      icon: <img src={`${moneyBagGif}?v=${gifVersion}`} alt="Sales" className="w-6 h-6" />,
     },
   ],
   placement: [
-    { label: "Placement", path: "/dashboard/placement", icon: <FiBriefcase /> },
+    { label: "Placement", path: "/dashboard/placement", icon: <img src={`${briefcaseGif}?v=${gifVersion}`} alt="Placement" className="w-6 h-6" /> },
   ],
   "learning-development": [
     {
       label: "L & D",
       path: "/dashboard/learning-development",
-      icon: <FiBook />,
+      icon: <img src={`${mortarboardGif}?v=${gifVersion}`} alt="L & D" className="w-6 h-6" />,
     },
   ],
   marketing: [
-    { label: "D M", path: "/dashboard/marketing", icon: <FiTrendingUp /> },
+    { label: "D M", path: "/dashboard/marketing", icon: <img src={`${lineChartGif}?v=${gifVersion}`} alt="D M" className="w-6 h-6" /> },
   ],
-  ca: [{ label: "CA", path: "/dashboard/ca", icon: <FiUserCheck /> }],
+  ca: [{ label: "CA", path: "/dashboard/ca", icon: <img src={`${checklistGif}?v=${gifVersion}`} alt="CA" className="w-6 h-6" /> }],
   hr: [
-    { label: "HR", path: "/dashboard/hr", icon: <FiShield /> },
+    { label: "HR", path: "/dashboard/hr", icon: <img src={`${customerGif}?v=${gifVersion}`} alt="HR" className="w-6 h-6" /> },
     {
       label: "Purchase",
       path: "/dashboard/purchase",
-      icon: <FiShoppingCart />,
+      icon: <img src={`${receiptGif}?v=${gifVersion}`} alt="Purchase" className="w-6 h-6" />,
     },
   ],
   purchase: [
     {
       label: "Purchase",
       path: "/dashboard/purchase",
-      icon: <FiShoppingCart />,
+      icon: <img src={`${receiptGif}?v=${gifVersion}`} alt="Purchase" className="w-6 h-6" />,
     },
+  ],
+  accountant: [
+    { label: "Accounts", path: "/dashboard/accounts", icon: <img src={`${calculatorGif}?v=${gifVersion}`} alt="Accounts" className="w-6 h-6" /> },
+  ],
+  accounts: [
+    { label: "Accounts", path: "/dashboard/accounts", icon: <img src={`${calculatorGif}?v=${gifVersion}`} alt="Accounts" className="w-6 h-6" /> },
   ],
 };
 
@@ -104,6 +128,7 @@ const normalizeRole = (role) => {
   if (norm.includes("ca")) return "ca";
   if (norm.includes("hr")) return "hr";
   if (norm.includes("placement")) return "placement";
+  if (norm.includes("accountant") || norm.includes("accounts")) return "accounts";
   return "";
 };
 
@@ -209,18 +234,29 @@ const Sidebar = ({ collapsed, onToggle }) => {
       ? location.pathname === "/dashboard"
       : location.pathname.startsWith(path);
 
+  // Check if user is in accounts department
+  const isAccountsUser = user?.departments?.some(dept =>
+    dept.toLowerCase().includes('accounts') || dept.toLowerCase().includes('accountant')
+  ) || user?.department?.toLowerCase().includes('accounts') || user?.department?.toLowerCase().includes('accountant');
+
   const links = [
-    {
+    // Hide Dashboard link for accounts users
+    ...(isAccountsUser ? [] : [{
       label: "Dashboard",
       path: "/dashboard",
-      icon: <FiHome />,
+      icon: <img src={`${dashboardGif}?v=${gifVersion}`} alt="Dashboard" className="w-6 h-6" />,
       skipRedirect: true,
-    },
+    }]),
+    // {
+    //   label: "Intro",
+    //   path: "/dashboard/intro",
+    //   icon: <FiBook />,
+    // },
     ...departmentLinks,
     {
       label: "Help",
       path: "/dashboard/help",
-      icon: <FiHelpCircle />,
+      icon: <img src={`${helpGif}?v=${gifVersion}`} alt="Help" className="w-7 h-7" />,
       skipRedirect: true,
     },
   ];
@@ -350,8 +386,8 @@ const Sidebar = ({ collapsed, onToggle }) => {
                           collapsed ? "justify-center px-2 py-2" : "px-3 py-2"
                         } rounded text-sm transition ${
                           isActive(path)
-                            ? "bg-blue-50 text-blue-600 font-medium"
-                            : "text-gray-600 hover:bg-gray-100"
+                            ? "bg-blue-100 text-blue-700 font-medium shadow-sm"
+                            : "text-gray-600 hover:bg-gray-200 hover:shadow-sm"
                         }`}
                         title={!collapsed ? label : ""}
                         onClick={() => {
@@ -396,7 +432,7 @@ const Sidebar = ({ collapsed, onToggle }) => {
                   } rounded text-sm bg-linear-to-r from-blue-50 to-sky-100 text-blue-700 hover:from-blue-100 hover:to-sky-150 hover:text-blue-800 border border-blue-200 shadow-sm transition-all duration-200`}
                   title={!collapsed ? "Ask AI" : ""}
                 >
-                  <FiMessageSquare className="text-lg shrink-0" />
+                  <img src={`${robotTalkingGif}?v=${gifVersion}`} alt="Ask AI" className="w-6 h-6 shrink-0" />
                   {!collapsed && <span className="ml-2">Ask AI</span>}
                 </button>
               </div>

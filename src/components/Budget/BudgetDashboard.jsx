@@ -357,7 +357,6 @@ function BudgetDashboard({
   // State management
   const [activeTab, setActiveTab] = useState("budgets");
   const [currentUser, setCurrentUser] = useState(null);
-  const [users, setUsers] = useState({});
   const [loading, setLoading] = useState(true);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [deletingBudget, setDeletingBudget] = useState(false);
@@ -386,7 +385,6 @@ function BudgetDashboard({
   const [showPurchaseIntentModal, setShowPurchaseIntentModal] = useState(false);
   const [showPurchaseOrderModal, setShowPurchaseOrderModal] = useState(false);
   const [selectedIntent, setSelectedIntent] = useState(null);
-  const [selectedOrder, setSelectedOrder] = useState(null);
   const [editingBudget, setEditingBudget] = useState(null);
 
   // Filters
@@ -434,11 +432,6 @@ function BudgetDashboard({
     }
     return department || "admin";
   }, [currentUserData, department]);
-
-  const isPurchaseDepartment = useMemo(() => {
-    const dept = currentUserDepartment?.toLowerCase();
-    return ["purchase", "admin", "hr"].includes(dept);
-  }, [currentUserDepartment]);
 
   const currentUserDepartmentComponents = getDepartmentComponents(
     currentUserDepartment
@@ -504,14 +497,11 @@ function BudgetDashboard({
     // Users data - this is critical for department info
     const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
       const userData = {};
-      let userCount = 0;
 
       snapshot.forEach((doc) => {
         userData[doc.id] = { id: doc.id, ...doc.data() };
-        userCount++;
       });
 
-      setUsers(userData);
       setUsersLoaded(true);
 
       // Debug: Check if we can find current user by email
@@ -844,7 +834,7 @@ function BudgetDashboard({
     return map[department?.toLowerCase()] || department?.toUpperCase();
   };
 
-  const generatePurchaseOrderNumber = async (
+  const generatePurchaseOrderNumber = useCallback(async (
     department,
     fiscalYear,
     budgetId
@@ -873,7 +863,7 @@ function BudgetDashboard({
     return `${prefix}/${fiscalYear}/${deptCode}/${nextNumber
       .toString()
       .padStart(2, "0")}`;
-  };
+  }, []);
 
   const handleCreatePurchaseOrder = useCallback(
     async (orderData) => {
@@ -984,7 +974,7 @@ function BudgetDashboard({
         throw error;
       }
     },
-    [currentUser, department, currentFiscalYear, activeBudget, departmentBudget]
+    [currentUser, department, currentFiscalYear, activeBudget, departmentBudget, generatePurchaseOrderNumber]
   );
 
   const handleUpdatePurchaseOrder = async (updatedOrder) => {
@@ -1125,7 +1115,7 @@ function BudgetDashboard({
 
   return (
     <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100">
-      <div className=" mx-auto py-6">
+      <div className=" mx-auto py-2">
         {/* Header */}
         <div className="bg-white rounded-2xl shadow-md border border-gray-200 p-6 mb-6">
           {/* Back Button */}
@@ -1238,7 +1228,7 @@ function BudgetDashboard({
         </div>
 
         {/* Main Content for Other Tabs */}
-        <div className="bg-gray-100 rounded-xl shadow-sm border border-gray-200 p-4 text-sm">
+        <div className="bg-gray-100 rounded-xl shadow-sm border border-gray-200 text-sm">
           <Suspense fallback={<ComponentLoader />}>
             {activeTab === "budgets" && (
               <>
@@ -1302,7 +1292,7 @@ function BudgetDashboard({
                               );
                               return yearB - yearA;
                             })
-                            .map((budget, index) => (
+                            .map((budget) => (
                               <tr
                                 key={budget.id}
                                 className={`border-b border-gray-100 ${

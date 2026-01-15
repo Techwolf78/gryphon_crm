@@ -247,7 +247,7 @@ function TrainingTable({ trainingData, onRowClick, onViewStudentData, onViewMouF
                       </button>
                       <button
                         onClick={() => {
-                          onInitiateJD(item);
+                          onInitiateJD();
                           setMenuOpenId(null);
                         }}
                         className="w-full px-3 py-2 text-left flex items-center gap-2 hover:bg-indigo-50 focus:bg-indigo-50 text-gray-700 transition group"

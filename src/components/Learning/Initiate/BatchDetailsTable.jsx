@@ -320,7 +320,7 @@ const TrainerRow = React.memo(
                   '&:hover': {
                     borderColor: '#6366f1',
                   },
-                  boxShadow: state.isFocused ? '0 0 0 1px #6366f1' : provided.boxShadow,
+                  boxShadow: state.isFocused ? '0 0 0 2px #3B82F6' : provided.boxShadow,
                   padding: '0 2px',
                 }),
                 valueContainer: (provided) => ({
@@ -381,7 +381,7 @@ const TrainerRow = React.memo(
                   e.target.value
                 )
               }
-              className="w-24 rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm py-1 px-2"
+              className="w-24 rounded border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-blue-500 text-sm py-1 px-2"
             >
               <option value="">Select Duration</option>
               {DAY_DURATION_OPTIONS.map((option) => (
@@ -406,7 +406,7 @@ const TrainerRow = React.memo(
                   e.target.value
                 )
               }
-              className="w-32 rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm py-1 px-2"
+              className="w-32 rounded border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-blue-500 text-sm py-1 px-2"
             />
           </td>
 
@@ -424,7 +424,7 @@ const TrainerRow = React.memo(
                   e.target.value
                 )
               }
-              className="w-32 rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm py-1 px-2"
+              className="w-32 rounded border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-blue-500 text-sm py-1 px-2"
             />
           </td>
 
@@ -474,7 +474,7 @@ const TrainerRow = React.memo(
                   e.target.value
                 )
               }
-              className="w-20 rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm py-1 px-2"
+              className="w-20 rounded border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-blue-500 text-sm py-1 px-2"
               placeholder="Hours"
             />
           </td>
@@ -493,13 +493,13 @@ const TrainerRow = React.memo(
                   parseFloat(e.target.value) || 0
                 )
               }
-              className="w-20 rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm py-1 px-2"
+              className="w-20 rounded border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-blue-500 text-sm py-1 px-2"
               placeholder="Cost"
             />
           </td>
 
           {/* Daily Hours */}
-          <td className="px-2 py-1 relative bg-linear-to-r from-gray-50 to-white rounded-md overflow-visible">
+          <td className="px-2 py-1 relative bg-linear-to-r from-gray-50 to-white rounded-xl overflow-visible">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-gray-700">
                 {trainer.dailyHours && trainer.dailyHours.length > 0
@@ -516,7 +516,7 @@ const TrainerRow = React.memo(
                 type="button"
                 onClick={() => setShowDailyHoursDropdown(!showDailyHoursDropdown)}
                 disabled={!trainer.assignedHours || Number(trainer.assignedHours) <= 0}
-                className={`ml-2 p-1.5 rounded-md bg-white border border-gray-200 hover:bg-indigo-50 hover:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition-all duration-200 shadow-sm ${
+                className={`ml-2 p-1.5 rounded-xl bg-white border border-gray-200 hover:bg-indigo-50 hover:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 shadow-sm ${
                   (!trainer.assignedHours || Number(trainer.assignedHours) <= 0) ? 'opacity-50 cursor-not-allowed' : ''
                 }`}
                 title={(!trainer.assignedHours || Number(trainer.assignedHours) <= 0) ? "Enter total hours first to view daily breakdown." : (showDailyHoursDropdown ? "Hide daily breakdown" : "Show daily breakdown")}
@@ -534,7 +534,7 @@ const TrainerRow = React.memo(
             {showDailyHoursDropdown && trainer.dailyHours && trainer.dailyHours.length > 0 && (
               <div
                 id="daily-hours-dropdown"
-                className="absolute top-full right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg p-2 z-60 min-w-60 max-w-[280px] max-h-48 overflow-y-auto"
+                className="absolute top-full right-0 mt-1 bg-white border border-gray-300 rounded-xl shadow-sm p-2 z-60 min-w-60 max-w-[280px] max-h-48 overflow-y-auto"
                 role="dialog"
                 aria-labelledby="daily-hours-title"
               >
@@ -545,7 +545,7 @@ const TrainerRow = React.memo(
                   <button
                     type="button"
                     onClick={() => setShowDailyHoursDropdown(false)}
-                    className="p-0.5 rounded-full hover:bg-gray-100 focus:outline-none focus:ring-1 focus:ring-gray-400 transition-colors"
+                    className="p-0.5 rounded-full hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
                     aria-label="Close daily hours breakdown"
                   >
                     <FiX className="w-3 h-3 text-gray-500" />
@@ -590,7 +590,7 @@ const TrainerRow = React.memo(
                                         e.target.value === "" ? 0 : parseFloat(e.target.value) || 0
                                       )
                                     }
-                                    className="w-12 text-sm border border-gray-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-400 text-center"
+                                    className="w-12 text-sm border border-gray-200 rounded px-1 py-0.5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-center"
                                     placeholder="0"
                                   />
                                 </td>
@@ -642,14 +642,14 @@ const TrainerRow = React.memo(
                 onClick={() => removeTrainer(rowIndex, batchIndex, trainerIdx)}
                 aria-label="Remove trainer"
                 title="Remove Trainer"
-                className="p-1 rounded-md text-rose-500 hover:text-rose-600 hover:bg-rose-100 focus:outline-none focus:ring-1 focus:ring-rose-300 transition"
+                className="p-1 rounded-xl text-rose-500 hover:text-rose-600 hover:bg-rose-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
               >
                 <FiTrash2 className="w-3 h-3" />
               </button>
               {trainer.dayDuration === "AM" && (
                 <button
                   type="button"
-                  className="ml-1 px-2 py-1 text-sm bg-black text-white rounded hover:bg-gray-800 focus:outline-none focus:ring-1 focus:ring-black/30"
+                  className="ml-1 px-2 py-1 text-sm bg-black text-white rounded hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   onClick={() => {
                     openSwapModal(rowIndex, batchIndex, trainerIdx);
                   }}
@@ -670,7 +670,7 @@ const TrainerRow = React.memo(
                 {/* Conveyance, Food, Lodging section */}
                 <div className="flex flex-row gap-2 self-start">
                   {/* Conveyance */}
-                  <div className="flex flex-col bg-white/70 border border-gray-100 rounded-md p-0.5 min-w-[90px]">
+                  <div className="flex flex-col bg-white/70 border border-gray-100 rounded-xl p-0.5 min-w-[90px]">
                     <label className="text-sm font-semibold text-slate-600 mb-0.5">
                       Conveyance
                     </label>
@@ -695,7 +695,7 @@ const TrainerRow = React.memo(
                               : parseFloat(e.target.value) || 0
                           )
                         }
-                        className="w-full pl-6 rounded border border-gray-200 bg-white text-sm py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-200"
+                        className="w-full pl-6 rounded border border-gray-200 bg-white text-sm py-0.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         placeholder="0"
                       />
                     </div>
@@ -710,7 +710,7 @@ const TrainerRow = React.memo(
                   </div>
 
                   {/* Food */}
-                  <div className="flex flex-col bg-white/70 border border-gray-100 rounded-md p-0.5 min-w-[90px]">
+                  <div className="flex flex-col bg-white/70 border border-gray-100 rounded-xl p-0.5 min-w-[90px]">
                     <label className="text-sm font-semibold text-slate-600 mb-0.5">
                       Food
                     </label>
@@ -735,7 +735,7 @@ const TrainerRow = React.memo(
                               : parseFloat(e.target.value) || 0
                           )
                         }
-                        className="w-full pl-6 rounded border border-gray-200 bg-white text-sm py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-200"
+                        className="w-full pl-6 rounded border border-gray-200 bg-white text-sm py-0.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         placeholder="0"
                       />
                     </div>
@@ -751,7 +751,7 @@ const TrainerRow = React.memo(
                   </div>
 
                   {/* Lodging */}
-                  <div className="flex flex-col bg-white/70 border border-gray-100 rounded-md p-0.5 min-w-[90px]">
+                  <div className="flex flex-col bg-white/70 border border-gray-100 rounded-xl p-0.5 min-w-[90px]">
                     <label className="text-sm font-semibold text-slate-600 mb-0.5">
                       Lodging
                     </label>
@@ -776,7 +776,7 @@ const TrainerRow = React.memo(
                               : parseFloat(e.target.value) || 0
                           )
                         }
-                        className="w-full pl-6 rounded border border-gray-200 bg-white text-sm py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-200"
+                        className="w-full pl-6 rounded border border-gray-200 bg-white text-sm py-0.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         placeholder="0"
                       />
                     </div>
@@ -804,7 +804,7 @@ const TrainerRow = React.memo(
                     const lodgingTotal = (Number(trainer.lodging) || 0) * days;
                     const miscCost = roundToNearestWhole(conveyanceTotal + foodTotal + lodgingTotal);
                     const totalCost = roundToNearestWhole(trainerCost + miscCost);
-                    const boxBase = "flex items-center gap-1 bg-white/70 border border-gray-100 rounded-md px-2 py-1";
+                    const boxBase = "flex items-center gap-1 bg-white/70 border border-gray-100 rounded-xl px-2 py-1";
                     const valueCls = "text-xs font-semibold";
                     return (
                       <>
@@ -853,7 +853,7 @@ const TrainerRow = React.memo(
                             <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                           </svg>
                         </button>
-                        <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block bg-slate-800 text-white text-sm rounded py-2 px-3 shadow-lg z-50 max-w-xs">
+                        <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block bg-slate-800 text-white text-sm rounded py-2 px-3 shadow-sm z-50 max-w-xs">
                           <div className="font-semibold mb-1">How to manage topics:</div>
                           <ul className="space-y-1">
                             <li>• Click topic buttons to select/deselect</li>
@@ -867,7 +867,7 @@ const TrainerRow = React.memo(
                       Click to select • Type to add
                     </span>
                   </div>
-                  <div className="bg-white rounded-md border border-gray-100 p-2 shadow-sm min-w-[250px]">
+                  <div className="bg-white rounded-xl border border-gray-100 p-2 shadow-sm min-w-[250px]">
                     {/* Simplified topics selection UI */}
                     {(() => {
                       const trainerDoc = trainers.find(
@@ -935,7 +935,7 @@ const TrainerRow = React.memo(
                                       role="checkbox"
                                       aria-checked={active}
                                       onClick={() => toggleTopic(topic)}
-                                      className={`text-sm px-1 py-0.5 rounded-full border transition-all focus:outline-none focus:ring-1 focus:ring-indigo-400 truncate ${
+                                      className={`text-sm px-1 py-0.5 rounded-full border transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 truncate ${
                                         active
                                           ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
                                           : "bg-white text-slate-700 border-gray-300 hover:border-indigo-400 hover:bg-indigo-50"
@@ -994,7 +994,7 @@ const TrainerRow = React.memo(
                                 }
                               }}
                               placeholder="Type new topic here and press Enter"
-                              className="flex-1 rounded border border-gray-200 px-1 py-0.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-200"
+                              className="flex-1 rounded border border-gray-200 px-1 py-0.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
                             <button
                               type="button"
@@ -1025,7 +1025,7 @@ const TrainerRow = React.memo(
                                 setNewTopicInput("");
                                 setDuplicateTopicMessage(""); // Clear any previous message
                               }}
-                              className="inline-flex items-center gap-0.5 bg-indigo-600 hover:bg-indigo-700 text-white px-1.5 py-0.5 rounded text-sm focus:outline-none focus:ring-1 focus:ring-indigo-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                              className="inline-flex items-center gap-0.5 bg-indigo-600 hover:bg-indigo-700 text-white px-1.5 py-0.5 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                               disabled={!newTopicInput.trim()}
                             >
                               <FiPlus size={10} />
@@ -1113,7 +1113,7 @@ const TrainersTable = React.memo(
             </button>
             {showTooltip && (
               <div
-                className="absolute top-full mt-1 left-0 z-10 bg-red-50 border border-red-200 text-red-800 text-sm px-3 py-2 rounded shadow-lg max-w-xs"
+                className="absolute top-full mt-1 left-0 z-10 bg-red-50 border border-red-200 text-red-800 text-sm px-3 py-2 rounded shadow-sm max-w-xs"
                 style={{
                   whiteSpace: "nowrap",
                   transform: "translateX(-50%)",
@@ -1131,7 +1131,7 @@ const TrainersTable = React.memo(
 
         {trainers.length > 0 ? (
           <div className="overflow-visible">
-            <table className="min-w-full text-xs border border-gray-200 rounded overflow-visible">
+            <table className="min-w-full text-xs border border-gray-200 rounded-xl overflow-visible">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-2 py-1 text-left">Trainer</th>
@@ -1179,7 +1179,7 @@ const TrainersTable = React.memo(
             </table>
           </div>
         ) : (
-          <div className="text-center py-6 bg-gray-50 rounded-lg">
+          <div className="text-center py-6 bg-gray-50 rounded-xl">
             <FiUser className="mx-auto text-gray-400" size={20} />
             <p className="text-sm text-gray-500 mt-2">No trainers assigned</p>
           </div>
@@ -1218,9 +1218,9 @@ const BatchComponent = React.memo(
   }) => {
     return (
       <div
-        className={`bg-white rounded-lg border ${
+        className={`bg-white rounded-xl border ${
           memoizedGetColorsForBatch(row.batch).border
-        } shadow-xs overflow-visible`}
+        } shadow-sm overflow-visible`}
       >
         <div
           className={`px-2 py-2 ${
@@ -1240,7 +1240,7 @@ const BatchComponent = React.memo(
             {row.batches.length > 1 && (
               <button
                 onClick={() => removeBatch(rowIndex, batchIndex)}
-                className="p-1.5 rounded-lg hover:bg-rose-50 text-rose-500 transition-colors"
+                className="p-1.5 rounded-xl hover:bg-rose-50 text-rose-500 transition-colors"
                 title="Remove Batch"
                 type="button"
               >
@@ -1261,7 +1261,7 @@ const BatchComponent = React.memo(
                 type="text"
                 inputMode="numeric"
                 pattern="[0-9]*"
-                className="w-20 rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm py-1 px-2"
+                className="w-20 rounded border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-blue-500 text-sm py-1 px-2"
                 value={batch.batchPerStdCount || ""}
                 onChange={(e) =>
                   handleBatchChange(
@@ -1277,12 +1277,12 @@ const BatchComponent = React.memo(
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-0.5">
-                Batch Code
+              <label className="block text-xs font-medium text-gray-400 tracking-wider mb-0.5" style={{ fontVariant: 'small-caps' }}>
+                Batch Code (editable)
               </label>
               <input
                 type="text"
-                className="w-24 rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm py-1 px-2"
+                className="w-24 rounded border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-blue-500 text-sm py-1 px-2"
                 value={batch.batchCode || ""}
                 onChange={(e) =>
                   handleBatchChange(
@@ -1313,18 +1313,35 @@ const BatchComponent = React.memo(
               (sum, t) => sum + Number(t.assignedHours || 0),
               0
             );
+            const totalHours = Number(row.hrs) || 0;
+            const progressPercentage = totalHours > 0 ? (assignedHours / totalHours) * 100 : 0;
+
+            // Determine gradient based on progress percentage (lava flow effect)
+            let progressGradient = "bg-gradient-to-r from-red-600 via-red-500 to-red-400"; // Default for 0%
+            if (progressPercentage >= 100) {
+              progressGradient = "bg-gradient-to-r from-emerald-600 via-green-500 to-emerald-400"; // Complete - cool green
+            } else if (progressPercentage >= 75) {
+              progressGradient = "bg-gradient-to-r from-yellow-400 via-yellow-300 to-green-400"; // Near complete - golden
+            } else if (progressPercentage >= 50) {
+              progressGradient = "bg-gradient-to-r from-orange-500 via-yellow-400 to-orange-300"; // Halfway - lava orange
+            } else if (progressPercentage >= 25) {
+              progressGradient = "bg-gradient-to-r from-red-600 via-orange-500 to-red-400"; // Starting - hot lava
+            } else if (progressPercentage > 0) {
+              progressGradient = "bg-gradient-to-r from-red-700 via-red-600 to-red-500"; // Just started - molten
+            }
+
             return assignedHours > 0 ? (
               <div className="mb-2">
                 <div className="flex justify-between items-center mb-1">
                   <span className="text-xs text-gray-600 font-medium">
-                    Assigned Hours: {assignedHours} / {assignedHours}
+                    Assigned Hours: {assignedHours} / {totalHours}
                   </span>
                 </div>
-                <div className="w-full bg-gray-200 rounded h-2">
+                <div className="w-full bg-gray-200 rounded h-2 overflow-hidden">
                   <div
-                    className="bg-indigo-500 h-2 rounded"
+                    className={`${progressGradient} h-2 rounded transition-all duration-500 ease-out`}
                     style={{
-                      width: "100%",
+                      width: `${Math.min(progressPercentage, 100)}%`,
                     }}
                   ></div>
                 </div>
@@ -3001,7 +3018,7 @@ const filteredTrainers = useMemo(() => {
     <div className="space-y-6">
       {/* Duplicate prompt banner inside the table component */}
       {duplicateTrainers && duplicateTrainers.length > 0 && (
-        <div className="rounded bg-red-50 border border-red-200 p-3">
+        <div className="rounded-xl bg-red-50 border border-red-200 p-3">
           <div className="flex items-center justify-between">
             <div className="text-xs text-red-800">
               Duplicate trainer assignments detected. Rows with conflicts are
@@ -3030,7 +3047,7 @@ const filteredTrainers = useMemo(() => {
                       });
                   }, 120);
                 }}
-                className="px-3 py-1.5 bg-red-600 text-white rounded hover:bg-red-700"
+                className="px-3 py-1.5 bg-red-600 text-white rounded-xl hover:bg-red-700"
               >
                 Show duplicates
               </button>
@@ -3181,7 +3198,7 @@ const filteredTrainers = useMemo(() => {
                         type="date"
                         value={mergeModal.startDate}
                         onChange={(e) => setMergeModal(prev => ({ ...prev, startDate: e.target.value }))}
-                        className="w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2 px-3"
+                        className="w-full rounded-xl border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-blue-500 text-sm py-2 px-3"
                       />
                     </div>
                     <div>
@@ -3192,7 +3209,7 @@ const filteredTrainers = useMemo(() => {
                         type="date"
                         value={mergeModal.endDate}
                         onChange={(e) => setMergeModal(prev => ({ ...prev, endDate: e.target.value }))}
-                        className="w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2 px-3"
+                        className="w-full rounded-xl border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-blue-500 text-sm py-2 px-3"
                       />
                     </div>
                   </div>
@@ -3210,7 +3227,7 @@ const filteredTrainers = useMemo(() => {
                   if (mergeModal.mergeType === "specific-date") {
                     const combinedHours = targets.reduce((sum, tgt) => sum + Number(tgt.hrs || 0), Number(src.hrs || 0));
                     return (
-                      <div className="rounded border border-gray-100 p-3 bg-gray-50 text-sm">
+                      <div className="rounded-xl border border-gray-100 p-3 bg-gray-50 text-sm">
                         <div className="mb-3">
                           <div className="font-medium">Summary</div>
                           <div className="text-xs text-gray-600">
@@ -3236,7 +3253,7 @@ const filteredTrainers = useMemo(() => {
                   } else {
                     // Whole-phase merge summary
                     return (
-                      <div className="rounded border border-gray-100 p-3 bg-gray-50 text-sm">
+                      <div className="rounded-xl border border-gray-100 p-3 bg-gray-50 text-sm">
                         <div className="flex items-center justify-between">
                           <div>
                             <div className="font-medium">Summary</div>
@@ -3273,7 +3290,7 @@ const filteredTrainers = useMemo(() => {
                       endDate: "",
                     })
                   }
-                  className="px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                  className="px-4 py-2 rounded-xl border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   Cancel
                 </button>
@@ -3292,7 +3309,7 @@ const filteredTrainers = useMemo(() => {
                     (mergeModal.mergeType === "specific-date" && 
                      (!mergeModal.startDate || !mergeModal.endDate))
                   }
-                  className={`px-4 py-2 rounded-lg text-sm font-medium text-white ${
+                  className={`px-4 py-2 rounded-xl text-sm font-medium text-white ${
                     (mergeModal.targetRowIndices && mergeModal.targetRowIndices.length > 0) &&
                     (mergeModal.mergeType === "whole-phase" || 
                      (mergeModal.startDate && mergeModal.endDate))
@@ -3315,7 +3332,7 @@ const filteredTrainers = useMemo(() => {
             <h3 className="text-lg font-semibold text-gray-900 mb-4">
               Select Trainer to Swap Batches With
             </h3>
-            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-xl">
               <p className="text-sm text-blue-800">
                 <strong>How Cross-Batch Swap Works:</strong>
                 <br />• <strong>Darshan (AM in CS)</strong> will be added to{" "}
@@ -3362,7 +3379,7 @@ const filteredTrainers = useMemo(() => {
                     </div>
                     <button
                       type="button"
-                      className="ml-4 px-3 py-1 bg-indigo-600 text-white rounded text-sm whitespace-nowrap hover:bg-indigo-700 transition-colors"
+                      className="ml-4 px-3 py-1 bg-indigo-600 text-white rounded-xl text-sm whitespace-nowrap hover:bg-indigo-700 transition-colors"
                       onClick={() => handleSwap(t)}
                     >
                       Swap Time Slots
@@ -3385,7 +3402,7 @@ const filteredTrainers = useMemo(() => {
             <div className="flex justify-end">
               <button
                 type="button"
-                className="mt-2 px-4 py-2 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors"
+                className="mt-2 px-4 py-2 rounded-xl bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
                 onClick={closeSwapModal}
               >
                 Cancel
@@ -3402,7 +3419,7 @@ const filteredTrainers = useMemo(() => {
             <h3 className="text-lg font-semibold text-gray-900 mb-4">
               Confirm Time Slot Swap
             </h3>
-            <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-xl">
               <p className="text-sm text-amber-800">
                 <strong>Review the changes below before confirming:</strong>
                 <br />• This will swap both trainers and their time slots between batches
@@ -3415,7 +3432,7 @@ const filteredTrainers = useMemo(() => {
               <h4 className="text-sm font-medium text-gray-900 mb-2">Current Assignments</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 {/* Source Trainer Current Assignment */}
-                <div className="border border-gray-200 rounded-md p-2 bg-red-50">
+                <div className="border border-gray-200 rounded-xl p-2 bg-red-50">
                   <div className="flex items-center justify-between mb-1">
                     <span className="font-medium text-red-800 text-xs truncate">
                       {swapConfirmationModal.sourceTrainerData?.trainerName} ({swapConfirmationModal.sourceTrainerData?.trainerId})
@@ -3432,7 +3449,7 @@ const filteredTrainers = useMemo(() => {
                 </div>
 
                 {/* Target Trainer Current Assignment */}
-                <div className="border border-gray-200 rounded-md p-2 bg-blue-50">
+                <div className="border border-gray-200 rounded-xl p-2 bg-blue-50">
                   <div className="flex items-center justify-between mb-1">
                     <span className="font-medium text-blue-800 text-xs truncate">
                       {swapConfirmationModal.targetTrainerData?.trainerName} ({swapConfirmationModal.targetTrainerData?.trainerId})
@@ -3481,7 +3498,7 @@ const filteredTrainers = useMemo(() => {
                 return (
                   <>
                     {postSwapDuplicates.size > 0 && (
-                      <div className="mb-2 p-2 bg-red-50 border border-red-200 rounded-md">
+                      <div className="mb-2 p-2 bg-red-50 border border-red-200 rounded-xl">
                         <div className="flex items-center text-red-800 text-xs">
                           <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
@@ -3492,7 +3509,7 @@ const filteredTrainers = useMemo(() => {
                     )}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                       {/* Source Trainer New Assignment */}
-                      <div className={`border rounded-md p-2 ${sourceHasDuplicate ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-green-50'}`}>
+                      <div className={`border rounded-xl p-2 ${sourceHasDuplicate ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-green-50'}`}>
                         {sourceHasDuplicate && (
                           <div className="text-xs text-red-600 font-medium mb-1 flex items-center">
                             <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
@@ -3535,7 +3552,7 @@ const filteredTrainers = useMemo(() => {
                       </div>
 
                       {/* Target Trainer New Assignment */}
-                      <div className={`border rounded-md p-2 ${targetHasDuplicate ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-green-50'}`}>
+                      <div className={`border rounded-xl p-2 ${targetHasDuplicate ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-green-50'}`}>
                         {targetHasDuplicate && (
                           <div className="text-xs text-red-600 font-medium mb-1 flex items-center">
                             <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
@@ -3585,7 +3602,7 @@ const filteredTrainers = useMemo(() => {
             {/* Calendar View */}
             <div className="mb-4">
               <h4 className="text-sm font-medium text-gray-900 mb-2">Calendar Overview</h4>
-              <div className="border border-gray-200 rounded-md p-3 bg-gray-50">
+              <div className="border border-gray-200 rounded-xl p-3 bg-gray-50">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {/* Before Swap */}
                   <div>
@@ -3737,7 +3754,7 @@ const filteredTrainers = useMemo(() => {
               <button
                 type="button"
                 onClick={closeSwapConfirmationModal}
-                className="px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                className="px-4 py-2 rounded-xl border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 Cancel
               </button>
@@ -3756,7 +3773,7 @@ const filteredTrainers = useMemo(() => {
                     type="button"
                     onClick={performSwap}
                     disabled={hasDuplicates}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors ${
+                    className={`px-4 py-2 rounded-xl text-sm font-medium text-white transition-colors ${
                       hasDuplicates 
                         ? 'bg-red-400 cursor-not-allowed' 
                         : 'bg-indigo-600 hover:bg-indigo-700'
@@ -3947,7 +3964,7 @@ const filteredTrainers = useMemo(() => {
                             e.stopPropagation();
                             addBatch(rowIndex);
                           }}
-                          className={`flex items-center px-2 py-1 rounded border border-indigo-500 bg-indigo-50 text-indigo-700 text-xs font-medium shadow-sm hover:bg-indigo-100 hover:border-indigo-600 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-200 ${
+                          className={`flex items-center px-2 py-1 rounded-xl border border-indigo-500 bg-indigo-50 text-indigo-700 text-xs font-medium shadow-sm hover:bg-indigo-100 hover:border-indigo-600 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                             memoizedGetColorsForBatch(row.batch).text
                           }`}
                           title={`Add Batch to ${row.batch}`}

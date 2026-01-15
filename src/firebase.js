@@ -6,6 +6,7 @@ import {
   browserLocalPersistence
 } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import { getDatabase } from "firebase/database";
 
 const firebaseConfig = {
   apiKey: "AIzaSyD9SBw0ZckY3ht0CwH39C5pPRWwkR2zR4M",
@@ -49,4 +50,6 @@ try {
   console.error("Secondary app initialization failed:", error);
 }
 
-export { app, auth, db, secondaryApp, secondaryAuth };
+const rtdb = getDatabase(app);
+
+export { app, auth, db, secondaryApp, secondaryAuth, rtdb };

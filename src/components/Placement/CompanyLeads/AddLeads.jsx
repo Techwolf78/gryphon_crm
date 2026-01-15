@@ -13,14 +13,9 @@ import {
   orderBy
 } from "firebase/firestore";
 import { XIcon } from "@heroicons/react/outline";
+import { INDUSTRY_OPTIONS, DESIGNATION_OPTIONS, STATUS_OPTIONS } from "../../../utils/constants";
 
-const statusOptions = [
-  "Hot",
-  "Warm",
-  "Cold",
-  "Called",
-  "Onboarded",
-];
+
 
 function AddLeads({ show, onClose, onAddLead }) {
   const [companyName, setCompanyName] = useState("");
@@ -31,11 +26,18 @@ function AddLeads({ show, onClose, onAddLead }) {
   const [workingSince, setWorkingSince] = useState("");
   const [pocLocation, setPocLocation] = useState("");
   const [pocPhone, setPocPhone] = useState("");
+  const [pocLandline, setPocLandline] = useState("");
   const [pocMail, setPocMail] = useState("");
   const [pocDesignation, setPocDesignation] = useState("");
   const [pocLinkedin, setPocLinkedin] = useState("");
   const [status, setStatus] = useState("Warm");
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  
+  // CTC (Cost to Company) state
+  const [ctcType, setCtcType] = useState("single"); // "single" or "range"
+  const [ctcSingle, setCtcSingle] = useState("");
+  const [ctcMin, setCtcMin] = useState("");
+  const [ctcMax, setCtcMax] = useState("");
   
   // Validation state
   const [validationErrors, setValidationErrors] = useState({});
@@ -44,13 +46,7 @@ function AddLeads({ show, onClose, onAddLead }) {
   // Duplicate warning state
   const [duplicateWarning, setDuplicateWarning] = useState(null);
 
-  // Designation options for consistency
-  const designationOptions = [
-    "CEO/Founder", "CTO/Technical Head", "HR Manager", "Recruitment Manager",
-    "Talent Acquisition Lead", "Business Development Manager", "Sales Manager",
-    "Operations Manager", "Project Manager", "Team Lead", "Senior Developer",
-    "Developer", "Intern", "Other"
-  ];
+
 
   // State for custom "Other" inputs
   const [customIndustry, setCustomIndustry] = useState("");
@@ -103,6 +99,13 @@ function AddLeads({ show, onClose, onAddLead }) {
     return phoneRegex.test(phone.replace(/\s/g, ''));
   };
 
+  const validateLandline = (landline) => {
+    if (!landline) return true; // Optional field
+    // Allow formats like: 022-12345678, (022) 12345678, 022 12345678, +91-22-12345678
+    const landlineRegex = /^[+]?[\d\s\-()]{6,}$/;
+    return landlineRegex.test(landline.replace(/\s/g, ''));
+  };
+
   const validateLinkedIn = (url) => {
     if (!url) return true; // Optional field
     const linkedinRegex = /^https?:\/\/(www\.)?linkedin\.com\/in\/[a-zA-Z0-9_-]+\/?$/;
@@ -124,13 +127,7 @@ function AddLeads({ show, onClose, onAddLead }) {
     return num > 0 && num <= 100000; // Reasonable range: 1-100k employees
   };
 
-  // Industry options for consistency
-  const industryOptions = [
-    "IT Services", "Software Development", "Consulting", "Manufacturing", 
-    "Healthcare", "Education", "Finance", "Retail", "Real Estate", 
-    "Construction", "Automotive", "Telecommunications", "Energy", 
-    "Transportation", "Agriculture", "Media & Entertainment", "Other"
-  ];
+
 
   // Update all state setters to track changes and validation
   const updateField = (setter, value, fieldName) => {
@@ -190,6 +187,11 @@ function AddLeads({ show, onClose, onAddLead }) {
           error = "Please enter a valid phone number";
         }
         break;
+      case "pocLandline":
+        if (value && !validateLandline(value)) {
+          error = "Please enter a valid landline number";
+        }
+        break;
       case "pocMail":
         if (value && !validateEmail(value)) {
           error = "Please enter a valid email address";
@@ -216,6 +218,23 @@ function AddLeads({ show, onClose, onAddLead }) {
       case "pocLinkedin":
         if (value && !validateLinkedIn(value)) {
           error = "Please enter a valid LinkedIn URL";
+        }
+        break;
+      case "ctcSingle":
+        if (ctcType === "single" && value.trim() && (!/^\d+(\.\d+)?$/.test(value) || parseFloat(value) <= 0)) {
+          error = "Please enter a valid CTC amount (e.g., 6.5)";
+        }
+        break;
+      case "ctcMin":
+        if (ctcType === "range" && value.trim() && (!/^\d+(\.\d+)?$/.test(value) || parseFloat(value) <= 0)) {
+          error = "Please enter a valid minimum CTC amount";
+        }
+        break;
+      case "ctcMax":
+        if (ctcType === "range" && value.trim() && (!/^\d+(\.\d+)?$/.test(value) || parseFloat(value) <= 0)) {
+          error = "Please enter a valid maximum CTC amount";
+        } else if (ctcType === "range" && value.trim() && ctcMin.trim() && parseFloat(value) <= parseFloat(ctcMin)) {
+          error = "Maximum CTC must be greater than minimum CTC";
         }
         break;
       default:
@@ -245,6 +264,7 @@ function AddLeads({ show, onClose, onAddLead }) {
     setWorkingSince("");
     setPocLocation("");
     setPocPhone("");
+    setPocLandline("");
     setPocMail("");
     setPocDesignation("");
     setPocLinkedin("");
@@ -255,6 +275,11 @@ function AddLeads({ show, onClose, onAddLead }) {
     setCustomIndustry("");
     setCustomDesignation("");
     setDuplicateWarning(null);
+    // Reset CTC fields
+    setCtcType("single");
+    setCtcSingle("");
+    setCtcMin("");
+    setCtcMax("");
   };
 
   const handleAddCompany = async () => {
@@ -281,11 +306,20 @@ function AddLeads({ show, onClose, onAddLead }) {
     const finalIndustry = sector === "Other" ? customIndustry.trim() : sector;
     const finalDesignation = pocDesignation === "Other" ? customDesignation.trim() : pocDesignation;
     
+    // Prepare CTC data
+    let ctcData = {};
+    if (ctcType === "single" && ctcSingle.trim()) {
+      ctcData.ctc = `${ctcSingle.trim()} LPA`;
+    } else if (ctcType === "range" && ctcMin.trim() && ctcMax.trim()) {
+      ctcData.ctc = `${ctcMin.trim()} LPA - ${ctcMax.trim()} LPA`;
+    }
+    
     const companyData = {
       name: companyName,
       contactPerson: pocName,
       designation: finalDesignation,
       phone: pocPhone,
+      landline: pocLandline,
       companyUrl: companyWebsite,
       linkedinUrl: pocLinkedin,
       email: pocMail,
@@ -299,6 +333,7 @@ function AddLeads({ show, onClose, onAddLead }) {
       assignedTo: user?.uid || null, // Assign to current user
       assignedBy: user?.uid || null,
       assignedAt: serverTimestamp(),
+      ...ctcData, // Add CTC data
     };
 
     // Add status-specific timestamp when company is created
@@ -387,6 +422,7 @@ function AddLeads({ show, onClose, onAddLead }) {
         pocName: companyData.contactPerson,
         pocDesignation: companyData.designation,
         pocPhone: companyData.phone,
+        pocLandline: companyData.landline,
         companyUrl: companyData.companyUrl,
         companyWebsite: companyData.companyUrl,
         linkedinUrl: companyData.linkedinUrl,
@@ -410,6 +446,8 @@ function AddLeads({ show, onClose, onAddLead }) {
         coldAt: companyData.coldAt,
         calledAt: companyData.calledAt,
         onboardedAt: companyData.onboardedAt,
+        // Include CTC data
+        ctc: companyData.ctc,
       };
 
       if (onAddLead) {
@@ -594,7 +632,7 @@ function AddLeads({ show, onClose, onAddLead }) {
                       required
                     >
                       <option value="">Select Industry</option>
-                      {industryOptions.map((option) => (
+                      {INDUSTRY_OPTIONS.map((option) => (
                         <option key={option} value={option}>
                           {option}
                         </option>
@@ -680,7 +718,7 @@ function AddLeads({ show, onClose, onAddLead }) {
                       value={pocName}
                       onChange={(e) => updateField(setPocName, e.target.value, "pocName")}
                       placeholder="e.g. John Doe"
-                      className={`w-full px-2.5 py-2 text-sm bg-white border rounded-lg focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all duration-200 shadow-sm ${
+                      className={`w-full px-2.5 py-2 text-sm bg-white border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 shadow-sm ${
                         validationErrors.pocName && touchedFields.pocName ? 'border-red-400 bg-red-50' : 'border-gray-200'
                       }`}
                       required
@@ -697,13 +735,13 @@ function AddLeads({ show, onClose, onAddLead }) {
                     <select
                       value={pocDesignation}
                       onChange={(e) => updateField(setPocDesignation, e.target.value, "pocDesignation")}
-                      className={`w-full px-2.5 py-2 text-sm bg-white border rounded-lg focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all duration-200 shadow-sm ${
+                      className={`w-full px-2.5 py-2 text-sm bg-white border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 shadow-sm ${
                         validationErrors.pocDesignation && touchedFields.pocDesignation ? 'border-red-400 bg-red-50' : 'border-gray-200'
                       }`}
                       required
                     >
                       <option value="">Select Designation</option>
-                      {designationOptions.map((option) => (
+                      {DESIGNATION_OPTIONS.map((option) => (
                         <option key={option} value={option}>
                           {option}
                         </option>
@@ -719,7 +757,7 @@ function AddLeads({ show, onClose, onAddLead }) {
                           setTouchedFields(prev => ({ ...prev, customDesignation: true }));
                         }}
                         placeholder="Please specify the designation"
-                        className={`w-full mt-1.5 px-2.5 py-2 text-sm bg-white border rounded-lg focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all duration-200 shadow-sm ${
+                        className={`w-full mt-1.5 px-2.5 py-2 text-sm bg-white border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 shadow-sm ${
                           validationErrors.customDesignation && touchedFields.customDesignation ? 'border-red-400 bg-red-50' : 'border-gray-200'
                         }`}
                       />
@@ -738,13 +776,31 @@ function AddLeads({ show, onClose, onAddLead }) {
                       value={pocPhone}
                       onChange={(e) => updateField(setPocPhone, e.target.value, "pocPhone")}
                       placeholder="e.g. +91 9876543210"
-                      className={`w-full px-2.5 py-2 text-sm bg-white border rounded-lg focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all duration-200 shadow-sm ${
+                      className={`w-full px-2.5 py-2 text-sm bg-white border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 shadow-sm ${
                         validationErrors.pocPhone && touchedFields.pocPhone ? 'border-red-400 bg-red-50' : 'border-gray-200'
                       }`}
                       required
                     />
                     {validationErrors.pocPhone && touchedFields.pocPhone && (
                       <span className="text-red-500 text-xs mt-0.5 block">{validationErrors.pocPhone}</span>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1 uppercase tracking-wide">
+                      POC Landline
+                    </label>
+                    <input
+                      type="text"
+                      value={pocLandline}
+                      onChange={(e) => updateField(setPocLandline, e.target.value, "pocLandline")}
+                      placeholder="e.g. 022-12345678"
+                      className={`w-full px-2.5 py-2 text-sm bg-white border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 shadow-sm ${
+                        validationErrors.pocLandline && touchedFields.pocLandline ? 'border-red-400 bg-red-50' : 'border-gray-200'
+                      }`}
+                    />
+                    {validationErrors.pocLandline && touchedFields.pocLandline && (
+                      <span className="text-red-500 text-xs mt-0.5 block">{validationErrors.pocLandline}</span>
                     )}
                   </div>
 
@@ -757,7 +813,7 @@ function AddLeads({ show, onClose, onAddLead }) {
                       value={pocMail}
                       onChange={(e) => updateField(setPocMail, e.target.value, "pocMail")}
                       placeholder="e.g. john@company.com"
-                      className={`w-full px-2.5 py-2 text-sm bg-white border rounded-lg focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all duration-200 shadow-sm ${
+                      className={`w-full px-2.5 py-2 text-sm bg-white border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 shadow-sm ${
                         validationErrors.pocMail && touchedFields.pocMail ? 'border-red-400 bg-red-50' : 'border-gray-200'
                       }`}
                     />
@@ -775,7 +831,7 @@ function AddLeads({ show, onClose, onAddLead }) {
                       value={pocLocation}
                       onChange={(e) => updateField(setPocLocation, e.target.value, "pocLocation")}
                       placeholder="e.g. Mumbai"
-                      className={`w-full px-2.5 py-2 text-sm bg-white border rounded-lg focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all duration-200 shadow-sm ${
+                      className={`w-full px-2.5 py-2 text-sm bg-white border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 shadow-sm ${
                         validationErrors.pocLocation && touchedFields.pocLocation ? 'border-red-400 bg-red-50' : 'border-gray-200'
                       }`}
                       required
@@ -794,7 +850,7 @@ function AddLeads({ show, onClose, onAddLead }) {
                       value={pocLinkedin}
                       onChange={(e) => updateField(setPocLinkedin, e.target.value, "pocLinkedin")}
                       placeholder="e.g. https://linkedin.com/in/johndoe"
-                      className={`w-full px-2.5 py-2 text-sm bg-white border rounded-lg focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all duration-200 shadow-sm ${
+                      className={`w-full px-2.5 py-2 text-sm bg-white border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 shadow-sm ${
                         validationErrors.pocLinkedin && touchedFields.pocLinkedin ? 'border-red-400 bg-red-50' : 'border-gray-200'
                       }`}
                     />
@@ -810,7 +866,7 @@ function AddLeads({ show, onClose, onAddLead }) {
             <div className="md:col-span-2">
               <div className="bg-gray-50/50 rounded-lg p-2 border border-gray-100/50">
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="w-4 h-4 bg-purple-500 rounded-md flex items-center justify-center">
+                  <div className="w-4 h-4 bg-blue-500 rounded-md flex items-center justify-center">
                     <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
@@ -826,7 +882,7 @@ function AddLeads({ show, onClose, onAddLead }) {
                       type="date"
                       value={workingSince}
                       onChange={(e) => updateField(setWorkingSince, e.target.value, "workingSince")}
-                      className="w-full px-2.5 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all duration-200 shadow-sm"
+                      className="w-full px-2.5 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 shadow-sm"
                     />
                   </div>
 
@@ -837,14 +893,123 @@ function AddLeads({ show, onClose, onAddLead }) {
                     <select
                       value={status}
                       onChange={(e) => updateField(setStatus, e.target.value)}
-                      className="w-full px-2.5 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all duration-200 shadow-sm"
+                      className="w-full px-2.5 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 shadow-sm"
                     >
-                      {statusOptions.map((option) => (
+                      {STATUS_OPTIONS.map((option) => (
                         <option key={option} value={option}>
                           {option}
                         </option>
                       ))}
                     </select>
+                  </div>
+
+                  {/* CTC Section */}
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-semibold text-gray-700 mb-1 uppercase tracking-wide">
+                      CTC (Cost to Company)
+                    </label>
+                    <div className="space-y-2">
+                      {/* CTC Type Selection */}
+                      <div className="flex gap-4">
+                        <label className="flex items-center">
+                          <input
+                            type="radio"
+                            name="ctcType"
+                            value="single"
+                            checked={ctcType === "single"}
+                            onChange={(e) => {
+                              setCtcType(e.target.value);
+                              // Clear range fields when switching to single
+                              if (e.target.value === "single") {
+                                setCtcMin("");
+                                setCtcMax("");
+                                setValidationErrors(prev => ({ ...prev, ctcMin: "", ctcMax: "" }));
+                              }
+                            }}
+                            className="w-3 h-3 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-1"
+                          />
+                          <span className="ml-2 text-xs text-gray-700">Single Value</span>
+                        </label>
+                        <label className="flex items-center">
+                          <input
+                            type="radio"
+                            name="ctcType"
+                            value="range"
+                            checked={ctcType === "range"}
+                            onChange={(e) => {
+                              setCtcType(e.target.value);
+                              // Clear single field when switching to range
+                              if (e.target.value === "range") {
+                                setCtcSingle("");
+                                setValidationErrors(prev => ({ ...prev, ctcSingle: "" }));
+                              }
+                            }}
+                            className="w-3 h-3 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-1"
+                          />
+                          <span className="ml-2 text-xs text-gray-700">Range</span>
+                        </label>
+                      </div>
+
+                      {/* CTC Input Fields */}
+                      {ctcType === "single" ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            value={ctcSingle}
+                            onChange={(e) => updateField(setCtcSingle, e.target.value, "ctcSingle")}
+                            placeholder="e.g. 6.5"
+                            className={`flex-1 px-2.5 py-2 text-sm bg-white border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 shadow-sm ${
+                              validationErrors.ctcSingle && touchedFields.ctcSingle ? 'border-red-400 bg-red-50' : 'border-gray-200'
+                            }`}
+                          />
+                          <span className="text-sm text-gray-600 font-medium">LPA</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            value={ctcMin}
+                            onChange={(e) => updateField(setCtcMin, e.target.value, "ctcMin")}
+                            placeholder="Min"
+                            className={`flex-1 px-2.5 py-2 text-sm bg-white border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 shadow-sm ${
+                              validationErrors.ctcMin && touchedFields.ctcMin ? 'border-red-400 bg-red-50' : 'border-gray-200'
+                            }`}
+                          />
+                          <span className="text-sm text-gray-600 font-medium">-</span>
+                          <input
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            value={ctcMax}
+                            onChange={(e) => updateField(setCtcMax, e.target.value, "ctcMax")}
+                            placeholder="Max"
+                            className={`flex-1 px-2.5 py-2 text-sm bg-white border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 shadow-sm ${
+                              validationErrors.ctcMax && touchedFields.ctcMax ? 'border-red-400 bg-red-50' : 'border-gray-200'
+                            }`}
+                          />
+                          <span className="text-sm text-gray-600 font-medium">LPA</span>
+                        </div>
+                      )}
+
+                      {/* Validation Errors */}
+                      {ctcType === "single" && validationErrors.ctcSingle && touchedFields.ctcSingle && (
+                        <span className="text-red-500 text-xs block">{validationErrors.ctcSingle}</span>
+                      )}
+                      {ctcType === "range" && (
+                        <>
+                          {validationErrors.ctcMin && touchedFields.ctcMin && (
+                            <span className="text-red-500 text-xs block">{validationErrors.ctcMin}</span>
+                          )}
+                          {validationErrors.ctcMax && touchedFields.ctcMax && (
+                            <span className="text-red-500 text-xs block">{validationErrors.ctcMax}</span>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

@@ -92,7 +92,7 @@ const BillsTable = ({
           {/* Responsive Table View */}
           <div className="overflow-x-auto rounded-xl border border-slate-200/60 shadow-sm">
             <table className="min-w-full divide-y divide-slate-200/60">
-              <thead className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200/60">
+              <thead className="bg-linear-to-r from-slate-50 to-slate-100 border-b border-slate-200/60">
                 <tr>
                   <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider min-w-[100px]">
                     Trainer
@@ -109,13 +109,13 @@ const BillsTable = ({
                   <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider w-auto">
                     Amount
                   </th>
-                  <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider min-w-[80px]">
+                  <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider min-w-20">
                     Submitted
                   </th>
-                  <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider min-w-[160px]">
+                  <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider min-w-40">
                     Status
                   </th>
-                  <th scope="col" className="px-3 py-3 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider min-w-[140px]">
+                  <th scope="col" className="px-3 py-3 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider min-w-40">
                     Actions
                   </th>
                 </tr>
@@ -125,7 +125,7 @@ const BillsTable = ({
                   <tr key={bill.id} className="hover:bg-slate-50/50 transition-all duration-200 group">
                     <td className="px-2 py-3">
                       <div className="flex items-center">
-                        <div className="w-6 h-6 bg-gradient-to-r from-blue-400 to-blue-500 rounded-lg flex items-center justify-center mr-2">
+                        <div className="w-6 h-6 bg-linear-to-r from-blue-400 to-blue-500 rounded-lg flex items-center justify-center mr-2">
                           <span className="text-xs font-semibold text-white">
                             {bill.trainerName.charAt(0).toUpperCase()}
                           </span>
@@ -151,14 +151,14 @@ const BillsTable = ({
                       </div>
                     </td>
                     <td className="px-2 py-3">
-                      <div className="text-sm text-slate-900 font-medium min-w-[80px] max-w-[100px] truncate">{bill.hours} hours</div>
+                      <div className="text-sm text-slate-900 font-medium min-w-20 max-w-[100px] truncate">{bill.hours} hours</div>
                       <div className="text-xs text-slate-500 truncate">₹{bill.rate}/hr</div>
                     </td>
                     <td className="px-2 py-3">
-                      <div className="text-sm font-bold text-slate-900 tabular-nums min-w-[80px] max-w-[100px] truncate">₹{bill.amount.toLocaleString()}</div>
+                      <div className="text-sm font-bold text-slate-900 tabular-nums min-w-20 max-w-[100px] truncate">₹{bill.amount.toLocaleString()}</div>
                     </td>
                     <td className="px-2 py-3 text-sm text-slate-600 font-medium">
-                      <div className="flex flex-col min-w-[70px] max-w-[80px]">
+                      <div className="flex flex-col min-w-[70px] max-w-20">
                         <span className="truncate">{new Date(bill.submittedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
                         <span className="text-xs text-slate-400 truncate">{new Date(bill.submittedDate).getFullYear()}</span>
                       </div>
@@ -167,7 +167,7 @@ const BillsTable = ({
                       {getStatusBadge(bill.status)}
                     </td>
                     <td className="px-2 py-3 text-sm font-medium text-right">
-                      <div className="flex items-center justify-end space-x-1 min-w-[140px] max-w-[160px]">
+                      <div className="flex items-center justify-end space-x-1 min-w-[140px] max-w-40">
                         <button
                           onClick={() => onViewDetails(bill)}
                           className="inline-flex items-center px-2 py-1 text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded transition-all duration-200 hover:shadow-sm"
@@ -201,7 +201,7 @@ const BillsTable = ({
                           <>
                             <button
                               onClick={() => onAction(bill, 'approved')}
-                              className="inline-flex items-center px-2 py-1 text-xs font-medium text-white bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 rounded transition-all duration-200 shadow-sm hover:shadow-md"
+                              className="inline-flex items-center px-2 py-1 text-xs font-medium text-white bg-linear-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 rounded transition-all duration-200 shadow-sm hover:shadow-md"
                               title="Approve Bill"
                               data-tour="approve-bill"
                             >
@@ -210,7 +210,7 @@ const BillsTable = ({
                             </button>
                             <button
                               onClick={() => handleRejectClick(bill)}
-                              className="inline-flex items-center px-2 py-1 text-xs font-medium text-white bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 rounded transition-all duration-200 shadow-sm hover:shadow-md"
+                              className="inline-flex items-center px-2 py-1 text-xs font-medium text-white bg-linear-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 rounded transition-all duration-200 shadow-sm hover:shadow-md"
                               title="Reject Bill"
                               data-tour="reject-bill"
                             >
@@ -272,9 +272,9 @@ const BillsTable = ({
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2" style={{ zIndex: 9999 }}>
             <div className="bg-white rounded-lg shadow-lg w-full max-w-md mx-auto border border-gray-200 max-h-[85vh] flex flex-col">
               {/* Header */}
-              <div className="flex items-center justify-between p-3 border-b border-gray-200 flex-shrink-0">
+              <div className="flex items-center justify-between p-3 border-b border-gray-200 shrink-0">
                 <div className="flex items-center space-x-2">
-                  <div className="flex-shrink-0 w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+                  <div className="shrink-0 w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
                     <FiXCircle className="w-4 h-4 text-red-600" />
                   </div>
                   <div>
@@ -284,7 +284,7 @@ const BillsTable = ({
                 </div>
                 <button
                   onClick={handleRejectCancel}
-                  className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full p-1 transition-colors flex-shrink-0"
+                  className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full p-1 transition-colors shrink-0"
                 >
                   <FiX className="w-4 h-4" />
                 </button>
@@ -332,7 +332,7 @@ const BillsTable = ({
               </div>
 
               {/* Footer */}
-              <div className="flex items-center justify-end space-x-2 p-3 border-t border-gray-200 bg-gray-50 rounded-b-lg flex-shrink-0">
+              <div className="flex items-center justify-end space-x-2 p-3 border-t border-gray-200 bg-gray-50 rounded-b-lg shrink-0">
                 <button
                   onClick={handleRejectCancel}
                   className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded transition-colors"

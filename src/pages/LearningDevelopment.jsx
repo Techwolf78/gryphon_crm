@@ -17,8 +17,8 @@ import StudentDataPage from "../components/Learning/StudentDataPage";
 import InitiationDashboard from "../components/Learning/Initiate/InitiationDashboard";
 import InitiationTrainingDetails from "../components/Learning/Initiate/InitiationTrainingDetails";
 import InitiationModal from "../components/Learning/Initiate/InitiationModal";
-import GenerateTrainerInvoice from "../components/Learning/GenerateTrainerInvoice";
-import ContractInvoiceTable from "../components/Learning/ContractInvoices/ContractInvoiceTable";
+// import GenerateTrainerInvoice from "../components/Learning/GenerateTrainerInvoice";
+// import ContractInvoiceTable from "../components/Learning/ContractInvoices/ContractInvoiceTable";
 import LearningDevelopmentTour from "../components/tours/LearningDevelopmentTour";
 import JDMergeModal from "../components/Learning/JD/JDMergeModal";
 import OperationsConfigurationModal from "../components/Learning/JD/OperationsConfigurationModal";
@@ -241,12 +241,8 @@ function LearningDevelopment() {
         return 0;
       case "initiation":
         return 1;
-      case "trainerInvoice":
-        return 2;
-      case "contractInvoices":
-        return 3;
       case "budget":
-        return 4;
+        return 2;
       default:
         return 0;
     }
@@ -532,7 +528,7 @@ function LearningDevelopment() {
             >
               Trainings
             </button>
-            <button
+            {/* <button
               className={`flex-1 px-6 py-2 font-medium text-sm transition-all duration-150 ${
                 activeTab === "trainerInvoice"
                   ? "text-blue-600 bg-blue-50"
@@ -553,7 +549,7 @@ function LearningDevelopment() {
               data-tour="contract-invoices-tab"
             >
               Contract Invoices
-            </button>
+            </button> */}
             {/* NEW BUDGET TAB */}
             <button
               className={`flex-1 px-6 py-2 font-medium text-sm transition-all duration-150 ${
@@ -574,7 +570,7 @@ function LearningDevelopment() {
           <div
             className="absolute bottom-0 h-0.5 bg-blue-600 transition-transform duration-150 ease-out"
             style={{
-              width: "20%", // Changed from 25% to 20% for 5 tabs
+              width: "33.33%", // Changed from 20% for 3 tabs
               transform: `translateX(${getActiveTabIndex() * 100}%)`,
             }}
           ></div>
@@ -881,10 +877,6 @@ function LearningDevelopment() {
               onRefresh={onRefreshInitiationDashboard}
             />
           )
-        ) : activeTab === "trainerInvoice" ? (
-          <GenerateTrainerInvoice />
-        ) : activeTab === "contractInvoices" ? (
-          <ContractInvoiceTable />
         ) : activeTab === "budget" ? (
           <BudgetDashboard
             department="lnd" // Set to LND department for Learning & Development

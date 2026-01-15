@@ -838,26 +838,7 @@ const handleCancelEdit = () => {
                     </td>
                   </tr>
 
-                  {invoice.invoiceType === "Cash Invoice" ? (
-                    <>
-                      <tr>
-                        <td className="border border-gray-300 px-3 py-1 font-semibold">
-                          CGST @ 0%
-                        </td>
-                        <td className="border border-gray-300 px-3 py-1 text-right">
-                          0.00
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="border border-gray-300 px-3 py-1 font-semibold">
-                          SGST @ 0%
-                        </td>
-                        <td className="border border-gray-300 px-3 py-1 text-right">
-                          0.00
-                        </td>
-                      </tr>
-                    </>
-                  ) : interstate ? (
+                  {interstate ? (
                     // ✅ IGST for inter-state
                     <tr>
                       <td className="border border-gray-300 px-3 py-1 font-semibold">

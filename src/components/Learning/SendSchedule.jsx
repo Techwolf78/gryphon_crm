@@ -6,6 +6,7 @@ import {
   FiUser,
   FiCalendar,
   FiCheck,
+  FiSearch,
 } from "react-icons/fi";
 import {
   collection,
@@ -37,44 +38,51 @@ function SendSchedule({
     contactPerson: "",
     contactNumber: "",
   });
-  const [trainerCostDetails, setTrainerCostDetails] = useState({
-    conveyance: 0,
-    food: 0,
-    lodging: 0
-  });
 
   const [feePerHour, setFeePerHour] = useState(0);
 
-  const [trainerDetails, setTrainerDetails] = useState([]);
+  const [selectedAssignments, setSelectedAssignments] = useState([]);
+  const [selectAll, setSelectAll] = useState(true);
 
   const [success, setSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
   const [trainingFormDoc, setTrainingFormDoc] = useState(null);
   const [phaseDocData, setPhaseDocData] = useState(null);
+  const [paymentCycle, setPaymentCycle] = useState("30");
 
-  // Helper to calculate training days
-function getTrainingDays(startDate, endDate, excludeDays = "None") {
-  if (!startDate || !endDate) return 0;
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  if (isNaN(start) || isNaN(end) || end < start) return 0;
-  let days = 0;
-  const cur = new Date(start);
-  while (cur <= end) {
-    const dayOfWeek = cur.getDay();
-    let shouldInclude = true;
-    if (excludeDays === "Saturday" && dayOfWeek === 6) shouldInclude = false;
-    else if (excludeDays === "Sunday" && dayOfWeek === 0) shouldInclude = false;
-    else if (excludeDays === "Both" && (dayOfWeek === 0 || dayOfWeek === 6))
-      shouldInclude = false;
-    if (shouldInclude) days++;
-    cur.setDate(cur.getDate() + 1);
-  }
-  return days;
-}
+  const [searchTerm, setSearchTerm] = useState("");
 
-// Utility: format date
+  // Helper function to calculate expenses for selected assignments
+  const calculateExpensesForSelected = (selectedAssignmentsData) => {
+    const uniqueDetails = new Set();
+    let conveyance = 0;
+    let food = 0;
+    let lodging = 0;
+
+    selectedAssignmentsData.forEach(assignment => {
+      const detail = trainersData.find(d => 
+        d.domain === assignment.domain && 
+        d.batchCode === assignment.batchCode && 
+        new Date(d.startDate) <= new Date(assignment.date) && 
+        new Date(assignment.date) <= new Date(d.endDate)
+      );
+      if (detail) {
+        const detailKey = `${detail.domain}_${detail.batchCode}_${detail.startDate}_${detail.endDate}`;
+        if (!uniqueDetails.has(detailKey)) {
+          uniqueDetails.add(detailKey);
+          conveyance += Number(detail.conveyance) || 0;
+        }
+        // Add per day
+        food += Number(detail.food) || 0;
+        lodging += Number(detail.lodging) || 0;
+      }
+    });
+
+    return { conveyance, food, lodging };
+  };
+
+  // Utility: format date
 const formatDate = (dateStr) => {
   if (!dateStr) return "";
   return new Date(dateStr).toLocaleDateString("en-US", {
@@ -84,40 +92,6 @@ const formatDate = (dateStr) => {
     day: "numeric",
   });
 };
-
-
-
-useEffect(() => {
-  if (!selectedTrainer || trainersData.length === 0) return;
-
-  const trainerDetails = trainersData.filter(trainer => {
-    return trainer.trainerId === selectedTrainer.trainerId || trainer.trainerId === selectedTrainer.id;
-  });
-
-  let totalConveyance = 0;
-  let totalFood = 0;
-  let totalLodging = 0;
-
-  trainerDetails.forEach(detail => {
-    // Calculate days for this assignment
-    const days = getTrainingDays(detail.startDate, detail.endDate, phaseData?.excludeDays || "None");
-    
-    // Conveyance is one-time per assignment
-    totalConveyance += Number(detail.conveyance) || 0;
-    
-    // Food and lodging are per day * days
-    totalFood += (Number(detail.food) || 0) * days;
-    totalLodging += (Number(detail.lodging) || 0) * days;
-  });
-
-  setTrainerCostDetails({
-    conveyance: totalConveyance,
-    food: totalFood,
-    lodging: totalLodging
-  });
-
-  setTrainerDetails(trainerDetails);
-}, [selectedTrainer, trainersData, phaseData?.excludeDays]);
 
 
 
@@ -301,6 +275,12 @@ useEffect(() => {
     fetchTrainingFormAndPhase();
   }, [training?.id, training?.selectedPhase]);
 
+  // Initialize payment cycle from form or training data when available
+  useEffect(() => {
+    const initialPaymentCycle = trainingFormDoc?.payment_cycle || trainingFormDoc?.paymentCycle || trainingData?.payment_cycle || trainingData?.paymentCycle;
+    if (initialPaymentCycle) setPaymentCycle(String(initialPaymentCycle));
+  }, [trainingFormDoc, trainingData]);
+
   // ---------- Fetch trainer-specific assignments ----------
   const fetchTrainerSchedule = async (trainerId) => {
     setFetchingSchedule(true);
@@ -318,6 +298,21 @@ useEffect(() => {
           const end = new Date(detail.endDate);
           const excludeDays = phaseData?.excludeDays || "None";
 
+          // First, calculate the number of training days
+          let days = 0;
+          for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+            const dayOfWeek = d.getDay();
+            let include = true;
+            if (excludeDays === "Saturday" && dayOfWeek === 6) include = false;
+            else if (excludeDays === "Sunday" && dayOfWeek === 0) include = false;
+            else if (excludeDays === "Both" && (dayOfWeek === 0 || dayOfWeek === 6)) include = false;
+            if (include) days++;
+          }
+
+          // Calculate hours per day
+          const hoursPerDay = days > 0 ? (detail.assignedHours || 0) / days : 0;
+
+          // Now generate assignments for each day
           for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
             const dayOfWeek = d.getDay();
             let include = true;
@@ -327,14 +322,14 @@ useEffect(() => {
 
             if (include) {
               assignments.push({
-                id: `${detail.trainerId}_${d.toISOString().split('T')[0]}_${detail.domain}_${detail.batchCode}`,
+                id: `${detail.trainerId}_${d.toISOString().split('T')[0]}_${detail.domain}_${detail.batchCode}_${detail.dayDuration}`,
                 date: d.toISOString().split('T')[0],
                 dayDuration: detail.dayDuration,
                 domain: detail.domain,
                 batchCode: detail.batchCode,
                 trainerId: detail.trainerId,
                 sourceTrainingId: training.id,
-                assignedHours: detail.assignedHours || 0,
+                assignedHours: hoursPerDay,
                 rate: detail.perHourCost || 0
               });
             }
@@ -344,6 +339,8 @@ useEffect(() => {
 
       assignments.sort((a, b) => new Date(a.date) - new Date(b.date));
       setTrainerAssignments(assignments);
+      setSelectedAssignments(assignments.map(a => a.id)); // Select all by default
+      setSelectAll(true);
     } catch (err) {
       console.error("Error generating trainer schedule:", err);
       setErrorMessage("Failed to generate trainer schedule");
@@ -358,7 +355,36 @@ useEffect(() => {
     fetchTrainerSchedule(trainer.trainerId || trainer.id);
   };
 
+  const handleSelectAll = () => {
+    if (selectAll) {
+      setSelectedAssignments([]);
+      setSelectAll(false);
+    } else {
+      setSelectedAssignments(trainerAssignments.map(a => a.id));
+      setSelectAll(true);
+    }
+    setErrorMessage(""); // Clear any previous errors
+  };
+
+  const handleAssignmentToggle = (assignmentId) => {
+    setSelectedAssignments(prev => {
+      const newSelected = prev.includes(assignmentId) 
+        ? prev.filter(id => id !== assignmentId)
+        : [...prev, assignmentId];
+      
+      // Update selectAll state based on whether all assignments are selected
+      setSelectAll(newSelected.length === trainerAssignments.length);
+      
+      return newSelected;
+    });
+    setErrorMessage(""); // Clear any previous errors
+  };
+
   const handleViewFinancials = () => {
+    if (selectedAssignments.length === 0) {
+      setErrorMessage("Please select at least one session to proceed.");
+      return;
+    }
     setCurrentStep(3);
   };
 
@@ -369,9 +395,9 @@ useEffect(() => {
     setEmailData((prev) => ({
       ...prev,
       to: prev.to || "", // Keep existing email if already entered
-      subject: `Training Schedule for ${
-        selectedTrainer?.name || selectedTrainer?.trainerName
-      } - ${trainingFormDoc?.collegeName || trainingData?.collegeName || ""}`,
+      subject: `Assignment Mail for ${
+        trainingFormDoc?.collegeName || trainingData?.collegeName || ""
+      } - Gryphon Academy Pvt. Ltd.`,
       message: `Dear ${
         selectedTrainer?.name || selectedTrainer?.trainerName
       },\n\nPlease find your training schedule details below:\n\nCollege: ${
@@ -390,9 +416,32 @@ useEffect(() => {
     setEmailData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const handlePaymentCycleChange = (e) => {
+    setPaymentCycle(e.target.value);
+  };
+
   // Function to import email from trainer data
-  const handleImportEmail = () => {
-    const trainerEmail = selectedTrainer?.email || selectedTrainer?.trainerEmail || "";
+  const handleImportEmail = async () => {
+    // First try to get email from selectedTrainer (if already loaded)
+    let trainerEmail = selectedTrainer?.email || selectedTrainer?.trainerEmail || "";
+    
+    if (!trainerEmail && selectedTrainer?.trainerId) {
+      // If not available, fetch from Firestore trainers collection
+      try {
+        const trainerQuery = query(
+          collection(db, "trainers"),
+          where("trainerId", "==", selectedTrainer.trainerId)
+        );
+        const trainerSnap = await getDocs(trainerQuery);
+        if (!trainerSnap.empty) {
+          const trainerData = trainerSnap.docs[0].data();
+          trainerEmail = trainerData.email || "";
+        }
+      } catch (err) {
+        console.error("Error fetching trainer email:", err);
+      }
+    }
+    
     setEmailData((prev) => ({ ...prev, to: trainerEmail }));
   };
 
@@ -408,37 +457,27 @@ useEffect(() => {
 
     try {
       
+      // Filter to only selected assignments
+      const selectedAssignmentsData = trainerAssignments.filter(a => selectedAssignments.includes(a.id));
+      
       const totalHours = (() => {
-        // Calculate based on assigned hours from trainersData
-        return trainerAssignments.reduce((acc, assignment) => {
+        // Calculate based on assigned hours from selected assignments
+        return selectedAssignmentsData.reduce((acc, assignment) => {
           return acc + (assignment.assignedHours || 0);
         }, 0);
       })();
 
-      // Calculate total training days from assignments
-      const totalDays = new Set(trainerAssignments.map(a => a.date)).size;
-
-      // Get trainer details for accurate fee calculation
-      const trainerDetails = trainersData.filter(trainer => 
-        trainer.trainerId === selectedTrainer.trainerId || trainer.id === selectedTrainer.id
-      );
+      // Calculate total training days from selected assignments
+      const totalDays = new Set(selectedAssignmentsData.map(a => a.date)).size;
 
       // FIXED: Use new calculation logic (matching InvoiceModal)
       const roundToNearestWhole = (num) => Math.round(num);
       
-      const trainingFees = roundToNearestWhole(
-        trainerDetails.reduce((acc, detail) => {
-          const hours = detail.assignedHours || 0;
-          const rate = detail.perHourCost || 0;
-          return acc + (hours * rate);
-        }, 0)
-      );
+      const trainingFees = roundToNearestWhole(totalHours * feePerHour);
       
       // Calculate expenses the same way as InitiationTrainingDetails
       // Conveyance is one-time, food and lodging are already totals from assignments
-      const conveyanceTotal = trainerCostDetails.conveyance || 0;
-      const foodTotal = trainerCostDetails.food || 0;
-      const lodgingTotal = trainerCostDetails.lodging || 0;
+      const { conveyance: conveyanceTotal, food: foodTotal, lodging: lodgingTotal } = calculateExpensesForSelected(selectedAssignmentsData);
       const totalExpenses = roundToNearestWhole(conveyanceTotal + foodTotal + lodgingTotal);
       
       const totalAmount = roundToNearestWhole(trainingFees + totalExpenses);
@@ -447,11 +486,9 @@ useEffect(() => {
       const tdsAmount = roundToNearestWhole(trainingFees * 0.1); // 10% TDS on training fees only
       const payableCost = roundToNearestWhole(totalAmount - tdsAmount);
 
-      const scheduleRows = trainerAssignments
+      const scheduleRows = selectedAssignmentsData
         .map((assignment) => {
           let hoursPerDay = assignment.assignedHours || 0;
-
-          const perDayCost = (assignment.rate || 0) * hoursPerDay;
 
           return `
 <tr>
@@ -463,12 +500,11 @@ useEffect(() => {
   <td>${getTimingForSlot(assignment.dayDuration)}</td>
   <td>${hoursPerDay.toFixed(2)}</td>
   <td>₹ ${assignment.rate || 0}</td>
-  <td>₹ ${perDayCost.toFixed(2)}</td>
 </tr>`;
         })
         .join("");
 
-   const templateParams = {
+      const templateParams = {
   to_email: emailData.to,
   email: emailData.to, // Dono fields set karein
   salutation: selectedTrainer?.salutation || "Dear",
@@ -486,13 +522,13 @@ useEffect(() => {
   schedule_rows: scheduleRows,
   total_days: totalDays,
   total_hours: totalHours,
-  start_date: trainerAssignments[0] ? formatDate(trainerAssignments[0].date) : "",
+  start_date: selectedAssignmentsData.length > 0 ? formatDate(selectedAssignmentsData[0].date) : "",
   fee_per_hour: feePerHour,
         fee_per_day:
-          trainerAssignments.length > 0
+          selectedAssignmentsData.length > 0
             ? (() => {
-                // Calculate total fee for all assignments (not average)
-                const totalFee = trainerAssignments.reduce((acc, assignment) => {
+                // Calculate total fee for selected assignments (not average)
+                const totalFee = selectedAssignmentsData.reduce((acc, assignment) => {
                   const hours = assignment.assignedHours || 0;
                   return acc + (hours * (assignment.rate || 0));
                 }, 0);
@@ -504,13 +540,8 @@ useEffect(() => {
         payable_cost: payableCost,
         project_code:
           trainingFormDoc?.projectCode || trainingData?.projectCode || "",
-        payment_cycle:
-          trainingFormDoc?.payment_cycle ||
-          trainingFormDoc?.paymentCycle ||
-          "30",
-      };
-
-      await emailjs.send(
+        payment_cycle: paymentCycle || trainingFormDoc?.payment_cycle || trainingFormDoc?.paymentCycle || "30",
+      };      await emailjs.send(
         "service_75e50yr",
         "template_c7rfyrl",
         templateParams,
@@ -532,103 +563,133 @@ useEffect(() => {
 
   // ---------- UI ----------
   return (
-    <div className="fixed inset-0 bg-transparent bg-opacity-90 backdrop-blur-xl flex items-center justify-center z-500 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0  bg-opacity-25 backdrop-blur-sm flex items-center justify-center p-4 z-54">
+      <div className="bg-white rounded-2xl shadow-xl w-[80vw] max-w-5xl max-h-[90vh] overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b">
-          <h2 className="text-xl font-semibold text-gray-800 flex items-center">
-            <FiMail className="mr-2" />
-            Send Training Schedule
-          </h2>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <h2 className="text-lg font-semibold text-gray-900">Send Training Schedule</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
+            className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
           >
-            <FiX size={24} />
+            <FiX size={16} className="text-gray-600" />
           </button>
         </div>
 
         {/* Step Indicator */}
-        <div className="px-6 py-4 bg-gray-50 border-b">
-          <div className="flex items-center space-x-4">
-            {[1, 2, 3, 4, 5].map((step) => (
-              <div key={step} className="flex items-center">
-                <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                    currentStep >= step
-                      ? "bg-blue-600 text-white"
-                      : "bg-gray-300 text-gray-600"
-                  }`}
-                >
-                  {step}
+        <div className="px-6 py-3 bg-gray-50 border-b border-gray-100">
+          <div className="flex items-center justify-center space-x-1">
+            {[
+              { step: 1, label: "Trainer", icon: FiUser },
+              { step: 2, label: "Schedule", icon: FiCalendar },
+              { step: 3, label: "Details", icon: FiCheck },
+              { step: 4, label: "Send", icon: FiMail }
+            ].map((item, index) => {
+              const IconComponent = item.icon;
+              const isActive = currentStep >= item.step;
+              const isCurrent = currentStep === item.step;
+
+              return (
+                <div key={item.step} className="flex items-center">
+                  <div className="flex flex-col items-center">
+                    <div
+                      className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
+                        isActive
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-gray-200 text-gray-400'
+                      } ${isCurrent ? 'ring-2 ring-blue-200 ring-offset-1' : ''}`}
+                    >
+                      <IconComponent className="w-4 h-4" />
+                    </div>
+                  </div>
+                  {index < 3 && (
+                    <div
+                      className={`w-8 h-px mx-1 transition-colors ${
+                        currentStep > item.step ? 'bg-blue-500' : 'bg-gray-200'
+                      }`}
+                    />
+                  )}
                 </div>
-                <span
-                  className={`ml-2 text-sm ${
-                    currentStep >= step
-                      ? "text-blue-600 font-medium"
-                      : "text-gray-500"
-                  }`}
-                >
-                  {step === 1 && "Select Trainer"}
-                  {step === 2 && "Review Schedule"}
-                  {step === 3 && "Financial Details"}
-                  {step === 4 && "Confirm & Email"}
-                  {step === 5 && "Send"}
-                </span>
-                {step < 5 && (
-                  <div
-                    className={`w-8 h-0.5 ml-4 ${
-                      currentStep > step ? "bg-blue-600" : "bg-gray-300"
-                    }`}
-                  />
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
-        <div className="p-6">
+        <div className="px-6 py-4 max-h-[70vh] overflow-y-auto">
           {errorMessage && (
-            <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm">
               {errorMessage}
             </div>
           )}
 
           {/* Step 1: Select Trainer */}
           {currentStep === 1 && (
-            <div>
-              <h3 className="text-lg font-medium text-gray-800 mb-4">
-                Select Trainer
-              </h3>
-              <p className="text-sm text-gray-600 mb-4">
-                Choose a trainer to send their schedule for this training phase
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {trainers.map((trainer) => (
-                  <div
-                    key={trainer.id}
-                    onClick={() => handleTrainerSelect(trainer)}
-                    className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 hover:shadow-md cursor-pointer transition-all"
-                  >
-                    <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                        <FiUser className="text-blue-600" />
-                      </div>
-                      <div>
-                        <div className="font-medium text-gray-900">
-                          {trainer.name || trainer.trainerName}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          ID: {trainer.trainerId || trainer.id}
-                        </div>
-                      </div>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900 mb-1">Select Trainer</h3>
+                  <p className="text-sm text-gray-600">Choose a trainer to send their schedule</p>
+                </div>
+
+                {/* Search Input */}
+                {trainers.length > 0 && (
+                  <div className="relative w-64">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <FiSearch className="h-4 w-4 text-gray-400" />
                     </div>
+                    <input
+                      type="text"
+                      placeholder="Search trainers..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    />
                   </div>
-                ))}
+                )}
               </div>
-              {trainers.length === 0 && (
-                <div className="text-center py-8 text-gray-500">
-                  No trainers assigned to this training phase
+
+              {trainers.length > 0 ? (
+                <div className="grid grid-cols-3 gap-3 max-h-80 overflow-y-auto">
+                  {trainers
+                    .filter((trainer) => {
+                      if (!searchTerm) return true;
+                      const name = (trainer.name || trainer.trainerName || "").toLowerCase();
+                      const id = (trainer.trainerId || trainer.id || "").toLowerCase();
+                      const search = searchTerm.toLowerCase();
+                      return name.includes(search) || id.includes(search);
+                    })
+                    .map((trainer) => (
+                      <div
+                        key={trainer.id}
+                        onClick={() => handleTrainerSelect(trainer)}
+                        className="bg-gray-50 border border-gray-200 rounded-xl p-4 hover:bg-blue-50 hover:border-blue-300 cursor-pointer transition-all active:scale-95"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
+                              <FiUser className="w-5 h-5 text-white" />
+                            </div>
+                            <div>
+                              <div className="font-medium text-gray-900 text-sm">
+                                {trainer.name || trainer.trainerName}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                ID: {trainer.trainerId || trainer.id}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <FiCheck className="w-3 h-3 text-blue-600" />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <FiUser className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                  <h4 className="text-sm font-medium text-gray-900 mb-1">No Trainers</h4>
+                  <p className="text-xs text-gray-500">No trainers assigned to this training</p>
                 </div>
               )}
             </div>
@@ -636,114 +697,116 @@ useEffect(() => {
 
           {/* Step 2: Review Schedule */}
           {currentStep === 2 && (
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-medium text-gray-800">
-                  Schedule for{" "}
-                  {selectedTrainer?.name || selectedTrainer?.trainerName}
-                </h3>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900">Schedule for {selectedTrainer?.name || selectedTrainer?.trainerName}</h3>
+                  <p className="text-xs text-gray-600">Select sessions to include</p>
+                </div>
                 <button
                   onClick={() => setCurrentStep(1)}
-                  className="text-blue-600 hover:underline text-sm"
+                  className="text-blue-600 hover:text-blue-800 text-sm font-medium"
                 >
-                  Change Trainer
+                  Change
                 </button>
               </div>
 
               {fetchingSchedule ? (
                 <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                  <span className="ml-2 text-gray-600">
-                    Loading schedule...
-                  </span>
+                  <div className="animate-spin rounded-full h-6 w-6 border-2 border-blue-200 border-t-blue-600"></div>
+                  <span className="ml-2 text-sm text-gray-600">Loading...</span>
                 </div>
               ) : trainerAssignments.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse border border-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-4 py-2 text-left border border-gray-200 font-medium">
-                          Date
-                        </th>
-                        <th className="px-4 py-2 text-left border border-gray-200 font-medium">
-                          Day
-                        </th>
-                        <th className="px-4 py-2 text-left border border-gray-200 font-medium">
-                          Duration
-                        </th>
-                        <th className="px-4 py-2 text-left border border-gray-200 font-medium">
-                          Timing
-                        </th>
-                        <th className="px-4 py-2 text-left border border-gray-200 font-medium">
-                          Hours
-                        </th>
-                        <th className="px-4 py-2 text-left border border-gray-200 font-medium">
-                          Domain
-                        </th>
-                        <th className="px-4 py-2 text-left border border-gray-200 font-medium">
-                          Batch
-                        </th>
-                        <th className="px-4 py-2 text-left border border-gray-200 font-medium">
-                          College
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {trainerAssignments.map((assignment) => {
-                        return (
-                          <tr key={assignment.id} className="hover:bg-gray-50">
-                            <td className="px-4 py-2 border border-gray-200">
-                              {formatDate(assignment.date)}
-                            </td>
-                            <td className="px-4 py-2 border border-gray-200">
-                              {new Date(assignment.date).toLocaleDateString(
-                                "en-US",
-                                { weekday: "long" }
-                              )}
-                            </td>
-                            <td className="px-4 py-2 border border-gray-200">
-                              {assignment.dayDuration || "-"}
-                            </td>
-                            <td className="px-4 py-2 border border-gray-200">
-                              {getTimingForSlot(assignment.dayDuration)}
-                            </td>
-                            <td className="px-4 py-2 border border-gray-200">
-                              {(assignment.assignedHours || 0).toFixed(2)}
-                            </td>
+                <div className="space-y-3">
+                  {/* Selection Controls */}
+                  <div className="bg-gray-50 rounded-xl p-3 border border-gray-200">
+                    <div className="flex items-center justify-between">
+                      <button
+                        onClick={handleSelectAll}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                          selectAll
+                            ? 'bg-blue-500 text-white'
+                            : 'bg-white text-blue-600 border border-blue-300'
+                        }`}
+                      >
+                        {selectAll ? 'Deselect All' : 'Select All'}
+                      </button>
+                      <span className="text-xs text-gray-600">
+                        {selectedAssignments.length} of {trainerAssignments.length} selected
+                      </span>
+                    </div>
+                  </div>
 
-                            <td className="px-4 py-2 border border-gray-200">
-                              {assignment.domain || "-"}
-                            </td>
-                            <td className="px-4 py-2 border border-gray-200">
-                              {assignment.batchCode || "-"}
-                            </td>
-                            <td className="px-4 py-2 border border-gray-200">
-                              {trainingFormDoc?.collegeName ||
-                                trainingData?.collegeName ||
-                                "-"}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                  {/* Schedule List */}
+                  <div className="grid grid-cols-2 gap-3 max-h-64 overflow-y-auto">
+                    {trainerAssignments.map((assignment) => {
+                      const isSelected = selectedAssignments.includes(assignment.id);
+                      return (
+                        <div
+                          key={assignment.id}
+                          className={`bg-white border rounded-xl p-3 transition-all cursor-pointer ${
+                            isSelected
+                              ? 'border-blue-300 bg-blue-50'
+                              : 'border-gray-200 hover:border-gray-300'
+                          }`}
+                          onClick={() => handleAssignmentToggle(assignment.id)}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-3">
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => handleAssignmentToggle(assignment.id)}
+                                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded"
+                              />
+                              <div>
+                                <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                                  {formatDate(assignment.date)}
+                                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                                    assignment.dayDuration?.toLowerCase().includes('am') 
+                                      ? 'bg-blue-100 text-blue-700' 
+                                      : assignment.dayDuration?.toLowerCase().includes('pm')
+                                      ? 'bg-orange-100 text-orange-700'
+                                      : 'bg-gray-100 text-gray-700'
+                                  }`}>
+                                    {assignment.dayDuration?.toLowerCase().includes('am') ? 'AM' : 
+                                     assignment.dayDuration?.toLowerCase().includes('pm') ? 'PM' : 
+                                     assignment.dayDuration}
+                                  </span>
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  {new Date(assignment.date).toLocaleDateString("en-US", { weekday: "short" })} • {getTimingForSlot(assignment.dayDuration)} • {assignment.assignedHours}h
+                                </div>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-xs text-gray-500">{assignment.domain}</div>
+                              <div className="text-xs text-gray-500">{assignment.batchCode}</div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               ) : (
-                <div className="text-center py-8 text-gray-500">
-                  No schedule assigned for this trainer
+                <div className="text-center py-8">
+                  <FiCalendar className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                  <h4 className="text-sm font-medium text-gray-900 mb-1">No Schedule</h4>
+                  <p className="text-xs text-gray-500">No schedule assigned</p>
                 </div>
               )}
 
-              <div className="mt-6 flex justify-end space-x-3">
+              <div className="flex justify-end space-x-3 pt-2">
                 <button
                   onClick={() => setCurrentStep(1)}
-                  className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors text-sm font-medium"
                 >
                   Back
                 </button>
                 <button
                   onClick={handleViewFinancials}
-                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                  className="px-4 py-2 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-colors text-sm font-medium"
                 >
                   Next
                 </button>
@@ -753,93 +816,165 @@ useEffect(() => {
 
           {/* Step 3: Financial Details */}
           {currentStep === 3 && (
-            <div>
-              <h3 className="text-lg font-medium text-gray-800 mb-4">
-                Calculated Financial Details
-              </h3>
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-base font-semibold text-gray-900 mb-1">Financial Overview</h3>
+                <p className="text-xs text-gray-600">Review costs for selected sessions</p>
+              </div>
 
               {(() => {
-                // Calculate financial details using assigned hours instead of calculated
-                const totalHours = trainerAssignments.reduce((acc, assignment) => {
+                // Filter assignments to only selected ones
+                const selectedAssignmentsData = trainerAssignments.filter(a => selectedAssignments.includes(a.id));
+
+                // Calculate financial details using only selected assignments
+                const totalHours = selectedAssignmentsData.reduce((acc, assignment) => {
                   return acc + (assignment.assignedHours || 0);
                 }, 0);
 
-                // Calculate total training days from assignments
-                const totalDays = new Set(trainerAssignments.map(a => a.date)).size;
+                // Calculate total training days from selected assignments
+                const totalDays = new Set(selectedAssignmentsData.map(a => a.date)).size;
 
                 // Round to nearest whole number (matching InvoiceModal)
                 const roundToNearestWhole = (num) => Math.round(num);
 
-                const trainingFees = roundToNearestWhole(
-                  trainerDetails.reduce((acc, detail) => {
-                    const hours = detail.assignedHours || 0;
-                    const rate = detail.perHourCost || 0;
-                    return acc + (hours * rate);
-                  }, 0)
-                );
-                
+                const trainingFees = roundToNearestWhole(totalHours * feePerHour);
+
                 // Calculate expenses the same way as InitiationTrainingDetails
                 // Conveyance is one-time, food and lodging are already totals from assignments
-                const conveyanceTotal = trainerCostDetails.conveyance || 0;
-                const foodTotal = trainerCostDetails.food || 0;
-                const lodgingTotal = trainerCostDetails.lodging || 0;
+                const { conveyance: conveyanceTotal, food: foodTotal, lodging: lodgingTotal } = calculateExpensesForSelected(selectedAssignmentsData);
                 const totalExpenses = roundToNearestWhole(conveyanceTotal + foodTotal + lodgingTotal);
-                
+
                 const totalAmount = roundToNearestWhole(trainingFees + totalExpenses);
-                
+
                 // TDS applied only on training fees (matching InvoiceModal logic)
                 const tdsAmount = roundToNearestWhole((trainingFees * 0.1)); // 10% TDS on training fees only
                 const amountBeforeGST = roundToNearestWhole(totalAmount - tdsAmount);
-                
+
                 // No GST in SendSchedule (simplified version)
                 const payableCost = amountBeforeGST;
 
                 return (
                   <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="bg-gray-50 p-4 rounded-lg">
-                        <h4 className="font-medium text-gray-800 mb-2">Training Details</h4>
-                        <div className="space-y-1 text-sm">
-                          <div>Total Days: {totalDays}</div>
-                          <div>Total Hours: {totalHours.toFixed(2)}</div>
-                          <div>Fee per Hour: ₹{feePerHour.toLocaleString('en-IN')}</div>
+                    {/* Summary Cards */}
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="bg-blue-50 rounded-xl p-2 border border-blue-200">
+                        <div className="flex items-center justify-between mb-1">
+                          <FiCalendar className="w-4 h-4 text-blue-600" />
+                          <span className="text-xs font-medium text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full">
+                            Days
+                          </span>
                         </div>
+                        <div className="text-lg font-bold text-blue-900">{totalDays}</div>
+                        <div className="text-xs text-blue-700">Sessions</div>
                       </div>
-                      <div className="bg-gray-50 p-4 rounded-lg">
-                        <h4 className="font-medium text-gray-800 mb-2">Expenses</h4>
-                        <div className="space-y-1 text-sm">
-                          <div>Conveyance: ₹{conveyanceTotal.toLocaleString('en-IN')}</div>
-                          <div>Food: ₹{foodTotal.toLocaleString('en-IN')}</div>
-                          <div>Lodging: ₹{lodgingTotal.toLocaleString('en-IN')}</div>
-                          <div className="font-medium">Total Expenses: ₹{totalExpenses.toLocaleString('en-IN')}</div>
+
+                      <div className="bg-green-50 rounded-xl p-2 border border-green-200">
+                        <div className="flex items-center justify-between mb-1">
+                          <FiCheck className="w-4 h-4 text-green-600" />
+                          <span className="text-xs font-medium text-green-600 bg-green-100 px-2 py-0.5 rounded-full">
+                            Hours
+                          </span>
+                        </div>
+                        <div className="text-lg font-bold text-green-900">{totalHours.toFixed(1)}</div>
+                        <div className="text-xs text-green-700">Training</div>
+                      </div>
+
+                      <div className="bg-purple-50 rounded-xl p-2 border border-purple-200">
+                        <div className="flex items-center justify-between mb-1">
+                          <FiUser className="w-4 h-4 text-purple-600" />
+                          <span className="text-xs font-medium text-purple-600 bg-purple-100 px-2 py-0.5 rounded-full">
+                            Selected
+                          </span>
+                        </div>
+                        <div className="text-lg font-bold text-purple-900">{selectedAssignments.length}</div>
+                        <div className="text-xs text-purple-700">Sessions</div>
+                      </div>
+                    </div>
+
+                    {/* Cost Breakdown */}
+                    <div className="rounded-xl p-4 border border-gray-200">
+                      <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                        <FiMail className="w-4 h-4 text-blue-600" />
+                        Cost Breakdown
+                      </h4>
+                      <div className="space-y-2">
+                        {/* Training Fees Breakdown */}
+                        <div className="space-y-1">
+                          <div className="flex justify-between items-center py-1">
+                            <span className="text-xs text-gray-600">Training Fees</span>
+                            <span className="text-sm font-semibold text-gray-900">₹{trainingFees.toLocaleString('en-IN')}</span>
+                          </div>
+                          <div className="ml-3 text-xs text-gray-500">
+                            {totalHours.toFixed(1)}h × ₹{feePerHour.toLocaleString('en-IN')}/hr
+                          </div>
+                        </div>
+
+                        {/* Expenses Breakdown */}
+                        <div className="space-y-1">
+                          <div className="flex justify-between items-center py-1">
+                            <span className="text-xs text-gray-600">Expenses</span>
+                            <span className="text-sm font-medium text-gray-800">₹{totalExpenses.toLocaleString('en-IN')}</span>
+                          </div>
+                          <div className="ml-3 space-y-0.5">
+                            {conveyanceTotal > 0 && (
+                              <div className="text-xs text-gray-500">
+                                Conveyance: ₹{conveyanceTotal.toLocaleString('en-IN')}
+                              </div>
+                            )}
+                            {foodTotal > 0 && (
+                              <div className="text-xs text-gray-500">
+                                Food: ₹{foodTotal.toLocaleString('en-IN')}
+                              </div>
+                            )}
+                            {lodgingTotal > 0 && (
+                              <div className="text-xs text-gray-500">
+                                Lodging: ₹{lodgingTotal.toLocaleString('en-IN')}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex justify-between items-center py-1">
+                          <span className="text-xs text-gray-600">TDS (10%)</span>
+                          <span className="text-sm font-medium text-orange-600">-₹{tdsAmount.toLocaleString('en-IN')}</span>
+                        </div>
+                        <div className="border-t border-gray-200 pt-2 mt-2">
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm font-semibold text-gray-800">Net Payable</span>
+                            <span className="text-lg font-bold text-green-600">₹{payableCost.toLocaleString('en-IN')}</span>
+                          </div>
                         </div>
                       </div>
                     </div>
-                    <div className="bg-blue-50 p-4 rounded-lg">
-                      <h4 className="font-medium text-gray-800 mb-2">Cost Summary</h4>
-                      <div className="space-y-1 text-sm">
-                        <div>Training Fees: ₹{trainingFees.toLocaleString('en-IN')}</div>
-                        <div>Total Amount: ₹{totalAmount.toLocaleString('en-IN')}</div>
-                        <div>TDS (10% on Training Fees): ₹{tdsAmount.toLocaleString('en-IN')}</div>
-                        <div className="font-bold text-lg">Payable Amount: ₹{payableCost.toLocaleString('en-IN')}</div>
+
+                    {/* Ready Alert */}
+                    <div className="bg-green-50 rounded-xl p-2 border border-green-200">
+                      <div className="flex items-center gap-2">
+                        <FiCheck className="w-4 h-4 text-green-600" />
+                        <div>
+                          <h5 className="text-sm font-medium text-green-800">Ready to Send</h5>
+                          <p className="text-xs text-green-700">
+                            {selectedAssignments.length} session{selectedAssignments.length !== 1 ? 's' : ''} • ₹{payableCost.toLocaleString('en-IN')}
+                          </p>
+                        </div>
                       </div>
                     </div>
                   </div>
                 );
               })()}
 
-              <div className="mt-6 flex justify-end space-x-3">
+              <div className="flex justify-end space-x-3 pt-2">
                 <button
                   onClick={() => setCurrentStep(2)}
-                  className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors text-sm font-medium"
                 >
                   Back
                 </button>
                 <button
                   onClick={handleConfirmSchedule}
-                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                  className="px-4 py-2 bg-green-500 text-white rounded-xl hover:bg-green-600 transition-colors text-sm font-medium"
                 >
-                  Confirm & Next
+                  Confirm & Send
                 </button>
               </div>
             </div>
@@ -847,109 +982,235 @@ useEffect(() => {
 
           {/* Step 4: Confirm & Email */}
           {currentStep === 4 && (
-            <div>
-              <h3 className="text-lg font-medium text-gray-800 mb-4">
-                Confirm Details
-              </h3>
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-base font-semibold text-gray-900 mb-1">Send Training Schedule</h3>
+                <p className="text-xs text-gray-600">Configure email and send to trainer</p>
+              </div>
 
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    To <span className="text-red-500">*</span>
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="email"
-                      name="to"
-                      value={emailData.to}
-                      onChange={handleInputChange}
-                      required
-                      className="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      placeholder="Enter recipient email"
-                    />
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {/* Email Configuration */}
+                <div className="space-y-4">
+                  <div className="bg-white rounded-xl p-4 border border-gray-200">
+                    <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                      <FiMail className="w-4 h-4 text-blue-600" />
+                      Email Details
+                    </h4>
+
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Email Address <span className="text-red-500">*</span>
+                        </label>
+                        <div className="flex gap-2">
+                          <input
+                            type="email"
+                            name="to"
+                            value={emailData.to}
+                            onChange={handleInputChange}
+                            required
+                            className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="trainer@example.com"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleImportEmail}
+                            className="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm font-medium"
+                            title="Import email from trainer data"
+                          >
+                            Import
+                          </button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Venue Address
+                        </label>
+                        <input
+                          type="text"
+                          name="venue"
+                          value={emailData.venue}
+                          onChange={handleInputChange}
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="College/Training Center Address"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Contact Person
+                          </label>
+                          <input
+                            type="text"
+                            name="contactPerson"
+                            value={emailData.contactPerson}
+                            onChange={handleInputChange}
+                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="Coordinator Name"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Contact Number
+                          </label>
+                          <input
+                            type="text"
+                            name="contactNumber"
+                            value={emailData.contactNumber}
+                            onChange={handleInputChange}
+                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="+91 XXXXX XXXXX"
+                          />
+                        </div>
+                        
+                        {/* Payment Cycle radio buttons */}
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Payment Cycle
+                          </label>
+                          <div className="flex items-center gap-4 mt-1">
+                            <label className="inline-flex items-center space-x-2 text-xs">
+                              <input
+                                type="radio"
+                                name="paymentCycle"
+                                value="30"
+                                checked={paymentCycle === '30'}
+                                onChange={handlePaymentCycleChange}
+                                className="form-radio h-4 w-4 text-blue-600"
+                              />
+                              <span>30 days</span>
+                            </label>
+                            <label className="inline-flex items-center space-x-2 text-xs">
+                              <input
+                                type="radio"
+                                name="paymentCycle"
+                                value="45"
+                                checked={paymentCycle === '45'}
+                                onChange={handlePaymentCycleChange}
+                                className="form-radio h-4 w-4 text-blue-600"
+                              />
+                              <span>45 days</span>
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Send Button */}
+                  <div className="bg-green-50 rounded-xl p-4 border border-green-200">
                     <button
-                      type="button"
-                      onClick={handleImportEmail}
-                      className="px-4 py-2 bg-linear-to-r from-blue-500 to-blue-600 text-white border border-blue-500 rounded-lg hover:from-blue-600 hover:to-blue-700 hover:border-blue-600 transition-all duration-200 text-sm font-medium whitespace-nowrap shadow-sm hover:shadow-md transform hover:scale-105 flex items-center gap-2"
-                      title="Import email from trainer database"
+                      onClick={handleSendEmail}
+                      disabled={loading}
+                      className="w-full px-4 py-3 bg-green-500 text-white rounded-xl hover:bg-green-600 transition-colors font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
-                      <FiMail className="w-4 h-4" />
-                      Import Email
+                      {loading ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                          Sending...
+                        </>
+                      ) : (
+                        <>
+                          <FiSend className="w-4 h-4" />
+                          Send Schedule
+                        </>
+                      )}
                     </button>
+                    <p className="text-xs text-green-700 mt-2 text-center">
+                      Includes schedule, costs & contact details
+                    </p>
                   </div>
                 </div>
 
-                {/* Editable Venue */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Venue
-                  </label>
-                  <input
-                    type="text"
-                    name="venue"
-                    value={emailData.venue}
-                    onChange={handleInputChange}
-                    className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
-                </div>
+                {/* Preview Summary */}
+                <div className="space-y-4">
+                  <div className="bg-white rounded-xl p-4 border border-gray-200">
+                    <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                      <FiCalendar className="w-4 h-4 text-purple-600" />
+                      Summary
+                    </h4>
 
-                {/* Editable Contact Person */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Contact Person
-                  </label>
-                  <input
-                    type="text"
-                    name="contactPerson"
-                    value={emailData.contactPerson}
-                    onChange={handleInputChange}
-                    className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
-                </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center py-1">
+                        <span className="text-xs text-gray-600">Trainer</span>
+                        <span className="text-sm font-medium text-gray-900">{selectedTrainer?.name || selectedTrainer?.trainerName}</span>
+                      </div>
+                      <div className="flex justify-between items-center py-1">
+                        <span className="text-xs text-gray-600">Sessions</span>
+                        <span className="text-sm font-medium text-gray-900">{selectedAssignments.length}</span>
+                      </div>
+                      <div className="flex justify-between items-center py-1">
+                        <span className="text-xs text-gray-600">Total Hours</span>
+                        <span className="text-sm font-medium text-gray-900">
+                          {trainerAssignments.filter(a => selectedAssignments.includes(a.id)).reduce((acc, a) => acc + (a.assignedHours || 0), 0).toFixed(1)}h
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center py-2 border-t border-gray-200 pt-2">
+                        <span className="text-sm font-semibold text-gray-800">Amount</span>
+                        <span className="text-lg font-bold text-green-600">
+                          ₹{(() => {
+                            const selectedData = trainerAssignments.filter(a => selectedAssignments.includes(a.id));
+                            const totalHours = selectedData.reduce((acc, a) => acc + (a.assignedHours || 0), 0);
+                            const trainingFees = Math.round(totalHours * feePerHour);
+                            const { conveyance, food, lodging } = calculateExpensesForSelected(selectedData);
+                            const expenses = Math.round(conveyance + food + lodging);
+                            const total = trainingFees + expenses;
+                            const tds = Math.round(trainingFees * 0.1);
+                            return (total - tds).toLocaleString('en-IN');
+                          })()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
 
-                {/* Editable Contact Number */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Contact Number
-                  </label>
-                  <input
-                    type="text"
-                    name="contactNumber"
-                    value={emailData.contactNumber}
-                    onChange={handleInputChange}
-                    className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
+                  {/* Email Preview */}
+                  <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
+                    <h5 className="text-sm font-medium text-blue-800 mb-2 flex items-center gap-2">
+                      <FiMail className="w-4 h-4" />
+                      Email Preview
+                    </h5>
+                    <div className="text-xs text-blue-700 space-y-1">
+                      <p><strong>Subject:</strong> Assignment Mail for {trainingFormDoc?.collegeName || trainingData?.collegeName || ""} - Gryphon Academy Pvt. Ltd.</p>
+                      <p><strong>To:</strong> {emailData.to || 'trainer@example.com'}</p>
+                      <p><strong>Payment Cycle:</strong> {paymentCycle} days</p>
+                      <p className="mt-2">
+                        Includes detailed schedule table, financial breakdown, venue information, and contact details.
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div className="mt-6 flex justify-end space-x-3">
+              <div className="flex justify-end space-x-3 pt-2">
                 <button
                   onClick={() => setCurrentStep(3)}
-                  className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors text-sm font-medium"
                 >
                   Back
-                </button>
-                <button
-                  onClick={handleSendEmail}
-                  disabled={loading}
-                  className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 flex items-center"
-                >
-                  {loading ? (
-                    <span className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full mr-2" />
-                  ) : (
-                    <FiSend className="mr-2" />
-                  )}
-                  Send Email
                 </button>
               </div>
             </div>
           )}
 
-          {/* Step 4: Success */}
+          {/* Success */}
           {success && (
-            <div className="mt-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded flex items-center">
-              <FiCheck className="mr-2" />
-              Email sent successfully!
+            <div className="text-center py-8">
+              <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <FiCheck className="w-8 h-8 text-white" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 mb-2">Schedule Sent!</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Training schedule sent to {selectedTrainer?.name || selectedTrainer?.trainerName}
+              </p>
+              <div className="bg-green-50 rounded-xl p-3 border border-green-200 inline-block">
+                <div className="flex items-center gap-2 text-green-700">
+                  <FiMail className="w-4 h-4" />
+                  <span className="text-sm font-medium">Email sent to: {emailData.to}</span>
+                </div>
+              </div>
             </div>
           )}
         </div>

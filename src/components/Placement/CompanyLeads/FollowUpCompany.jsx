@@ -26,6 +26,8 @@ import { useMsal } from "@azure/msal-react";
 import { InteractionRequiredAuthError } from "@azure/msal-browser";
 
 import { logPlacementActivity } from "../../../utils/placementAuditLogger";
+import { INDUSTRY_OPTIONS, REMARKS_TEMPLATES } from "../../../utils/constants";
+
 
 const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
   const [date, setDate] = useState(dayjs().format("YYYY-MM-DD"));
@@ -36,6 +38,8 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
   });
   const [remarks, setRemarks] = useState("");
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState("");
+  const [selectedIndustry, setSelectedIndustry] = useState(company?.industry || "");
   const [loading, setLoading] = useState(false);
   const [pastFollowups, setPastFollowups] = useState([]);
   const [calendarError, setCalendarError] = useState(null);
@@ -47,7 +51,9 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
   const [deleteFollowupKey, setDeleteFollowupKey] = useState(null);
   const [snackbar, setSnackbar] = useState("");
   const [snackbarType, setSnackbarType] = useState("success");
+  const [maliciousWarning, setMaliciousWarning] = useState("");
   const timePickerRef = useRef(null);
+  const [connecting, setConnecting] = useState(false);
 
   const { instance, accounts } = useMsal();
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -81,7 +87,6 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
     if (!company?.id) return;
 
     try {
-      console.log("Fetching past follow-ups for company:", company);
       // For companies, follow-ups are stored within the company data in companyleads collection
       const lead = company; // company is passed as lead-like object
       if (!lead || !lead.batchId) return;
@@ -100,12 +105,10 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
             const uriDecoded = atob(encodedCompanies[companyIndex]);
             jsonString = decodeURIComponent(uriDecoded);
           } catch {
-            console.log("atob failed, trying decodeURIComponent directly");
             jsonString = decodeURIComponent(encodedCompanies[companyIndex]);
           }
           const decodedCompany = JSON.parse(jsonString);
           const followups = decodedCompany.followups || [];
-          console.log("Fetched past follow-ups:", followups);
           setPastFollowups(followups);
         } else {
           console.error("Invalid company index in fetchPastFollowups:", companyIndex);
@@ -120,7 +123,6 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
 
   const handleDeleteFollowup = async (followupKey) => {
     try {
-      console.log("Deleting follow-up with key:", followupKey, "for company:", company);
       const lead = company;
       if (!lead || !lead.batchId) return;
 
@@ -138,7 +140,6 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
             const uriDecoded = atob(encodedCompanies[companyIndex]);
             jsonString = decodeURIComponent(uriDecoded);
           } catch {
-            console.log("atob failed, trying decodeURIComponent directly");
             jsonString = decodeURIComponent(encodedCompanies[companyIndex]);
           }
           const decodedCompany = JSON.parse(jsonString);
@@ -157,18 +158,6 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
           await setDoc(batchDocRef, {
             ...batchData,
             companies: encodedCompanies,
-          });
-
-          console.log("Successfully deleted follow-up");
-
-          // Log the follow-up deletion activity
-          await logPlacementActivity({
-            action: 'DELETE_FOLLOWUP',
-            leadId: lead.id,
-            leadName: lead.companyName || lead.name,
-            details: {
-              followupKey
-            }
           });
 
           setPastFollowups(updatedFollowups);
@@ -192,8 +181,8 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
   }, [company, fetchPastFollowups]);
 
   const getAccessToken = async () => {
-    if (accounts.length === 0) {
-      throw new Error("No accounts available");
+    if (!accounts || accounts.length === 0) {
+      throw new Error("MS365 not connected - please connect your Microsoft account first");
     }
 
     const request = {
@@ -206,10 +195,32 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
       return response.accessToken;
     } catch (error) {
       if (error instanceof InteractionRequiredAuthError) {
-        const response = await instance.acquireTokenPopup(request);
-        return response.accessToken;
+        // Try popup authentication
+        try {
+          const response = await instance.acquireTokenPopup(request);
+          return response.accessToken;
+        } catch (popupError) {
+          console.warn("Popup authentication failed:", popupError);
+          throw new Error("MS365 authentication required - please sign in to Microsoft 365");
+        }
       }
       throw error;
+    }
+  };
+
+  const handleConnectM365 = async () => {
+    setConnecting(true);
+    try {
+      const loginRequest = {
+        scopes: graphScopes,
+      };
+      await instance.loginPopup(loginRequest);
+      showSnackbar("Successfully connected to Microsoft 365!", "success");
+    } catch (error) {
+      console.error("M365 connection failed:", error);
+      showSnackbar("Failed to connect to Microsoft 365", "error");
+    } finally {
+      setConnecting(false);
     }
   };
 
@@ -266,7 +277,6 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
       }
 
       const createdEvent = await response.json();
-      console.log("Calendar event created:", createdEvent);
 
       return createdEvent;
     } catch (error) {
@@ -284,14 +294,33 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // Validate required fields
+    if (!selectedTemplate) {
+      showSnackbar("Please select a template", "error");
+      return;
+    }
+
+    if (!selectedIndustry) {
+      showSnackbar("Please select an industry", "error");
+      return;
+    }
+
+    // Check for malicious input before proceeding
+    if (maliciousWarning) {
+      showSnackbar("Cannot submit: Please remove malicious content from remarks", "error");
+      return;
+    }
+
     setLoading(true);
 
     try {
-      console.log("Starting handleSubmit for company:", company);
       const followupData = {
         key: Date.now().toString(),
         date,
         time: getFullTimeString(),
+        template: selectedTemplate,
+        industry: selectedIndustry,
         remarks,
         createdAt: new Date().toISOString(),
         calendarEventCreated: false,
@@ -304,10 +333,14 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
         calendarEvent = await createCalendarEvent();
         followupData.calendarEventCreated = true;
         followupData.calendarEventId = calendarEvent.id;
+        console.log("Calendar event created successfully:", calendarEvent.id);
       } catch (calendarErr) {
-        console.error("Calendar creation failed:", calendarErr);
-        // Only show warning once per day
-        if (shouldShowCalendarWarning()) {
+        console.warn("Calendar event creation failed:", calendarErr.message);
+        followupData.calendarEventCreated = false;
+        followupData.calendarError = calendarErr.message;
+
+        // Only show warning once per day for MS365 connection issues
+        if (shouldShowCalendarWarning() && !calendarErr.message.includes("MS365")) {
           setShowCalendarWarning(true);
           markCalendarWarningShown();
         }
@@ -315,53 +348,59 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
 
       // Save follow-up to company data
       const lead = company;
-      console.log("Lead object:", lead);
       if (!lead || !lead.batchId) {
         throw new Error("Invalid company data");
       }
 
-      console.log("Fetching batchDoc for batchId:", lead.batchId);
       const batchDocRef = doc(db, "companyleads", lead.batchId);
       const batchDocSnap = await getDoc(batchDocRef);
 
       if (batchDocSnap.exists()) {
-        console.log("Batch doc exists");
         const batchData = batchDocSnap.data();
         const encodedCompanies = batchData.companies || [];
-        console.log("Encoded companies length:", encodedCompanies.length);
         const companyIndex = parseInt(lead.id.split('_').pop());
-        console.log("Lead ID:", lead.id, "Parsed companyIndex:", companyIndex);
 
         if (companyIndex >= 0 && companyIndex < encodedCompanies.length) {
-          console.log("Company index is valid, decoding company at index", companyIndex);
           let jsonString;
           try {
             const uriDecoded = atob(encodedCompanies[companyIndex]);
             jsonString = decodeURIComponent(uriDecoded);
           } catch {
-            console.log("atob failed, trying decodeURIComponent directly");
             jsonString = decodeURIComponent(encodedCompanies[companyIndex]);
           }
           const decodedCompany = JSON.parse(jsonString);
-          console.log("Decoded company:", decodedCompany);
           const followups = decodedCompany.followups || [];
           const updatedFollowups = [followupData, ...followups];
 
           const updatedCompany = {
             ...decodedCompany,
             followups: updatedFollowups,
+            // Always update company industry to match follow-up selection
+            industry: selectedIndustry,
           };
           // Use Unicode-safe encoding: encodeURIComponent + btoa to handle Unicode characters
           const updatedJsonString = JSON.stringify(updatedCompany);
           const uriEncoded = encodeURIComponent(updatedJsonString);
           encodedCompanies[companyIndex] = btoa(uriEncoded);
 
-          console.log("Saving updated batch data to Firestore");
           await setDoc(batchDocRef, {
             ...batchData,
             companies: encodedCompanies,
           });
-          console.log("Successfully saved to Firestore");
+
+          // Log industry update
+          if (decodedCompany.industry !== selectedIndustry) {
+            await logPlacementActivity({
+              action: 'UPDATE_COMPANY_INDUSTRY',
+              leadId: lead.id,
+              leadName: lead.companyName || lead.name,
+              details: {
+                oldIndustry: decodedCompany.industry || 'Not set',
+                newIndustry: selectedIndustry,
+                updatedDuring: 'Follow-up scheduling'
+              }
+            });
+          }
 
           // Log the follow-up scheduling activity
           await logPlacementActivity({
@@ -392,6 +431,8 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
           setDate(dayjs().format("YYYY-MM-DD"));
           setTime({ hours: 12, minutes: 0, ampm: "AM" });
           setRemarks("");
+          setSelectedTemplate("");
+          setSelectedIndustry(company?.industry || "");
           setSendInvite(false);
         } else {
           console.error("Invalid company index:", companyIndex, "for array length:", encodedCompanies.length);
@@ -482,7 +523,6 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
       }
 
       const createdEvent = await response.json();
-      console.log("Calendar event created:", createdEvent);
 
       // Update the followup in the database
       const lead = company;
@@ -502,7 +542,6 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
             const uriDecoded = atob(encodedCompanies[companyIndex]);
             jsonString = decodeURIComponent(uriDecoded);
           } catch {
-            console.log("atob failed, trying decodeURIComponent directly");
             jsonString = decodeURIComponent(encodedCompanies[companyIndex]);
           }
           const decodedCompany = JSON.parse(jsonString);
@@ -598,92 +637,125 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
   };
 
   const getRelativeTime = (dateString) => {
-    const now = dayjs();
     const followupDate = dayjs(dateString);
-    const diffInDays = now.diff(followupDate, 'day');
+    return followupDate.fromNow();
+  };
 
-    if (diffInDays === 0) {
-      return 'Today';
-    } else if (diffInDays === 1) {
-      return 'Yesterday';
-    } else if (diffInDays < 7) {
-      return `${diffInDays} days ago`;
-    } else if (diffInDays < 30) {
-      const weeks = Math.floor(diffInDays / 7);
-      return weeks === 1 ? '1 week ago' : `${weeks} weeks ago`;
-    } else if (diffInDays < 365) {
-      const months = Math.floor(diffInDays / 30);
-      return months === 1 ? '1 month ago' : `${months} months ago`;
-    } else {
-      const years = Math.floor(diffInDays / 365);
-      return years === 1 ? '1 year ago' : `${years} years ago`;
-    }
+  // Function to detect malicious input patterns
+  const detectMaliciousInput = (text) => {
+    const maliciousPatterns = [
+      /<script[^>]*>[\s\S]*?<\/script>/gi, // Script tags
+      /javascript:/gi, // JavaScript URLs
+      /on\w+\s*=/gi, // Event handlers
+      /<iframe[^>]*>/gi, // Iframes
+      /<object[^>]*>/gi, // Object tags
+      /<embed[^>]*>/gi, // Embed tags
+      /<form[^>]*>/gi, // Form tags
+      /<input[^>]*>/gi, // Input tags
+      /<meta[^>]*>/gi, // Meta tags
+      /<link[^>]*>/gi, // Link tags
+      /eval\s*\(/gi, // Eval function calls
+      /Function\s*\(/gi, // Function constructor
+      /setTimeout\s*\(/gi, // setTimeout with string
+      /setInterval\s*\(/gi, // setInterval with string
+      /document\./gi, // Direct document access
+      /window\./gi, // Direct window access
+      /location\./gi, // Direct location access
+      /cookie/gi, // Cookie manipulation
+      /localStorage/gi, // Local storage access
+      /sessionStorage/gi, // Session storage access
+      /XMLHttpRequest/gi, // AJAX requests
+      /fetch\s*\(/gi, // Fetch API calls
+      /import\s*\(/gi, // Dynamic imports
+      /require\s*\(/gi, // Require calls
+      /process\./gi, // Node.js process access
+      /fs\./gi, // File system access
+      /child_process/gi, // Child process execution
+      /exec\s*\(/gi, // Command execution
+      /spawn\s*\(/gi, // Process spawning
+      /--drop/gi, // SQL DROP statements
+      /--delete/gi, // SQL DELETE statements
+      /union\s+select/gi, // SQL injection patterns
+      /select\s+.*\s+from/gi, // SQL SELECT patterns
+      /insert\s+into/gi, // SQL INSERT patterns
+      /update\s+.*\s+set/gi, // SQL UPDATE patterns
+      /alter\s+table/gi, // SQL ALTER patterns
+      /create\s+table/gi, // SQL CREATE patterns
+      /truncate\s+table/gi, // SQL TRUNCATE patterns
+      /drop\s+table/gi, // SQL DROP patterns
+      /drop\s+database/gi, // SQL DROP database
+      /show\s+tables/gi, // SQL SHOW tables
+      /show\s+databases/gi, // SQL SHOW databases
+      /information_schema/gi, // SQL information schema access
+      /load_file/gi, // SQL file loading
+      /into\s+outfile/gi, // SQL file writing
+      /benchmark\s*\(/gi, // SQL benchmark attacks
+      /sleep\s*\(/gi, // SQL time-based attacks
+      /waitfor\s+delay/gi, // SQL Server delay attacks
+      /xp_cmdshell/gi, // SQL Server command execution
+      /sp_executesql/gi, // SQL Server dynamic execution
+    ];
+
+    return maliciousPatterns.some(pattern => pattern.test(text));
   };
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-54 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden border border-slate-200/50">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[95vh] overflow-hidden border border-slate-200/50">
         {/* Header */}
-        <div className="bg-linear-to-r from-slate-50 to-slate-100 border-b border-slate-200/50 px-6 py-2">
+        <div className="bg-linear-to-r from-slate-50 to-slate-100 border-b border-slate-200/50 px-6 py-1.5">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-linear-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center shadow-lg">
-                <FaCalendarAlt className="text-white text-base" />
+              <div className="w-6 h-6 bg-linear-to-br from-blue-500 to-blue-600 rounded flex items-center justify-center shadow-lg">
+                <FaCalendarAlt className="text-white text-sm" />
               </div>
               <div>
-                <h1 className="text-lg font-semibold text-slate-900 tracking-tight">Schedule Follow-up</h1>
-                <p className="text-sm text-slate-600 mt-0.5">
+                <h1 className="text-base font-semibold text-slate-900 tracking-tight">Schedule Follow-up</h1>
+                <p className="text-xs text-slate-600">
                   {company.companyName || company.name}
                 </p>
               </div>
             </div>
             <button
               onClick={onClose}
-              className="w-7 h-7 bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 rounded-lg flex items-center justify-center transition-all duration-200 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              className="w-6 h-6 bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 rounded flex items-center justify-center transition-all duration-200 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
               aria-label="Close modal"
             >
-              <FaTimes size={12} />
+              <FaTimes size={10} />
             </button>
           </div>
         </div>
 
         {/* Content */}
-        <div className="p-4 overflow-y-auto max-h-[calc(85vh-120px)]">
+        <div className="p-4 overflow-y-auto max-h-[calc(95vh-120px)]">
           {/* Company Confirmation Section */}
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
-            <div className="flex items-start space-x-3">
-              <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center shrink-0">
-                <FaExclamationTriangle className="text-amber-600 text-sm" />
+          <div className="bg-amber-50/50 border border-amber-200/30 rounded p-2 mb-3">
+            <div className="flex items-center space-x-2">
+              <div className="w-4 h-4 bg-amber-100 rounded flex items-center justify-center shrink-0">
+                <FaExclamationTriangle className="text-amber-600 text-xs" />
               </div>
               <div className="flex-1">
-                <h3 className="text-sm font-semibold text-amber-900 mb-1">Confirm Company Details</h3>
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <span className="text-xs font-medium text-amber-700">Company:</span>
-                    <span className="text-sm font-semibold text-amber-900">{company.companyName || company.name || 'N/A'}</span>
-                  </div>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs">
+                  <span className="font-medium text-amber-700">{company.companyName || company.name || 'N/A'}</span>
                   {company.pocName && company.pocName !== 'N/A' && (
-                    <div className="flex items-center space-x-2">
-                      <span className="text-xs font-medium text-amber-700">Contact:</span>
-                      <span className="text-sm text-amber-800">{company.pocName}</span>
-                    </div>
+                    <>
+                      <span className="text-amber-500">•</span>
+                      <span className="text-amber-800">{company.pocName}</span>
+                    </>
                   )}
                   {company.pocPhone && company.pocPhone !== 'N/A' && (
-                    <div className="flex items-center space-x-2">
-                      <span className="text-xs font-medium text-amber-700">Phone:</span>
-                      <span className="text-sm text-amber-800">{company.pocPhone}</span>
-                    </div>
+                    <>
+                      <span className="text-amber-500">•</span>
+                      <span className="text-amber-800">{company.pocPhone}</span>
+                    </>
                   )}
                   {company.pocMail && company.pocMail !== 'N/A' && (
-                    <div className="flex items-center space-x-2">
-                      <span className="text-xs font-medium text-amber-700">Email:</span>
-                      <span className="text-sm text-amber-800">{company.pocMail}</span>
-                    </div>
+                    <>
+                      <span className="text-amber-500">•</span>
+                      <span className="text-amber-800 truncate">{company.pocMail}</span>
+                    </>
                   )}
                 </div>
-                <p className="text-xs text-amber-700 mt-2">
-                  Please verify this is the correct company before scheduling the follow-up.
-                </p>
               </div>
             </div>
           </div>
@@ -691,6 +763,49 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Left Side - Form */}
             <div className="lg:col-span-2 space-y-4">
+              {/* M365 Connection */}
+              {accounts.length === 0 ? (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg py-1 px-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-white flex items-center justify-center">
+                        <img src="https://cdn-icons-png.flaticon.com/512/732/732221.png" alt="Microsoft 365" className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-medium text-blue-900">Connect Microsoft 365</h3>
+                        <p className="text-xs text-blue-700">Enable calendar integration for follow-ups</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleConnectM365}
+                      disabled={connecting}
+                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-xs font-medium rounded-lg transition-all duration-200 disabled:cursor-not-allowed flex items-center space-x-1"
+                    >
+                      {connecting ? (
+                        <>
+                          <div className="animate-spin rounded-full h-3 w-3 border border-white border-t-transparent"></div>
+                          <span>Connecting...</span>
+                        </>
+                      ) : (
+                        <>
+                          <FaCalendarAlt size={10} />
+                          <span>Connect</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                  <div className="flex items-center space-x-2">
+                    <FaCheckCircle className="text-green-600 text-sm" />
+                    <span className="text-xs text-green-800 font-medium">Connected to Microsoft 365</span>
+                    <span className="text-xs text-green-600">({accounts[0].username})</span>
+                  </div>
+                </div>
+              )}
+
               <form onSubmit={handleSubmit} className="space-y-4">
                 {/* Date and Time */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -800,42 +915,132 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
                   </div>
                 </div>
 
+                {/* Template */}
+                <div className="space-y-1">
+                  <label className="block text-sm font-medium text-slate-700">
+                    Template <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={selectedTemplate}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setSelectedTemplate(value);
+                    }}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-slate-400"
+                    required
+                  >
+                    <option value="">Select a template</option>
+                    {REMARKS_TEMPLATES.map((template) => (
+                      <option key={template.value} value={template.value}>
+                        {template.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Industry Selection - Show only after template is selected */}
+                {selectedTemplate && (
+                  selectedIndustry ? (
+                    // Show selected industry in nice UI like M365 connection
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                      <div className="flex items-center space-x-2">
+                        <FaCheckCircle className="text-green-600 text-sm" />
+                        <span className="text-xs text-green-800 font-medium">Industry: {selectedIndustry}</span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedIndustry("")}
+                          className="text-green-600 hover:text-green-800 text-xs underline ml-auto"
+                        >
+                          Change
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    // Show industry dropdown
+                    <div className="space-y-1">
+                      <label className="block text-sm font-medium text-slate-700">
+                        Industry <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={selectedIndustry}
+                        onChange={(e) => setSelectedIndustry(e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-slate-400"
+                        required
+                      >
+                        <option value="">Select industry to schedule</option>
+                        {INDUSTRY_OPTIONS.map((industry) => (
+                          <option key={industry} value={industry}>
+                            {industry}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )
+                )}
+
                 {/* Remarks */}
                 <div className="space-y-1">
                   <label className="block text-sm font-medium text-slate-700">
                     Remarks
                   </label>
-                  <textarea
-                    value={remarks}
-                    onChange={(e) => setRemarks(e.target.value)}
-                    placeholder="Add notes about this follow-up..."
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-slate-400 resize-none"
-                    rows={3}
-                  />
+                  <div className="relative">
+                    <textarea
+                      value={remarks}
+                      onChange={(e) => {
+                        const newValue = e.target.value;
+                        if (newValue.length <= 250) {
+                          // Check for malicious input
+                          if (detectMaliciousInput(newValue)) {
+                            setMaliciousWarning("Warning: Malicious content detected. Please remove any scripts or potentially harmful content.");
+                          } else {
+                            setMaliciousWarning("");
+                          }
+                          setRemarks(newValue);
+                        }
+                      }}
+                      placeholder="Add notes about this follow-up..."
+                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-slate-400 resize-none"
+                      rows={2}
+                    />
+                    {maliciousWarning && (
+                      <div className="mt-1 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700 flex items-center">
+                        <FaExclamationTriangle className="mr-1 text-red-500" size={10} />
+                        {maliciousWarning}
+                      </div>
+                    )}
+                    <div className="absolute bottom-2 right-2 text-xs text-slate-400">
+                      {remarks.length}/250
+                    </div>
+                  </div>
                 </div>
 
                 {/* Calendar Integration */}
-                <div className="bg-linear-to-r from-blue-50 to-indigo-50 border border-blue-200/50 rounded-lg p-3">
+                <div className="bg-linear-to-r from-blue-50 to-blue-100 border border-blue-200/50 rounded-lg p-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
-                      <div className="w-6 h-6 bg-blue-100 rounded flex items-center justify-center">
+                      <div className="w-5 h-5 bg-blue-100 rounded flex items-center justify-center">
                         <FaCalendarAlt className="text-blue-600 text-xs" />
                       </div>
                       <div>
-                        <h4 className="text-sm font-semibold text-slate-900">Calendar Integration</h4>
-                        <p className="text-xs text-slate-600 mt-0.5">Meeting will be added to your Outlook calendar</p>
+                        <h4 className="text-xs font-semibold text-slate-900">Calendar Integration</h4>
+                        <p className="text-xs text-slate-600">Outlook calendar event will be created automatically</p>
                       </div>
                     </div>
-                    <label className="flex items-center space-x-2 cursor-pointer">
+                    <label className="flex items-center space-x-1 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={sendInvite}
                         onChange={(e) => setSendInvite(e.target.checked)}
-                        className="w-4 h-4 text-blue-600 bg-white border-slate-300 rounded focus:ring-blue-500 focus:ring-2"
+                        className="w-3 h-3 text-blue-600 bg-white border-slate-300 rounded focus:ring-blue-500 focus:ring-2"
                       />
-                      <span className="text-sm font-medium text-slate-700">Send invite to client</span>
+                      <span className="text-xs font-medium text-slate-700">Send invite to client</span>
                     </label>
                   </div>
+                  {sendInvite && (
+                    <div className="mt-1 p-1.5 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700">
+                      Client will receive a meeting invitation email with all details
+                    </div>
+                  )}
                 </div>
 
                 {/* Submit Button */}
@@ -849,13 +1054,23 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
                   </button>
                   <button
                     type="submit"
-                    disabled={loading}
-                    className="px-4 py-2 bg-linear-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:shadow-lg hover:shadow-blue-500/25 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none flex items-center justify-center font-medium"
+                    disabled={loading || accounts.length === 0 || (selectedTemplate && !selectedIndustry)}
+                    className="px-4 py-2 bg-linear-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:shadow-lg hover:shadow-blue-500/25 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none flex items-center justify-center font-medium"
                   >
                     {loading ? (
                       <>
                         <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
                         Scheduling...
+                      </>
+                    ) : accounts.length === 0 ? (
+                      <>
+                        <FaCalendarAlt className="mr-2" />
+                        Connect M365 to Schedule
+                      </>
+                    ) : selectedTemplate && !selectedIndustry ? (
+                      <>
+                        <FaExclamationTriangle className="mr-2" />
+                        Select Industry to Schedule
                       </>
                     ) : (
                       <>
@@ -899,7 +1114,7 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
                             <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>
                             <div className="flex flex-col">
                               <span className="text-sm font-medium text-slate-900">
-                                {getRelativeTime(followup.date)}
+                                {getRelativeTime(`${followup.date} ${followup.time}`)}
                               </span>
                               <span className="text-xs text-slate-500">
                                 {new Date(followup.date).toLocaleDateString('en-US', {
@@ -1040,7 +1255,11 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
                   </div>
                 </div>
                 <p className="text-slate-700 mb-3 leading-relaxed">
-                  The follow-up was saved successfully, but we couldn't create the calendar event. Would you like to retry?
+                  The follow-up was saved successfully, but we couldn't create the calendar event.
+                  {calendarError && calendarError.includes("MS365") ?
+                    " Please connect your Microsoft 365 account to enable calendar integration." :
+                    " Would you like to retry?"
+                  }
                 </p>
                 {calendarError && (
                   <div className="bg-red-50 border border-red-200 rounded p-2 mb-3">
@@ -1058,7 +1277,7 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
                   <button
                     onClick={handleCalendarRetry}
                     disabled={isRetrying}
-                    className="px-4 py-2 bg-linear-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:shadow-lg hover:shadow-blue-500/25 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none flex items-center justify-center font-medium"
+                    className="px-4 py-2 bg-linear-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:shadow-lg hover:shadow-blue-500/25 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none flex items-center justify-center font-medium"
                   >
                     {isRetrying ? (
                       <>

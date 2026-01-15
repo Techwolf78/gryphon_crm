@@ -86,8 +86,9 @@ function CompanyHeader({
   activeTab,
   setActiveTab,
   setShowJDForm,
-  setShowPlacedStudent,
-  fetchCompanies
+  fetchCompanies,
+  showPlacedStudentDashboard,
+  setShowPlacedStudentDashboard
 }) {
   return (
     <div className="sticky top-0 z-40 bg-linear-to-br from-gray-50 to-gray-100 pt-1 pb-2">
@@ -153,9 +154,14 @@ function CompanyHeader({
             </svg>
             Add JD
           </button>
+
           <button
-            onClick={() => setShowPlacedStudent(true)}
-            className="flex items-center justify-center px-2 py-1 bg-linear-to-r from-blue-600 to-indigo-700 text-white rounded-lg font-semibold hover:opacity-90 transition-all shadow-md text-xs"
+            onClick={() => setShowPlacedStudentDashboard(true)}
+            className={`flex items-center justify-center px-2 py-1 rounded-lg font-semibold transition-all shadow-md text-xs ${
+              showPlacedStudentDashboard
+                ? 'bg-green-600 hover:bg-green-700 text-white'
+                : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+            }`}
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"

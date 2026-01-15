@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { FiX, FiInfo, FiPlus, FiTrash2 } from "react-icons/fi";
 import { universityOptions } from "./universityData";
+import Select from "react-select";
 
 const courseSpecializations = {
   Engineering: [
@@ -69,6 +70,16 @@ const courseYears = {
 };
 
 const contactMethodOptions = ["Visit", "Call", "Other"];
+
+const stateOptions = [
+  "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal", "Delhi", "Jammu and Kashmir", "Ladakh", "Puducherry", "Chandigarh", "Andaman and Nicobar Islands", "Dadra and Nagar Haveli and Daman and Diu", "Lakshadweep"
+].map(s => ({ value: s, label: s }));
+
+const cityOptions = [
+  "Mumbai", "Delhi", "Bangalore", "Hyderabad", "Ahmedabad", "Chennai", "Kolkata", "Surat", "Pune", "Jaipur", "Lucknow", "Kanpur", "Nagpur", "Indore", "Thane", "Bhopal", "Visakhapatnam", "Pimpri-Chinchwad", "Patna", "Vadodara", "Ghaziabad", "Ludhiana", "Agra", "Nashik", "Faridabad", "Meerut", "Rajkot", "Kalyan-Dombivli", "Vasai-Virar", "Varanasi", "Srinagar", "Aurangabad", "Dhanbad", "Amritsar", "Navi Mumbai", "Allahabad", "Howrah", "Ranchi", "Gwalior", "Jabalpur", "Coimbatore", "Vijayawada", "Jodhpur", "Madurai", "Raipur", "Kota", "Guwahati", "Chandigarh", "Solapur", "Hubballi-Dharwad", "Tiruchirappalli", "Bareilly", "Moradabad", "Mysore", "Tiruppur", "Gurgaon", "Aligarh", "Jalandhar", "Bhubaneswar", "Salem", "Warangal", "Guntur", "Bhiwandi", "Saharanpur", "Gorakhpur", "Bikaner", "Amravati", "Noida", "Jamshedpur", "Bhilai", "Cuttack", "Firozabad", "Kochi", "Nellore", "Bhavnagar", "Dehradun", "Durgapur", "Asansol", "Rourkela", "Nanded", "Kolhapur", "Ajmer", "Akola", "Gulbarga", "Jamnagar", "Ujjain", "Loni", "Siliguri", "Jhansi", "Ulhasnagar", "Jammu", "Sangli-Miraj & Kupwad", "Mangalore", "Erode", "Belgaum", "Ambattur", "Tirunelveli", "Malegaon", "Gaya", "Tirupati", "Davanagere", "Kozhikode", "Akbarpur", "Kurnool", "Rajpur Sonarpur", "Bokaro", "South Dumdum", "Bellary", "Patiala", "Gopalpur", "Agartala", "Bhagalpur", "Muzaffarnagar", "Bhatpara", "Panihati", "Latur", "Dhule", "Tiruppur", "Rohtak", "Korba", "Bhilwara", "Berhampur", "Muzaffarpur", "Ahmednagar", "Mathura", "Kollam", "Avadi", "Kadapa", "Kamarhati", "Bilaspur", "Shahjahanpur", "Satara", "Bijapur", "Kakinada", "Rampur", "Shimoga", "Chandrapur", "Junagadh", "Thrissur", "Alwar", "Bardhaman", "Kulti", "Kakinada", "Nizamabad", "Parbhani", "Tumkur", "Khammam", "Ozhukarai", "Bihar Sharif", "Panipat", "Darbhanga", "Bally", "Aizawl", "Dewas", "Ichalkaranji", "Karnal", "Bathinda", "Jalna", "Eluru", "Kirari Suleman Nagar", "Barasat", "Purnia", "Satna", "Mau", "Sonipat", "Farrukhabad", "Sagar", "Rourkela", "Durg", "Imphal", "Ratlam", "Hapur", "Arrah", "Anantapur", "Karimnagar", "Etawah", "Ambarnath", "North Dumdum", "Bharatpur", "Begusarai", "New Delhi", "Gandhidham", "Baranagar", "Tiruvottiyur", "Pondicherry", "Sikar", "Thoothukudi", "Rewa", "Mirzapur", "Raichur", "Pali", "Ramagundam", "Silchar", "Haridwar", "Vijayanagaram", "Tenali", "Nagercoil", "Sri Ganganagar", "Karawal Nagar", "Mango", "Thanjavur", "Bulandshahr", "Uluberia", "Katni", "Sambhal", "Singrauli", "Nadiad", "Secunderabad", "Naihati", "Yamunanagar", "Bidhan Nagar", "Pallavaram", "Bidar", "Munger", "Panchkula", "Burhanpur", "Raurkela Industrial Township", "Kharagpur", "Dindigul", "Gandhinagar", "Hospet", "Nangloi Jat", "Malda", "Ongole", "Deoghar", "Chapra", "Haldia", "Khandwa", "Nandyal", "Morena", "Amroha", "Anand", "Bhind", "Bhalswa Jahangir Pur", "Madhyamgram", "Bhiwani", "Berhampore", "Ambala", "Morvi", "Fatehpur", "Raebareli", "Khora, Ghaziabad", "Chittorgarh", "Bhusawal", "Orai", "Bahraich", "Phusro", "Vellore", "Mehsana", "Raiganj", "Sirsa", "Danapur", "Serampore", "Sultan Pur Majra", "Guna", "Jaunpur", "Panvel", "Shivpuri", "Surendranagar Dudhrej", "Unnao", "Chinsurah", "Alappuzha", "Kottayam", "Machilipatnam", "Shimla", "Adoni", "Udupi", "Katihar", "Proddatur", "Mahbubnagar", "Saharsa", "Dibrugarh", "Jorhat", "Hazaribagh", "Hindupur", "Nagaon", "Sasaram", "Hajipur", "Giridih", "Bhimavaram", "Kishanganj", "Port Blair", "Adilabad", "Bongaigaon", "Itanagar", "Siliguri", "Gangtok", "Kohima", "Shillong", "Aizawl", "Imphal", "Agartala", "Daman", "Diu", "Kavaratti"
+].map(c => ({ value: c, label: c }));
+
+const universitySelectOptions = universityOptions.map((u) => ({ value: u, label: u }));
 
 function EditDetailsModal({ show, onClose, lead, onSave }) {
   // Helper for Indian number formatting
@@ -419,13 +430,13 @@ function EditDetailsModal({ show, onClose, lead, onSave }) {
     <div className="fixed inset-0 z-54 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden transform transition-all">
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-5 flex justify-between items-center">
+        <div className="bg-linear-to-r from-blue-600 to-indigo-700 p-3 flex justify-between items-center">
           <div>
-            <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
               <FiInfo className="text-white" />
               Edit College Lead
             </h2>
-            <p className="text-blue-100 text-sm mt-1 truncate">
+            <p className="text-blue-100 text-xs mt-0.5 truncate">
               {formData.businessName || "College Information"}
             </p>
           </div>
@@ -439,11 +450,11 @@ function EditDetailsModal({ show, onClose, lead, onSave }) {
         </div>
 
         {/* Body/Form */}
-        <div className="overflow-y-auto p-6 flex-1">
+        <div className="overflow-y-auto p-2 flex-1">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Basic Information */}
             <div className="space-y-4">
-              <div className="border border-gray-100 rounded-lg p-4 hover:shadow transition-shadow">
+              <div className="border border-gray-100 rounded-lg p-3 hover:shadow transition-shadow">
                 <label className="block text-xs font-semibold uppercase text-gray-500 tracking-wide mb-1">
                   College Name
                 </label>
@@ -451,43 +462,67 @@ function EditDetailsModal({ show, onClose, lead, onSave }) {
                   type="text"
                   value={formData.businessName || ""}
                   onChange={(e) => handleChange("businessName", e.target.value)}
-                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-2 py-1 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
 
-              <div className="border border-gray-100 rounded-lg p-4 hover:shadow transition-shadow">
+              <div className="border border-gray-100 rounded-lg p-3 hover:shadow transition-shadow">
                 <label className="block text-xs font-semibold uppercase text-gray-500 tracking-wide mb-1">
                   Address
                 </label>
                 <textarea
                   value={formData.address || ""}
                   onChange={(e) => handleChange("address", e.target.value)}
-                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-2 py-1 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   rows={3}
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="border border-gray-100 rounded-lg p-4 hover:shadow transition-shadow">
+                <div className="border border-gray-100 rounded-lg p-3 hover:shadow transition-shadow">
                   <label className="block text-xs font-semibold uppercase text-gray-500 tracking-wide mb-1">
                     State
                   </label>
-                  <input
-                    type="text"
-                    value={formData.state || ""}
-                    onChange={(e) => handleChange("state", e.target.value)}
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  <Select
+                    options={stateOptions}
+                    value={stateOptions.find((opt) => opt.value === formData.state)}
+                    onChange={(selected) => handleChange("state", selected ? selected.value : "")}
+                    placeholder="Select State"
+                    isClearable
+                    styles={{
+                      control: (provided) => ({
+                        ...provided,
+                        minHeight: '34px',
+                        fontSize: '14px'
+                      }),
+                      option: (provided) => ({
+                        ...provided,
+                        fontSize: '14px'
+                      })
+                    }}
                   />
                 </div>
-                <div className="border border-gray-100 rounded-lg p-4 hover:shadow transition-shadow">
+                <div className="border border-gray-100 rounded-lg p-3 hover:shadow transition-shadow">
                   <label className="block text-xs font-semibold uppercase text-gray-500 tracking-wide mb-1">
                     City
                   </label>
-                  <input
-                    type="text"
-                    value={formData.city || ""}
-                    onChange={(e) => handleChange("city", e.target.value)}
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  <Select
+                    options={cityOptions}
+                    value={cityOptions.find((opt) => opt.value === formData.city)}
+                    onChange={(selected) => handleChange("city", selected ? selected.value : "")}
+                    placeholder="Select City"
+                    isClearable
+                    styles={{
+                      control: (provided) => ({
+                        ...provided,
+                        minHeight: '34px',
+                        fontSize: '14px'
+                      }),
+                      option: (provided) => ({
+                        ...provided,
+                        fontSize: '14px'
+                      })
+                    }}
                   />
                 </div>
               </div>
@@ -495,7 +530,7 @@ function EditDetailsModal({ show, onClose, lead, onSave }) {
 
             {/* Contact Information */}
             <div className="space-y-4">
-              <div className="border border-gray-100 rounded-lg p-4 hover:shadow transition-shadow">
+              <div className="border border-gray-100 rounded-lg p-3 hover:shadow transition-shadow">
                 <label className="block text-xs font-semibold uppercase text-gray-500 tracking-wide mb-1">
                   Contact Person
                 </label>
@@ -503,12 +538,12 @@ function EditDetailsModal({ show, onClose, lead, onSave }) {
                   type="text"
                   value={formData.pocName || ""}
                   onChange={(e) => handleChange("pocName", e.target.value)}
-                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-2 py-1 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="border border-gray-100 rounded-lg p-4 hover:shadow transition-shadow">
+                <div className="border border-gray-100 rounded-lg p-3 hover:shadow transition-shadow">
                   <label className="block text-xs font-semibold uppercase text-gray-500 tracking-wide mb-1">
                     Phone Number
                   </label>
@@ -516,10 +551,10 @@ function EditDetailsModal({ show, onClose, lead, onSave }) {
                     type="text"
                     value={formData.phoneNo || ""}
                     onChange={(e) => handleChange("phoneNo", e.target.value)}
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-2 py-1 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
-                <div className="border border-gray-100 rounded-lg p-4 hover:shadow transition-shadow">
+                <div className="border border-gray-100 rounded-lg p-3 hover:shadow transition-shadow">
                   <label className="block text-xs font-semibold uppercase text-gray-500 tracking-wide mb-1">
                     Email
                   </label>
@@ -527,12 +562,12 @@ function EditDetailsModal({ show, onClose, lead, onSave }) {
                     type="email"
                     value={formData.email || ""}
                     onChange={(e) => handleChange("email", e.target.value)}
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-2 py-1 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
               </div>
 
-              <div className="border border-gray-100 rounded-lg p-4 hover:shadow transition-shadow">
+              <div className="border border-gray-100 rounded-lg p-3 hover:shadow transition-shadow">
                 <label className="block text-xs font-semibold uppercase text-gray-500 tracking-wide mb-1">
                   Contact Method
                 </label>
@@ -541,7 +576,7 @@ function EditDetailsModal({ show, onClose, lead, onSave }) {
                   onChange={(e) =>
                     handleChange("contactMethod", e.target.value)
                   }
-                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-2 py-1 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >
                   {contactMethodOptions.map((method) => (
                     <option key={method} value={method}>
@@ -565,7 +600,7 @@ function EditDetailsModal({ show, onClose, lead, onSave }) {
                     onChange={(e) =>
                       handleChange("accreditation", e.target.value)
                     }
-                    className="w-full p-2 border rounded"
+                    className="w-full p-1 border rounded"
                   >
                     <option value="">Select NAAC Grade</option>
                     {accreditationOptions.map((option) => (
@@ -580,27 +615,31 @@ function EditDetailsModal({ show, onClose, lead, onSave }) {
                   <label className="block text-sm font-medium mb-1">
                     University Affiliation
                   </label>
-                  <select
-                    value={formData.affiliation || ""}
-                    onChange={(e) =>
-                      handleChange("affiliation", e.target.value)
-                    }
-                    className="w-full p-2 border rounded"
-                  >
-                    <option value="">Select University</option>
-                    {universityOptions.map((univ) => (
-                      <option key={univ} value={univ}>
-                        {univ}
-                      </option>
-                    ))}
-                  </select>
+                  <Select
+                    options={universitySelectOptions}
+                    value={universitySelectOptions.find((opt) => opt.value === formData.affiliation)}
+                    onChange={(selected) => handleChange("affiliation", selected ? selected.value : "")}
+                    placeholder="Search university"
+                    isClearable
+                    styles={{
+                      control: (provided) => ({
+                        ...provided,
+                        minHeight: '34px',
+                        fontSize: '14px'
+                      }),
+                      option: (provided) => ({
+                        ...provided,
+                        fontSize: '14px'
+                      })
+                    }}
+                  />
                 </div>
               </div>
             </div>
 
             {/* Timeline */}
             <div className="col-span-2 space-y-4">
-              <div className="border border-gray-100 rounded-lg p-4 hover:shadow transition-shadow">
+              <div className="border border-gray-100 rounded-lg p-3 hover:shadow transition-shadow">
                 <label className="block text-xs font-semibold uppercase text-gray-500 tracking-wide mb-1">
                   Expected Closure Date
                 </label>
@@ -610,7 +649,7 @@ function EditDetailsModal({ show, onClose, lead, onSave }) {
                   onChange={(e) =>
                     handleChange("expectedClosureDate", e.target.value)
                   }
-                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-2 py-1 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
                 <div className="mt-2 text-sm text-gray-600">
                   Current Phase:{" "}
@@ -662,7 +701,7 @@ function EditDetailsModal({ show, onClose, lead, onSave }) {
                             e.target.value
                           )
                         }
-                        className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        className="w-full px-2 py-1 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       >
                         <option value="">Select Course Type</option>
                         {Object.keys(courseSpecializations).map((type) => (
@@ -684,7 +723,7 @@ function EditDetailsModal({ show, onClose, lead, onSave }) {
                               )
                             }
                             placeholder="Specify course type"
-                            className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            className="w-full px-2 py-1 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                           />
                         </div>
                       )}
@@ -703,7 +742,7 @@ function EditDetailsModal({ show, onClose, lead, onSave }) {
                             e.target.value
                           )
                         }
-                        className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        className="w-full px-2 py-1 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       >
                         <option value="">Select Passing Year</option>
                         {yearOptions.map((year) => (
@@ -724,7 +763,7 @@ function EditDetailsModal({ show, onClose, lead, onSave }) {
                         onChange={(e) =>
                           handleCourseChange(index, "year", e.target.value)
                         }
-                        className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        className="w-full px-2 py-1 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                         disabled={!course.courseType} // Disable if no course type selected
                       >
                         <option value="">Select Current Year</option>
@@ -776,7 +815,7 @@ function EditDetailsModal({ show, onClose, lead, onSave }) {
                             )
                           }
                           placeholder="Specify specialization"
-                          className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          className="w-full px-2 py-1 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                         />
                       </div>
                     )}
@@ -797,7 +836,7 @@ function EditDetailsModal({ show, onClose, lead, onSave }) {
                             e.target.value
                           )
                         }
-                        className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        className="w-full px-2 py-1 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       />
                     </div>
                     <div>
@@ -814,7 +853,7 @@ function EditDetailsModal({ show, onClose, lead, onSave }) {
                             e.target.value
                           )
                         }
-                        className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        className="w-full px-2 py-1 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       />
                     </div>
                     <div>
@@ -829,7 +868,7 @@ function EditDetailsModal({ show, onClose, lead, onSave }) {
                             : "0.00"
                         }
                         readOnly
-                        className="w-full px-3 py-2 border rounded-md bg-gray-50"
+                        className="w-full px-2 py-1 border rounded-md bg-gray-50"
                       />
                     </div>
                   </div>
@@ -840,16 +879,16 @@ function EditDetailsModal({ show, onClose, lead, onSave }) {
         </div>
 
         {/* Footer */}
-        <div className="border-t border-gray-200 bg-white p-4 flex-shrink-0 flex justify-end gap-3">
+        <div className="border-t border-gray-200 bg-white p-4 shrink-0 flex justify-end gap-3">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm sm:text-base text-gray-600 hover:text-gray-800 font-medium rounded-lg transition-colors"
+            className="px-2 py-1 text-sm sm:text-base text-gray-600 hover:text-gray-800 font-medium rounded-lg transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm sm:text-base font-medium rounded-lg transition-colors"
+            className="px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white text-sm sm:text-base font-medium rounded-lg transition-colors"
           >
             Save Changes
           </button>

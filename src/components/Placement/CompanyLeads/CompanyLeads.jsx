@@ -4,6 +4,7 @@ import { PlusIcon, CloudUploadIcon } from "@heroicons/react/outline";
 import AddLeads from "./AddLeads";
 import BulkUploadModal from "./BulkUploadModal";
 import BulkAssignModal from "./BulkAssignModal";
+import ExcelUploadDelete from "./ExcelUploadDelete";
 import AddJD from "../AddJd/AddJD"; // ✅ adjust the relative path
 
 import {
@@ -16,19 +17,25 @@ import {
   setDoc,
 } from "firebase/firestore";
 import { db } from "../../../firebase";
-import LeadsFilters from "./LeadsFilters";
+import LeadStatusTabs from "./LeadStatusTabs";
 import LeadsTable from "./LeadsTable";
 import LeadViewEditModal from "./LeadViewEditModal";
 import FollowUpCompany from "./FollowUpCompany";
 import PlacementLeadAlert from "../PlacementLeadAlert";
 import ViewModeToggle from "./ViewModeToggle";
 import LeadFilters from "./LeadFilters";
+import FollowupDashboard from "./FollowupDashboard";
 import { useAuth } from "../../../context/AuthContext";
 import { useMsal } from "@azure/msal-react";
 import { InteractionRequiredAuthError } from "@azure/msal-browser";
 
 import { logPlacementActivity, AUDIT_ACTIONS } from "../../../utils/placementAuditLogger";
 import ViewToggle from "./ViewToggle";
+import * as XLSX from 'xlsx-js-style';
+import { saveAs } from 'file-saver';
+// import BatchSplitModal from "./BatchSplitModal";
+
+
 
   // Utility function to handle Firestore index errors
   const handleFirestoreIndexError = (error, operation = "operation") => {
@@ -41,7 +48,7 @@ function CompanyLeads() {
   const [activeTab, setActiveTab] = useState(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const tab = urlParams.get('tab');
-    if (tab && ['hot', 'warm', 'cold', 'called', 'onboarded', 'deleted'].includes(tab)) {
+    if (tab && ['hot', 'warm', 'cold', 'called', 'onboarded', 'dead'].includes(tab)) {
       return tab;
     }
     const saved = localStorage.getItem("companyLeadsActiveTab");
@@ -50,10 +57,12 @@ function CompanyLeads() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showAddLeadForm, setShowAddLeadForm] = useState(false);
   const [leads, setLeads] = useState([]);
+  const [allLeads, setAllLeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedLead, setSelectedLead] = useState(null);
   const [showLeadDetails, setShowLeadDetails] = useState(false);
   const [showBulkUploadForm, setShowBulkUploadForm] = useState(false);
+  const [showExcelScanner, setShowExcelScanner] = useState(false);
 
   // Bulk Assign modal state
   const [showBulkAssignModal, setShowBulkAssignModal] = useState(false);
@@ -66,6 +75,12 @@ function CompanyLeads() {
   const [todayFollowUps, setTodayFollowUps] = useState([]);
   const [showTodayFollowUpAlert, setShowTodayFollowUpAlert] = useState(false);
   const [reminderPopup, setReminderPopup] = useState(null);
+
+  // Follow-ups dashboard state
+  const [showFollowUpsDashboard, setShowFollowUpsDashboard] = useState(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get('show') === 'followupdashboard';
+  });
 
   // Toast notification state
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
@@ -102,6 +117,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
   // Additional filter states
   const [companyFilter, setCompanyFilter] = useState('');
   const [phoneFilter, setPhoneFilter] = useState('');
+  const [industryFilter, setIndustryFilter] = useState('');
   const [dateFilterType, setDateFilterType] = useState('single');
   const [singleDate, setSingleDate] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -117,30 +133,38 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
   // Users state for hierarchical team logic
   const [allUsers, setAllUsers] = useState({});
 
+  // Export modal state
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportStatuses, setExportStatuses] = useState(['hot', 'warm', 'called', 'onboarded']); // Default selected statuses (cold only available for myleads)
+
+  // Batch Split modal state
+  // const [showBatchSplitModal, setShowBatchSplitModal] = useState(false);
+
+
+
   // Debounced search term for performance
   const [debouncedSearchTerm] = useDebounce(searchTerm, 500);
 
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(100); // Start with 100 companies per page
-  const [totalCompanies, setTotalCompanies] = useState(0);
-  const [hasMorePages, setHasMorePages] = useState(false);
+  // Debounced search logging with longer delay to avoid logging every keystroke
+  const [debouncedSearchForLogging] = useDebounce(searchTerm, 2000);
+
+
 
   // Log search activity when debounced search changes
   useEffect(() => {
-    if (debouncedSearchTerm.trim()) {
+    if (debouncedSearchForLogging.trim()) {
       logPlacementActivity({
         userId: user?.uid,
         userName: user?.displayName || user?.name || "Unknown User",
         action: AUDIT_ACTIONS.SEARCH_PERFORMED,
         companyId: null,
         companyName: null,
-        details: `Searched for: "${debouncedSearchTerm}"`,
-        changes: { searchTerm: debouncedSearchTerm },
+        details: `Searched for: "${debouncedSearchForLogging}"`,
+        changes: { searchTerm: debouncedSearchForLogging },
         sessionId: sessionStorage.getItem('sessionId') || 'unknown'
       });
     }
-  }, [debouncedSearchTerm, user]);
+  }, [debouncedSearchForLogging, user]);
 
   // Test Microsoft 365 connection status
   const testMs365Connection = useCallback(async () => {
@@ -245,66 +269,10 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
 
   // Get team member IDs based on role-based logic (matches Sales module)
   const getTeamMemberIds = useCallback((managerUid, users = allUsers) => {
-    const user = Object.values(users).find((u) => u.uid === managerUid);
-    if (!user) return [];
-
-    const isPlacementDept = user.departments?.includes("Placement") || user.department === "Placement";
-    const isHigherRole = ["Director", "Head", "Manager"].includes(user.role);
-
-    if (user.role === "Director") {
-      // Director sees all placement team leads
-      return Object.values(users)
-        .filter(u => u.departments?.includes("Placement") || u.department === "Placement")
-        .map(u => u.uid || u.id);
-    } else if (user.role === "Head") {
-      // Head sees Managers and their subordinates in Placement (regardless of Head's own department)
-      const teamMembers = [];
-      
-      // Find all Managers in Placement
-      const managers = Object.values(users).filter(
-        (u) => u.role === "Manager" && 
-        (u.departments?.includes("Placement") || u.department === "Placement")
-      );
-      teamMembers.push(...managers.map(u => u.uid || u.id));
-      
-        // Find subordinates of those Managers
-        managers.forEach(manager => {
-          const subordinates = Object.values(users).filter(
-            (u) =>
-              u.reportingManager === manager.name &&
-              ["Assistant Manager", "Executive"].includes(u.role) &&
-              (u.departments?.includes("Placement") || u.department === "Placement")
-          );
-          teamMembers.push(...subordinates.map(u => u.uid || u.id));
-        });      return teamMembers;
-    } else if (isPlacementDept && isHigherRole) {
-      if (user.role === "Manager") {
-        // Manager sees all other Managers and their subordinates in Placement (same as Head)
-        const teamMembers = [];
-        
-        // Find all Managers in Placement
-        const managers = Object.values(users).filter(
-          (u) => u.role === "Manager" && 
-          (u.departments?.includes("Placement") || u.department === "Placement")
-        );
-        teamMembers.push(...managers.map(u => u.uid || u.id));
-        
-        // Find subordinates of ALL Managers
-        managers.forEach(manager => {
-          const subordinates = Object.values(users).filter(
-            (u) =>
-              u.reportingManager === manager.name &&
-              ["Assistant Manager", "Executive"].includes(u.role) &&
-              (u.departments?.includes("Placement") || u.department === "Placement")
-          );
-          teamMembers.push(...subordinates.map(u => u.uid || u.id));
-        });
-        return teamMembers;
-      }
-    }
-
-    // Lower roles or non-placement users see no team members
-    return [];
+    // All users can see leads from all other users (complete transparency)
+    return Object.values(users)
+      .filter(u => u.uid !== managerUid)
+      .map(u => u.uid || u.id);
   }, [allUsers]);
 
   // Fetch today's follow-ups from all companies
@@ -315,13 +283,14 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
       const today = new Date().toISOString().split('T')[0]; // Get today's date in YYYY-MM-DD format
       const allFollowUps = [];
 
-      // Use the already filtered leads from state
+      // Filter allLeads to get only leads assigned to the current user
+      let userAccessibleLeads = allLeads;
+      if (user) {
+        userAccessibleLeads = allLeads.filter(lead => lead.assignedTo === user.uid);
+      }
 
-      // Extract follow-ups from each company
-      leads.forEach(lead => {
-        // Only process hot leads for follow-up alerts
-        if (lead.status !== "hot") return;
-        
+      // Extract follow-ups from each accessible lead
+      userAccessibleLeads.forEach(lead => {
         const followups = lead.followups || [];
         followups.forEach(followup => {
           // Check if follow-up is for today
@@ -334,6 +303,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
               time: followup.time,
               date: followup.date,
               remarks: followup.remarks,
+              template: followup.template,
               assignedTo: lead.assignedTo,
               leadId: lead.id,
               followupKey: followup.key
@@ -341,33 +311,41 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
           }
         });
       });
-      setTodayFollowUps(allFollowUps);
 
-      // Show alert if there are follow-ups
-      setShowTodayFollowUpAlert(allFollowUps.length > 0);
+      // Check localStorage for already shown alerts for today
+      const shownAlertsKey = `shownFollowUpAlerts_${user.uid}_${today}`;
+      const shownAlerts = JSON.parse(localStorage.getItem(shownAlertsKey) || '[]');
+
+      // Filter out follow-ups that have already been shown today
+      const newFollowUps = allFollowUps.filter(followup => !shownAlerts.includes(followup.id));
+
+      setTodayFollowUps(allFollowUps); // Keep all follow-ups for display
+
+      // Show alert only for new follow-ups
+      setShowTodayFollowUpAlert(newFollowUps.length > 0);
+
+      // If there are new follow-ups, store them in localStorage after showing
+      if (newFollowUps.length > 0) {
+        const updatedShownAlerts = [...shownAlerts, ...newFollowUps.map(f => f.id)];
+        localStorage.setItem(shownAlertsKey, JSON.stringify(updatedShownAlerts));
+      }
 
     } catch (error) {
       console.error("Error fetching today's follow-ups:", error);
     }
-  }, [user, leads]);
+  }, [allLeads, user]);
 
   // Caching constants
   const CACHE_KEY = 'companyLeadsCache';
   const CACHE_DURATION = 60 * 60 * 1000; // 1 hour in milliseconds
 
 
-  // Fetch ALL leads from Firestore (with pagination for performance)
-  const fetchLeads = useCallback(async (page = 1, size = pageSize) => {
+  // Fetch ALL leads from Firestore (no pagination)
+  const fetchLeads = useCallback(async () => {
     try {
       setLoading(true);
 
-      // Calculate offset for pagination
-      const offset = (page - 1) * size;
-      let companiesCollected = 0;
-      let companiesToFetch = size;
-      const allCompanies = [];
-
-      // Fetch batches in order until we have enough companies
+      // Fetch ALL batch documents from companyleads collection
       const q = query(
         collection(db, "companyleads"),
         orderBy("__name__", "desc") // Sort by document name (batch_39, batch_38, etc.)
@@ -375,48 +353,26 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
 
       const querySnapshot = await getDocs(q);
 
-      // First pass: count total companies and determine which batches to fetch
-      let totalCount = 0;
-      const batchesToFetch = [];
+      const allCompanies = [];
 
-      for (const batchDoc of querySnapshot.docs) {
-        const batchData = batchDoc.data();
-        const encodedCompanies = batchData.companies || [];
-        const batchCompanyCount = Array.isArray(encodedCompanies) ? encodedCompanies.length : Object.keys(encodedCompanies).length;
-        totalCount += batchCompanyCount;
-
-        // Determine if we need this batch for current page
-        if (totalCount > offset) {
-          batchesToFetch.push({
-            doc: batchDoc,
-            startIndex: Math.max(0, offset - (totalCount - batchCompanyCount)),
-            companiesNeeded: companiesToFetch
-          });
-          if (companiesToFetch <= 0) break;
-        }
-      }
-
-      setTotalCompanies(totalCount);
-      setHasMorePages(totalCount > offset + size);
-
-      // Second pass: fetch only the required batches and decode only needed companies
-      for (const batchInfo of batchesToFetch) {
-        const { doc: batchDoc, startIndex, companiesNeeded } = batchInfo;
+      querySnapshot.docs.forEach((batchDoc) => {
         const batchData = batchDoc.data();
         const encodedCompanies = batchData.companies || [];
 
+        // Decode Base64 companies and add batch info
         if (Array.isArray(encodedCompanies)) {
-          // Array structure - decode only the companies we need
-          const endIndex = Math.min(encodedCompanies.length, startIndex + companiesNeeded);
-          for (let i = startIndex; i < endIndex && companiesCollected < size; i++) {
+          // Array structure
+          encodedCompanies.forEach((encodedCompany, index) => {
             try {
-              const uriDecoded = atob(encodedCompanies[i]);
+              // Decode Unicode-safe Base64: atob() first, then decodeURIComponent()
+              const uriDecoded = atob(encodedCompany);
               const jsonString = decodeURIComponent(uriDecoded);
               const decodedCompany = JSON.parse(jsonString);
               allCompanies.push({
-                id: `${batchDoc.id}_${i}`,
+                id: `${batchDoc.id}_${index}`, // Unique ID combining batchId and index
                 batchId: batchDoc.id,
                 ...decodedCompany,
+                // Map the fields to match existing UI component expectations
                 companyName: decodedCompany.name || decodedCompany.companyName || '',
                 pocName: decodedCompany.contactPerson || decodedCompany.pocName || '',
                 pocDesignation: decodedCompany.designation || decodedCompany.pocDesignation || '',
@@ -425,9 +381,11 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
                 companyWebsite: decodedCompany.companyWebsite || decodedCompany.companyUrl || '',
                 linkedinUrl: decodedCompany.linkedinUrl || '',
                 pocLinkedin: decodedCompany.pocLinkedin || decodedCompany.linkedinUrl || '',
-                pocMail: decodedCompany.email || decodedCompany.pocMail ||
+                // Handle email field mapping (Excel might put email in companyUrl)
+                pocMail: decodedCompany.email || decodedCompany.pocMail || 
                         (decodedCompany.companyUrl && decodedCompany.companyUrl.includes('@') ? decodedCompany.companyUrl : ''),
                 pocLocation: decodedCompany.location || decodedCompany.pocLocation || '',
+                pocLandline: decodedCompany.landline || decodedCompany.pocLandline || '',
                 industry: decodedCompany.industry || decodedCompany.sector || '',
                 companySize: decodedCompany.companySize || decodedCompany.employeeCount || '',
                 source: decodedCompany.source || 'Excel Upload',
@@ -446,28 +404,24 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
                 updatedAt: decodedCompany.updatedAt || new Date().toISOString(),
                 contacts: decodedCompany.contacts || [],
               });
-              companiesCollected++;
-              companiesToFetch--;
             } catch (error) {
-              console.error(`❌ Error decoding company ${i} in batch ${batchDoc.id}:`, error);
+              console.error(`❌ Error decoding company ${index} in batch ${batchDoc.id}:`, error);
             }
-          }
+          });
         } else {
-          // Map structure - decode only the companies we need
-          const keys = Object.keys(encodedCompanies).sort((a, b) => parseInt(a) - parseInt(b));
-          const startKeyIndex = startIndex;
-          const endKeyIndex = Math.min(keys.length, startKeyIndex + companiesNeeded);
-
-          for (let i = startKeyIndex; i < endKeyIndex && companiesCollected < size; i++) {
-            const key = keys[i];
+          // Map structure (e.g., batch_9)
+          Object.entries(encodedCompanies).forEach(([key, encodedCompany]) => {
+            const index = parseInt(key);
             try {
-              const uriDecoded = atob(encodedCompanies[key]);
+              // Decode Unicode-safe Base64: atob() first, then decodeURIComponent()
+              const uriDecoded = atob(encodedCompany);
               const jsonString = decodeURIComponent(uriDecoded);
               const decodedCompany = JSON.parse(jsonString);
               allCompanies.push({
-                id: `${batchDoc.id}_${key}`,
+                id: `${batchDoc.id}_${index}`, // Unique ID combining batchId and index
                 batchId: batchDoc.id,
                 ...decodedCompany,
+                // Map the fields to match existing UI component expectations
                 companyName: decodedCompany.name || decodedCompany.companyName || '',
                 pocName: decodedCompany.contactPerson || decodedCompany.pocName || '',
                 pocDesignation: decodedCompany.designation || decodedCompany.pocDesignation || '',
@@ -476,9 +430,11 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
                 companyWebsite: decodedCompany.companyWebsite || decodedCompany.companyUrl || '',
                 linkedinUrl: decodedCompany.linkedinUrl || '',
                 pocLinkedin: decodedCompany.pocLinkedin || decodedCompany.linkedinUrl || '',
-                pocMail: decodedCompany.email || decodedCompany.pocMail ||
+                // Handle email field mapping (Excel might put email in companyUrl)
+                pocMail: decodedCompany.email || decodedCompany.pocMail || 
                         (decodedCompany.companyUrl && decodedCompany.companyUrl.includes('@') ? decodedCompany.companyUrl : ''),
                 pocLocation: decodedCompany.location || decodedCompany.pocLocation || '',
+                pocLandline: decodedCompany.landline || decodedCompany.pocLandline || '',
                 industry: decodedCompany.industry || decodedCompany.sector || '',
                 companySize: decodedCompany.companySize || decodedCompany.employeeCount || '',
                 source: decodedCompany.source || 'Excel Upload',
@@ -497,16 +453,15 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
                 updatedAt: decodedCompany.updatedAt || new Date().toISOString(),
                 contacts: decodedCompany.contacts || [],
               });
-              companiesCollected++;
-              companiesToFetch--;
             } catch (error) {
-              console.error(`❌ Error decoding company ${key} in batch ${batchDoc.id}:`, error);
+              console.error(`❌ Error decoding company ${index} in batch ${batchDoc.id}:`, error);
             }
-          }
+          });
         }
+      });
 
-        if (companiesCollected >= size) break;
-      }
+      // Set all leads before filtering
+      setAllLeads(allCompanies);
 
       // Filter leads by current user based on view mode and user filter
       let teamMemberIds = [];
@@ -602,6 +557,9 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
           assignedTo: doc.data().assignedTo || null,
         }));
         
+        // Set all leads before filtering
+        setAllLeads(leadsData);
+
         // Filter leads by current user for fallback collection too
         let teamMemberIds = [];
         if (!viewMyLeadsOnly && user) {
@@ -663,7 +621,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
     } finally {
       setLoading(false);
     }
-  }, [user, viewMyLeadsOnly, getTeamMemberIds, selectedUserFilter, pageSize]);
+  }, [user, viewMyLeadsOnly, getTeamMemberIds, selectedUserFilter]);
 
   // Backfill warmAt timestamps for existing warm leads
   const backfillWarmAtTimestamps = useCallback(async () => {
@@ -751,64 +709,74 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
   // Load data from cache or fetch from Firestore
   const loadData = useCallback(async () => {
     try {
-      // Skip cache for pagination to ensure fresh data for each page
-      const shouldSkipCache = totalCompanies > pageSize || currentPage > 1;
-      
-      if (!shouldSkipCache) {
-        const cached = localStorage.getItem(CACHE_KEY);
-        if (cached) {
-          const { data, timestamp, compressed } = JSON.parse(cached);
-          if (Date.now() - timestamp < CACHE_DURATION) {
-            // If cache is compressed, we need fresh data for full functionality
-            if (compressed) {
-              await fetchLeads(currentPage, pageSize);
-              return;
-            }
-
-            // Filter cached data by current user based on view mode and user filter
-            let teamMemberIds = [];
-            if (!viewMyLeadsOnly && user) {
-              teamMemberIds = getTeamMemberIds(user.uid);
-            }
-
-            let userLeads = user ? data.filter(lead => {
-              if (viewMyLeadsOnly) {
-                // My Leads: Only show leads assigned to current user
-                return lead.assignedTo === user.uid;
-              } else {
-                // My Team: Show leads assigned to team members OR unassigned leads (exclude current user's leads)
-                return !lead.assignedTo || teamMemberIds.includes(lead.assignedTo);
-              }
-            }) : data;
-
-            // Apply user filter
-            if (selectedUserFilter !== 'all') {
-              if (selectedUserFilter === 'unassigned') {
-                userLeads = userLeads.filter(lead => !lead.assignedTo);
-              } else {
-                userLeads = userLeads.filter(lead => lead.assignedTo === selectedUserFilter);
-              }
-            }
-
-            setLeads(userLeads);
-            setLoading(false);
+      const cached = localStorage.getItem(CACHE_KEY);
+      if (cached) {
+        const { data, timestamp, compressed } = JSON.parse(cached);
+        if (Date.now() - timestamp < CACHE_DURATION) {
+          // If cache is compressed, we need fresh data for full functionality
+          if (compressed) {
+            await fetchLeads();
             return;
           }
+          
+          // Filter cached data by current user based on view mode and user filter
+          let teamMemberIds = [];
+          if (!viewMyLeadsOnly && user) {
+            teamMemberIds = getTeamMemberIds(user.uid);
+          }
+          
+          let userLeads = user ? data.filter(lead => {
+            if (viewMyLeadsOnly) {
+              // My Leads: Only show leads assigned to current user
+              return lead.assignedTo === user.uid;
+            } else {
+              // My Team: Show leads assigned to team members OR unassigned leads (exclude current user's leads)
+              return !lead.assignedTo || teamMemberIds.includes(lead.assignedTo);
+            }
+          }) : data;
+
+          // Apply user filter
+          if (selectedUserFilter !== 'all') {
+            if (selectedUserFilter === 'unassigned') {
+              userLeads = userLeads.filter(lead => !lead.assignedTo);
+            } else {
+              userLeads = userLeads.filter(lead => lead.assignedTo === selectedUserFilter);
+            }
+          }
+
+          setLeads(userLeads);
+          setLoading(false);
+          return;
         }
       }
-      // Cache is stale, missing, or pagination is active - fetch from Firestore
-      await fetchLeads(currentPage, pageSize);
+      // Cache is stale, missing, or compressed - fetch from Firestore
+      await fetchLeads();
     } catch (error) {
       console.error("Error loading data:", error);
       // Fallback to fetch
-      await fetchLeads(currentPage, pageSize);
+      await fetchLeads();
     }
-  }, [fetchLeads, CACHE_DURATION, user, viewMyLeadsOnly, getTeamMemberIds, selectedUserFilter, currentPage, pageSize, totalCompanies]);
+  }, [fetchLeads, CACHE_DURATION, user, viewMyLeadsOnly, getTeamMemberIds, selectedUserFilter]);
 
   // Initial fetch on component mount
   useEffect(() => {
     loadData();
   }, [loadData]);
+  
+  // Effect to handle COLD status availability based on current view mode
+  useEffect(() => {
+    if (!viewMyLeadsOnly) {
+      // Remove cold from selected statuses when in "My Team" view
+      setExportStatuses(prev => prev.filter(status => status !== 'cold'));
+    }
+  }, [viewMyLeadsOnly]);
+
+  // Fetch today's follow-ups when allLeads is loaded
+  useEffect(() => {
+    if (allLeads.length > 0) {
+      fetchTodayFollowUps();
+    }
+  }, [allLeads, fetchTodayFollowUps]);
   
   const calculateCompletenessScore = useCallback((lead) => {
     let score = 0;
@@ -850,7 +818,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
   const filteredLeads = useMemo(() => {
     
     // Early return for empty search and "all" tab
-    if (!debouncedSearchTerm && activeTab === "all" && selectedUserFilter === 'all' && !companyFilter.trim() && !phoneFilter.trim()) {
+    if (!debouncedSearchTerm && activeTab === "all" && selectedUserFilter === 'all' && !companyFilter.trim() && !phoneFilter.trim() && !industryFilter.trim()) {
       // Sort by manual leads first, then by completeness score
       return [...leads].sort((a, b) => {
         // Manual leads always come first
@@ -902,15 +870,23 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         }
       }
 
+      // Filter by industry
+      if (industryFilter.trim()) {
+        const industry = (lead.industry || '').toLowerCase().trim();
+        if (industry !== industryFilter.trim().toLowerCase()) {
+          return false;
+        }
+      }
+
       // Filter by date
       if (dateFilterType && ((dateFilterType === 'single' && singleDate) || (dateFilterType === 'range' && startDate && endDate))) {
         const getDateField = (lead) => {
-          if (activeTab === "called") return lead.calledAt;
+          if (activeTab === "called" || activeTab === "dialed") return lead.calledAt;
           if (activeTab === "warm") return lead.warmAt;
           if (activeTab === "cold") return lead.coldAt;
           if (activeTab === "hot") return lead.hotAt;
           if (activeTab === "onboarded") return lead.onboardedAt;
-          if (activeTab === "deleted") return lead.deletedAt;
+          if (activeTab === "dead") return lead.deadAt;
           return lead.updatedAt;
         };
 
@@ -967,9 +943,24 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
       const scoreB = calculateCompletenessScore(b);
       return scoreB - scoreA; // Higher score first
     });
-  }, [leads, activeTab, debouncedSearchTerm, selectedUserFilter, companyFilter, phoneFilter, dateFilterType, singleDate, startDate, endDate, calculateCompletenessScore]);
+  }, [leads, activeTab, debouncedSearchTerm, selectedUserFilter, companyFilter, phoneFilter, industryFilter, dateFilterType, singleDate, startDate, endDate, calculateCompletenessScore]);
 
-  // Group leads by date for all tabs (hot, warm, cold, called, onboarded, deleted)
+  const formatDate = useCallback((dateString) => {
+    if (dateString === 'Unknown Date') return 'Unknown Date';
+    try {
+      return dateString
+        ? new Date(dateString).toLocaleDateString("en-US", {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+        : "-";
+    } catch {
+      return "-";
+    }
+  }, []);
   const groupedLeads = useMemo(() => {
     // Only group for specific tabs and when view mode is "date"
     if (viewMode !== "date" || !["hot", "warm", "cold", "called", "onboarded", "deleted"].includes(activeTab)) return null;
@@ -987,35 +978,53 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
     }
 
     // Use filteredLeads instead of all leads to respect applied filters
-    const leadsToGroup = filteredLeads.filter(lead => lead.status === activeTab);
+    const leadsToGroup = filteredLeads.filter(lead => activeTab === 'called' ? (lead.status === 'called' || lead.status === 'dialed') : lead.status === activeTab);
 
     // Group by date based on status
     const grouped = leadsToGroup.reduce((acc, lead) => {
       try {
+        // Check for upcoming follow-ups first
+        let upcomingFollowUpDate = null;
+        if (lead.followups && Array.isArray(lead.followups)) {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const upcomingFollowUps = lead.followups
+            .filter(f => f.date && new Date(f.date) >= today)
+            .sort((a, b) => new Date(a.date) - new Date(b.date));
+          if (upcomingFollowUps.length > 0) {
+            upcomingFollowUpDate = upcomingFollowUps[0].createdAt;
+          }
+        }
+
         let dateField;
         
-        // Determine which date field to use based on status
-        if (activeTab === "called") {
-          // For called leads, use calledAt (when they were marked as called)
-          dateField = lead.calledAt;
-        } else if (activeTab === "warm") {
-          // For warm leads, use warmAt (when they were marked as warm)
-          dateField = lead.warmAt;
-        } else if (activeTab === "cold") {
-          // For cold leads, use coldAt (when they were marked as cold)
-          dateField = lead.coldAt;
-        } else if (activeTab === "hot") {
-          // For hot leads, use hotAt (when they were marked as hot)
-          dateField = lead.hotAt;
-        } else if (activeTab === "onboarded") {
-          // For onboarded leads, use onboardedAt (when they were marked as onboarded)
-          dateField = lead.onboardedAt;
-        } else if (activeTab === "deleted") {
-          // For deleted leads, use deletedAt (when they were marked as deleted)
-          dateField = lead.deletedAt;
+        // If there's an upcoming follow-up, use that date for grouping
+        if (upcomingFollowUpDate) {
+          dateField = upcomingFollowUpDate;
         } else {
-          // For other statuses, use updatedAt (when they were last updated to this status)
-          dateField = lead.updatedAt;
+          // Determine which date field to use based on status
+          if (activeTab === "called" || activeTab === "dialed") {
+            // For called leads, use calledAt (when they were marked as called)
+            dateField = lead.calledAt;
+          } else if (activeTab === "warm") {
+            // For warm leads, use warmAt (when they were marked as warm)
+            dateField = lead.warmAt;
+          } else if (activeTab === "cold") {
+            // For cold leads, use coldAt (when they were marked as cold)
+            dateField = lead.coldAt;
+          } else if (activeTab === "hot") {
+            // For hot leads, use hotAt (when they were marked as hot)
+            dateField = lead.hotAt;
+          } else if (activeTab === "onboarded") {
+            // For onboarded leads, use onboardedAt (when they were marked as onboarded)
+            dateField = lead.onboardedAt;
+          } else if (activeTab === "deleted") {
+            // For deleted leads, use deletedAt (when they were marked as deleted)
+            dateField = lead.deletedAt;
+          } else {
+            // For other statuses, use updatedAt (when they were last updated to this status)
+            dateField = lead.updatedAt;
+          }
         }
         
         let date;
@@ -1068,18 +1077,32 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
     return sortedGrouped;
   }, [filteredLeads, activeTab, viewMyLeadsOnly, viewMode]);
 
-  // Group leads by status for tab counts (calculate based on what user can actually see)
+  // Group leads by status for tab counts (filtered by current view mode)
   const leadsByStatus = useMemo(() => {
-    const counts = { hot: 0, warm: 0, cold: 0, called: 0, onboarded: 0, deleted: 0 };
+    const counts = { hot: 0, warm: 0, cold: 0, called: 0, onboarded: 0, dead: 0 };
 
-    leads.forEach(lead => {
+    // Apply the same view mode filtering as fetchLeads
+    let teamMemberIds = [];
+    if (!viewMyLeadsOnly && user) {
+      teamMemberIds = getTeamMemberIds(user.uid, allUsers);
+    }
+
+    let userLeads = user ? leads.filter(lead => {
+      if (viewMyLeadsOnly) {
+        return lead.assignedTo === user.uid;
+      } else {
+        return !lead.assignedTo || lead.assignedTo === user.uid || teamMemberIds.includes(lead.assignedTo);
+      }
+    }) : leads;
+
+    userLeads.forEach(lead => {
       if (lead.status && counts[lead.status] !== undefined) {
         counts[lead.status]++;
       }
     });
 
     return counts;
-  }, [leads]);
+  }, [leads, viewMyLeadsOnly, user, allUsers, getTeamMemberIds]);
 
   const handleAddLead = (newLead) => {
     setLeads((prevLeads) => [
@@ -1161,8 +1184,8 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
               updatedCompany.hotAt = new Date().toISOString();
             } else if (newStatus === "onboarded") {
               updatedCompany.onboardedAt = new Date().toISOString();
-            } else if (newStatus === "deleted") {
-              updatedCompany.deletedAt = new Date().toISOString();
+            } else if (newStatus === "dead") {
+              updatedCompany.deadAt = new Date().toISOString();
             }
             // Unicode-safe encoding: encodeURIComponent + btoa
             const updatedJsonString = JSON.stringify(updatedCompany);
@@ -1204,8 +1227,8 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
               updatedCompany.hotAt = new Date().toISOString();
             } else if (newStatus === "onboarded") {
               updatedCompany.onboardedAt = new Date().toISOString();
-            } else if (newStatus === "deleted") {
-              updatedCompany.deletedAt = new Date().toISOString();
+            } else if (newStatus === "dead") {
+              updatedCompany.deadAt = new Date().toISOString();
             }
             // Unicode-safe encoding: encodeURIComponent + btoa
             const updatedJsonString = JSON.stringify(updatedCompany);
@@ -1217,10 +1240,41 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
 
         if (updated) {
           // Save back to Firestore
-          await setDoc(batchDocRef, {
-            ...batchData,
-            companies: encodedCompanies,
-          });
+          try {
+            await setDoc(batchDocRef, {
+              ...batchData,
+              companies: encodedCompanies,
+            });
+          } catch (error) {
+            if (error.message && error.message.includes('size exceeds')) {
+              // Split the batch due to size limit
+              const totalCompanies = encodedCompanies.length;
+              const mid = Math.floor(totalCompanies / 2);
+              const firstHalf = encodedCompanies.slice(0, mid);
+              const secondHalf = encodedCompanies.slice(mid);
+
+              // Create new batch
+              const newBatchId = `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+              const newBatchData = {
+                companies: firstHalf,
+                createdAt: new Date().toISOString(),
+              };
+              await setDoc(doc(db, "companyleads", newBatchId), newBatchData);
+
+              // Update old batch with second half
+              const updatedBatchData = {
+                ...batchData,
+                companies: secondHalf,
+              };
+              await setDoc(batchDocRef, updatedBatchData);
+
+              // Refresh data to update batchIds and local state
+              fetchLeads();
+              console.log('Batch split due to size limit');
+            } else {
+              throw error;
+            }
+          }
         }
       }
 
@@ -1239,12 +1293,12 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
       const coldAtData = newStatus === "cold" ? { coldAt: new Date().toISOString() } : {};
       const hotAtData = newStatus === "hot" ? { hotAt: new Date().toISOString() } : {};
       const onboardedAtData = newStatus === "onboarded" ? { onboardedAt: new Date().toISOString() } : {};
-      const deletedAtData = newStatus === "deleted" ? { deletedAt: new Date().toISOString() } : {};
+      const deadAtData = newStatus === "dead" ? { deadAt: new Date().toISOString() } : {};
 
       setLeads((prevLeads) =>
         prevLeads.map((l) =>
           l.id === leadId
-            ? { ...l, status: newStatus, updatedAt: new Date().toISOString(), ...localAssignmentData, ...calledAtData, ...warmAtData, ...coldAtData, ...hotAtData, ...onboardedAtData, ...deletedAtData, isTransitioning: false }
+            ? { ...l, status: newStatus, updatedAt: new Date().toISOString(), ...localAssignmentData, ...calledAtData, ...warmAtData, ...coldAtData, ...hotAtData, ...onboardedAtData, ...deadAtData, isTransitioning: false }
             : l
         )
       );
@@ -1466,10 +1520,41 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
       }
 
       // Save back to Firestore
-      await setDoc(batchDocRef, {
-        ...batchData,
-        companies: encodedCompanies,
-      });
+      try {
+        await setDoc(batchDocRef, {
+          ...batchData,
+          companies: encodedCompanies,
+        });
+      } catch (error) {
+        if (error.message && error.message.includes('size exceeds')) {
+          // Split the batch due to size limit
+          const totalCompanies = encodedCompanies.length;
+          const mid = Math.floor(totalCompanies / 2);
+          const firstHalf = encodedCompanies.slice(0, mid);
+          const secondHalf = encodedCompanies.slice(mid);
+
+          // Create new batch
+          const newBatchId = `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          const newBatchData = {
+            companies: firstHalf,
+            createdAt: new Date().toISOString(),
+          };
+          await setDoc(doc(db, "companyleads", newBatchId), newBatchData);
+
+          // Update old batch with second half
+          const updatedBatchData = {
+            ...batchData,
+            companies: secondHalf,
+          };
+          await setDoc(batchDocRef, updatedBatchData);
+
+          // Refresh data to update batchIds and local state
+          fetchLeads();
+          console.log('Batch split due to size limit');
+        } else {
+          throw error;
+        }
+      }
 
       // Map Firestore field names back to UI field names for local state update
       const uiFieldUpdates = {
@@ -1481,6 +1566,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         pocLocation: updatedData.location || updatedData.pocLocation,
         companyWebsite: updatedData.companyUrl || updatedData.companyWebsite,
         pocLinkedin: updatedData.linkedinUrl || updatedData.pocLinkedin,
+        pocLandline: updatedData.landline,
         industry: updatedData.industry,
         companySize: updatedData.companySize,
         status: updatedData.status,
@@ -1529,7 +1615,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
       if (!lead || !lead.batchId) return;
 
       // Confirm deletion - now it's actually marking as deleted
-      if (!window.confirm(`Are you sure you want to mark this lead as deleted? It will be moved to the Deleted tab.`)) {
+      if (!window.confirm(`Are you sure you want to mark this lead as dead? It will be moved to the Dead tab.`)) {
         return;
       }
 
@@ -1540,7 +1626,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         action: AUDIT_ACTIONS.DELETE_LEAD,
         companyId: leadId,
         companyName: lead.companyName || lead.name || "Unknown Company",
-        details: `Marked lead as deleted`,
+        details: `Marked lead as dead`,
         sessionId: sessionStorage.getItem('sessionId') || 'unknown'
       });
 
@@ -1586,8 +1672,8 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
 
             const updatedCompany = {
               ...decodedCompany,
-              status: "deleted",
-              deletedAt: new Date().toISOString(),
+              status: "dead",
+              deadAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
             };
             // Unicode-safe encoding: encodeURIComponent + btoa
@@ -1600,33 +1686,55 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
 
         if (updated) {
           // Save back to Firestore
-          await setDoc(batchDocRef, {
-            ...batchData,
-            companies: encodedCompanies,
-          });
+          try {
+            await setDoc(batchDocRef, {
+              ...batchData,
+              companies: encodedCompanies,
+            });
+          } catch (error) {
+            if (error.message && error.message.includes('size exceeds')) {
+              // Split the batch due to size limit
+              const totalCompanies = encodedCompanies.length;
+              const mid = Math.floor(totalCompanies / 2);
+              const firstHalf = encodedCompanies.slice(0, mid);
+              const secondHalf = encodedCompanies.slice(mid);
+
+              // Create new batch
+              const newBatchId = `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+              const newBatchData = {
+                companies: firstHalf,
+                createdAt: new Date().toISOString(),
+              };
+              await setDoc(doc(db, "companyleads", newBatchId), newBatchData);
+
+              // Update old batch with second half
+              const updatedBatchData = {
+                ...batchData,
+                companies: secondHalf,
+              };
+              await setDoc(batchDocRef, updatedBatchData);
+
+              // Refresh data to update batchIds and local state
+              fetchLeads();
+              console.log('Batch split due to size limit');
+            } else {
+              throw error;
+            }
+          }
         }
       }
 
-      // Update local state - change status to "deleted" instead of removing
+      // Update local state - change status to "dead" instead of removing
       setLeads((prevLeads) =>
         prevLeads.map((l) =>
           l.id === leadId
-            ? { ...l, status: "deleted", deletedAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
+            ? { ...l, status: "dead", deadAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
             : l
         )
       );
 
-      // Switch to "deleted" tab if user is admin
-      const isAdmin = user?.departments?.includes("admin") || 
-                     user?.departments?.includes("Admin") || 
-                     user?.department === "admin" || 
-                     user?.department === "Admin" ||
-                     user?.role === "admin" || 
-                     user?.role === "Admin";
-      
-      if (isAdmin) {
-        setActiveTab("deleted");
-      }
+      // Switch to "dead" tab
+      setActiveTab("dead");
     } catch (error) {
       handleFirestoreIndexError(error, "lead deletion");
       alert("Failed to mark the lead as deleted. Please try again.");
@@ -1710,10 +1818,41 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
 
         if (updated) {
           // Save back to Firestore
-          await setDoc(batchDocRef, {
-            ...batchData,
-            companies: encodedCompanies,
-          });
+          try {
+            await setDoc(batchDocRef, {
+              ...batchData,
+              companies: encodedCompanies,
+            });
+          } catch (error) {
+            if (error.message && error.message.includes('size exceeds')) {
+              // Split the batch due to size limit
+              const totalCompanies = encodedCompanies.length;
+              const mid = Math.floor(totalCompanies / 2);
+              const firstHalf = encodedCompanies.slice(0, mid);
+              const secondHalf = encodedCompanies.slice(mid);
+
+              // Create new batch
+              const newBatchId = `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+              const newBatchData = {
+                companies: firstHalf,
+                createdAt: new Date().toISOString(),
+              };
+              await setDoc(doc(db, "companyleads", newBatchId), newBatchData);
+
+              // Update old batch with second half
+              const updatedBatchData = {
+                ...batchData,
+                companies: secondHalf,
+              };
+              await setDoc(batchDocRef, updatedBatchData);
+
+              // Refresh data to update batchIds and local state
+              fetchLeads();
+              console.log('Batch split due to size limit');
+            } else {
+              throw error;
+            }
+          }
         }
       }
 
@@ -1750,25 +1889,8 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
       })
     );
     // Refresh data from Firestore to ensure consistency
-    await fetchLeads(currentPage, pageSize);
+    await fetchLeads();
   };
-
-  const formatDate = useCallback((dateString) => {
-    if (dateString === 'Unknown Date') return 'Unknown Date';
-    try {
-      return dateString
-        ? new Date(dateString).toLocaleDateString("en-US", {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-          })
-        : "-";
-    } catch {
-      return "-";
-    }
-  }, []);
 
   // Filter follow-ups based on view mode (My Leads vs My Team)
   const filteredFollowUps = useMemo(() => {
@@ -1780,6 +1902,235 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
     return todayFollowUps;
   }, [todayFollowUps, user]);
 
+  // Export leads report function
+  const exportLeadsReport = useCallback((viewMode = 'myteam', selectedStatuses = ['hot', 'warm', 'called', 'onboarded', 'dead']) => {
+    try {
+      // Filter leads based on view mode
+      let filteredLeads = leads;
+      if (viewMode === 'myleads') {
+        // My Leads: Only show leads assigned to current user
+        filteredLeads = leads.filter(lead => lead.assignedTo === user?.uid);
+      } else {
+        // My Team: Show leads assigned to team members OR unassigned leads
+        const teamMemberIds = user ? getTeamMemberIds(user.uid) : [];
+        filteredLeads = leads.filter(lead => !lead.assignedTo || teamMemberIds.includes(lead.assignedTo));
+      }
+
+      // Group leads by status
+      const leadsByStatus = {
+        hot: [],
+        warm: [],
+        cold: [],
+        called: [],
+        onboarded: [],
+        deleted: []
+      };
+
+      // Use filtered leads for the report
+      filteredLeads.forEach(lead => {
+        const status = lead.status || 'cold';
+        if (leadsByStatus[status] && selectedStatuses.includes(status)) {
+          leadsByStatus[status].push(lead);
+        }
+      });
+
+      // Create workbook
+      const wb = XLSX.utils.book_new();
+
+      // Status order for sheets
+      const statusOrder = ['hot', 'warm', 'cold', 'called', 'onboarded', 'deleted'];
+
+      statusOrder.forEach(status => {
+        const statusLeads = leadsByStatus[status];
+        if (statusLeads.length === 0) return;
+
+        // Prepare data for this status
+        const exportData = statusLeads.map(lead => {
+          // Format follow-ups as numbered list
+          let remarks = '';
+          if (lead.followups && lead.followups.length > 0) {
+            // Sort follow-ups by date ascending (oldest first)
+            const sortedFollowups = lead.followups.sort((a, b) => new Date(a.date) - new Date(b.date));
+            remarks = sortedFollowups.map((followup, index) => {
+              const date = new Date(followup.date).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+              });
+              return `${index + 1}. ${date} - ${followup.template || 'No template'}`;
+            }).join('\n');
+          } else {
+            remarks = lead.notes || 'No remarks';
+          }
+
+          // Get assigned user name
+          const assignedUserData = Object.values(allUsers).find(u => 
+            u.uid === lead.assignedTo || 
+            u.id === lead.assignedTo || 
+            u.email === lead.assignedTo
+          );
+          const assignedUser = lead.assignedTo ? 
+            (assignedUserData?.displayName || 
+             assignedUserData?.name || 
+             assignedUserData?.email || 
+             `${assignedUserData?.firstName || ''} ${assignedUserData?.lastName || ''}`.trim() || 
+             'Unknown') : 
+            'Unassigned';
+
+          return {
+            'Company Name': lead.companyName || lead.name || '',
+            'Contact Person': lead.pocName || lead.contactPerson || '',
+            'Designation': lead.pocDesignation || lead.designation || '',
+            'Contact Details': lead.pocPhone || lead.phone || '',
+            'Email ID': lead.pocMail || lead.email || '',
+            'CTC': lead.ctc || '',
+            'Remarks': remarks,
+            'ASSGN': assignedUser
+          };
+        });
+
+        // Create worksheet
+        const ws = XLSX.utils.json_to_sheet(exportData);
+
+        // Set column widths
+        const colWidths = [
+          { wch: 25 }, // Company Name
+          { wch: 20 }, // Contact Person
+          { wch: 20 }, // Designation
+          { wch: 15 }, // Contact Details
+          { wch: 25 }, // Email ID
+          { wch: 15 }, // CTC
+          { wch: 40 }, // Remarks
+          { wch: 15 }  // ASSGN
+        ];
+        ws['!cols'] = colWidths;
+
+        // Get range and apply styling
+        const range = XLSX.utils.decode_range(ws['!ref']);
+        const totalRows = range.e.r + 1;
+        const totalCols = range.e.c + 1;
+
+        // Freeze header row
+        ws['!freeze'] = { xSplit: 0, ySplit: 1 };
+
+        // Apply styling
+        for (let R = 0; R <= totalRows; ++R) {
+          for (let C = 0; C < totalCols; ++C) {
+            const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+            if (!ws[cellAddress]) continue;
+
+            // Header row styling
+            if (R === 0) {
+              ws[cellAddress].s = {
+                font: { 
+                  bold: true, 
+                  sz: 12, 
+                  color: { rgb: "FFFFFF" },
+                  name: "Calibri"
+                },
+                alignment: { 
+                  horizontal: "center", 
+                  vertical: "center",
+                  wrapText: true
+                },
+                fill: { 
+                  fgColor: { rgb: "1E40AF" },
+                  patternType: "solid"
+                },
+                border: {
+                  top: { style: "medium", color: { rgb: "1E40AF" } },
+                  bottom: { style: "medium", color: { rgb: "1E40AF" } },
+                  left: { style: "thin", color: { rgb: "1E40AF" } },
+                  right: { style: "thin", color: { rgb: "1E40AF" } }
+                }
+              };
+            } else {
+              // Data rows styling
+              const isEvenRow = (R - 1) % 2 === 0;
+              
+              ws[cellAddress].s = {
+                font: { 
+                  sz: 11, 
+                  color: { rgb: "374151" },
+                  name: "Calibri"
+                },
+                alignment: { 
+                  vertical: "center",
+                  wrapText: C === 6 // Remarks column
+                },
+                border: {
+                  top: { style: "thin", color: { rgb: "E5E7EB" } },
+                  bottom: { style: "thin", color: { rgb: "E5E7EB" } },
+                  left: { style: "thin", color: { rgb: "E5E7EB" } },
+                  right: { style: "thin", color: { rgb: "E5E7EB" } }
+                }
+              };
+
+              // Alternating row colors
+              if (isEvenRow) {
+                ws[cellAddress].s.fill = { 
+                  fgColor: { rgb: "F9FAFB" },
+                  patternType: "solid"
+                };
+              } else {
+                ws[cellAddress].s.fill = { 
+                  fgColor: { rgb: "FFFFFF" },
+                  patternType: "solid"
+                };
+              }
+
+              // Column-specific alignment
+              if (C === 0 || C === 1 || C === 2 || C === 6) { // Text columns - left align
+                ws[cellAddress].s.alignment = { 
+                  horizontal: "left", 
+                  vertical: "center",
+                  wrapText: C === 6
+                };
+              } else if (C === 3) { // Contact Details - left align
+                ws[cellAddress].s.alignment = { 
+                  horizontal: "left", 
+                  vertical: "center" 
+                };
+              } else { // Other columns - center align
+                ws[cellAddress].s.alignment = { 
+                  horizontal: "center", 
+                  vertical: "center" 
+                };
+              }
+            }
+          }
+        }
+
+        // Add worksheet to workbook with status name
+        const sheetName = status.charAt(0).toUpperCase() + status.slice(1) + ` (${statusLeads.length})`;
+        XLSX.utils.book_append_sheet(wb, ws, sheetName);
+      });
+
+      // Generate and download file
+      const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      const data = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const filename = `placement_leads_report_${new Date().toISOString().split('T')[0]}.xlsx`;
+      saveAs(data, filename);
+
+      showToast('Leads report exported successfully!', 'success');
+
+      // Log export activity
+      logPlacementActivity({
+        userId: user?.uid,
+        userName: user?.displayName || user?.name || "Unknown User",
+        action: AUDIT_ACTIONS.VIEW_LEAD,
+        companyId: null,
+        companyName: null,
+        details: `Exported leads report with ${filteredLeads.length} leads in view mode "${viewMode}" and statuses: ${selectedStatuses.join(', ')}`,
+        sessionId: sessionStorage.getItem('sessionId') || 'unknown'
+      });
+
+    } catch (error) {
+      console.error('Error exporting leads report:', error);
+      showToast('Failed to export leads report', 'error');
+    }
+  }, [leads, allUsers, user, showToast, getTeamMemberIds]);
+
   if (loading) {
     return (
       <div className="bg-white rounded-lg shadow p-4 flex items-center justify-center min-h-screen">
@@ -1790,296 +2141,335 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
 
   return (
     <div className="bg-white rounded-lg shadow p-4">
-      {/* Header with View Toggle on Left, Search in Center, Actions on Right */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between mb-2 gap-2">
-        {/* View Mode Toggle and Filters on Left */}
-        <div className="flex items-center gap-4 shrink-0 h-8">
-          <ViewModeToggle
-            viewMyLeadsOnly={viewMyLeadsOnly}
-            setViewMyLeadsOnly={(value) => {
-              // Log view mode change
+      {/* Header controls - only show when leads table is visible */}
+      {!showFollowUpsDashboard && (
+        <>
+          {/* Header with View Toggle on Left, Search in Center, Actions on Right */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between mb-2 gap-2">
+            {/* View Mode Toggle and Filters on Left */}
+            <div className="flex items-center gap-4 shrink-0 h-8">
+              <ViewModeToggle
+                viewMyLeadsOnly={viewMyLeadsOnly}
+                setViewMyLeadsOnly={(value) => {
+                  // Log view mode change
+                  logPlacementActivity({
+                    userId: user?.uid,
+                    userName: user?.displayName || user?.name || "Unknown User",
+                    action: AUDIT_ACTIONS.FILTER_APPLIED,
+                    companyId: null,
+                    companyName: null,
+                    details: `Changed view mode to: ${value ? 'My Leads Only' : 'All Leads'}`,
+                    changes: { viewMyLeadsOnly: value },
+                    sessionId: sessionStorage.getItem('sessionId') || 'unknown'
+                  });
+                  setViewMyLeadsOnly(value);
+                  // Update URL
+                  const url = new URL(window.location);
+                  url.searchParams.set('view', value ? 'myleads' : 'myteam');
+                  window.history.replaceState(null, '', url);
+                }}
+              />
+              <ViewToggle
+                viewMode={viewMode}
+                setViewMode={setViewMode}
+              />
+              <LeadFilters
+                filters={{ selectedUserFilter, companyFilter, phoneFilter, industryFilter, dateFilterType, singleDate, startDate, endDate }}
+                setFilters={(newFilters) => {
+                  // Log filter application
+                  logPlacementActivity({
+                    userId: user?.uid,
+                    userName: user?.displayName || user?.name || "Unknown User",
+                    action: AUDIT_ACTIONS.FILTER_APPLIED,
+                    companyId: null,
+                    companyName: null,
+                    details: `Applied filters: User=${newFilters.selectedUserFilter || 'all'}, Company="${newFilters.companyFilter || ''}", Phone="${newFilters.phoneFilter || ''}", Industry="${newFilters.industryFilter || ''}", Date Type="${newFilters.dateFilterType || 'single'}", Single Date="${newFilters.singleDate || ''}", Start Date="${newFilters.startDate || ''}", End Date="${newFilters.endDate || ''}"`,
+                    changes: newFilters,
+                    sessionId: sessionStorage.getItem('sessionId') || 'unknown'
+                  });
+
+                  setSelectedUserFilter(newFilters.selectedUserFilter || 'all');
+                  setCompanyFilter(newFilters.companyFilter || '');
+                  setPhoneFilter(newFilters.phoneFilter || '');
+                  setIndustryFilter(newFilters.industryFilter || '');
+                  setDateFilterType(newFilters.dateFilterType || 'single');
+                  setSingleDate(newFilters.singleDate || '');
+                  setStartDate(newFilters.startDate || '');
+                  setEndDate(newFilters.endDate || '');
+                }}
+                isFilterOpen={isFilterOpen}
+                setIsFilterOpen={setIsFilterOpen}
+                allUsers={allUsers}
+                leads={leads}
+                activeTab={activeTab}
+                viewMyLeadsOnly={viewMyLeadsOnly}
+                currentUser={user}
+                getTeamMemberIds={getTeamMemberIds}
+              />
+            </div>
+
+            {/* Search in Center */}
+            <div className="flex-1 flex justify-center max-w-md h-8">
+              <input
+                type="text"
+                placeholder="Search companies or contacts..."
+                className="w-full px-3 py-1 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs h-full"
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                }}
+              />
+            </div>
+
+            {/* Microsoft 365 Connection Status */}
+            <div className="flex items-center gap-2 shrink-0 h-8">
+              <div className="flex items-center gap-2 px-2 py-1 bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-gray-200/50">
+                {ms365TestingConnection ? (
+                  <div className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <div
+                    className={`w-3 h-3 rounded-full ${
+                      ms365ConnectionStatus === 'connected'
+                        ? 'bg-green-500 shadow-green-500/30 shadow-lg'
+                        : ms365ConnectionStatus === 'weak'
+                        ? 'bg-yellow-500 shadow-yellow-500/30 shadow-lg'
+                        : 'bg-red-500 shadow-red-500/30 shadow-lg'
+                    }`}
+                  ></div>
+                )}
+                <img 
+                  src="https://cdn-icons-png.flaticon.com/512/732/732221.png" 
+                  alt="Microsoft Logo" 
+                  title="Microsoft 365"
+                  className="w-3 h-3 rounded-sm object-cover" 
+                />
+                {ms365ConnectionStatus !== 'connected' && !ms365TestingConnection && (
+                  <button
+                    onClick={connectToMs365}
+                    className="ml-1 px-3 py-1 bg-blue-600 text-white text-xs font-semibold rounded-xl hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-md transition-all duration-200"
+                  >
+                    Connect
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Action Buttons on Right */}
+            <div className="flex gap-1 shrink-0 h-8">
+              <button
+                onClick={() => {
+                  const newState = !showFollowUpsDashboard;
+                  setShowFollowUpsDashboard(newState);
+                  const url = new URL(window.location);
+                  if (newState) {
+                    url.searchParams.set('show', 'followupdashboard');
+                  } else {
+                    url.searchParams.delete('show');
+                  }
+                  window.history.replaceState(null, '', url);
+                }}
+                className="px-3 py-1 bg-blue-500 text-white rounded-lg font-semibold flex items-center justify-center hover:bg-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-md transition-all duration-200 text-xs h-full"
+              >
+                Followups
+              </button>
+              <button
+                onClick={() => setShowAddLeadForm(true)}
+                className="px-3 py-1 bg-linear-to-r from-blue-600 to-blue-700 text-white rounded-lg font-semibold flex items-center justify-center hover:from-blue-700 hover:to-blue-800 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-md transition-all duration-200 text-xs h-full"
+              >
+                <PlusIcon className="h-3 w-3 mr-1" />
+                Add Company
+              </button>
+              {user && (user?.departments?.includes("admin") || 
+                         user?.departments?.includes("Admin") || 
+                         user?.department === "admin" || 
+                         user?.department === "Admin" ||
+                         user?.role === "admin" || 
+                         user?.role === "Admin") && (
+                <button
+                  onClick={() => setShowBulkUploadForm(true)}
+                  className="px-3 py-1 bg-blue-600 text-white rounded-lg font-semibold flex items-center justify-center hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-md text-xs h-full"
+                >
+                  <CloudUploadIcon className="h-3 w-3 mr-1" />
+                  
+                </button>
+              )}
+              {user && (user?.departments?.includes("admin") || 
+                         user?.departments?.includes("Admin") || 
+                         user?.department === "admin" || 
+                         user?.department === "Admin" ||
+                         user?.role === "admin" || 
+                         user?.role === "Admin") && (
+                <button
+                  onClick={() => setShowExcelScanner(true)}
+                  className="px-3 py-1 bg-red-600 text-white rounded-lg font-semibold flex items-center justify-center hover:bg-red-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 shadow-md text-xs h-full"
+                >
+                  <svg className="h-3 w-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                  
+                </button>
+              )}
+              {user && (user?.role === "Director" || user?.role === "Head") && !viewMyLeadsOnly && (
+                <button
+                  onClick={() => setShowBulkAssignModal(true)}
+                  className="px-3 py-1 bg-blue-600 text-white rounded-lg font-semibold flex items-center justify-center hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-md text-xs h-full"
+                >
+                  Bulk Assign
+                </button>
+              )}
+              {/* {user && (user?.departments?.includes("admin") || 
+                         user?.departments?.includes("Admin") || 
+                         user?.department === "admin" || 
+                         user?.department === "Admin" ||
+                         user?.role === "admin" || 
+                         user?.role === "Admin") && (
+                <button
+                  onClick={() => setShowBatchSplitModal(true)}
+                  className="px-3 py-1 bg-red-600 text-white rounded-lg font-semibold flex items-center justify-center hover:bg-red-700 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 shadow-md text-xs h-full"
+                >
+                  Split Batches
+                </button>
+              )} */}
+            </div>
+          </div>
+
+          {/* Status tabs - only show when leads table is visible */}
+          <LeadStatusTabs
+            activeTab={activeTab}
+            onTabChange={(tab) => {
+              // Log tab change activity
               logPlacementActivity({
                 userId: user?.uid,
                 userName: user?.displayName || user?.name || "Unknown User",
                 action: AUDIT_ACTIONS.FILTER_APPLIED,
                 companyId: null,
                 companyName: null,
-                details: `Changed view mode to: ${value ? 'My Leads Only' : 'All Leads'}`,
-                changes: { viewMyLeadsOnly: value },
+                details: `Changed tab filter to: ${tab}`,
+                changes: { tabFilter: tab },
                 sessionId: sessionStorage.getItem('sessionId') || 'unknown'
               });
-              setViewMyLeadsOnly(value);
+              setActiveTab(tab);
               // Update URL
               const url = new URL(window.location);
-              url.searchParams.set('view', value ? 'myleads' : 'myteam');
+              url.searchParams.set('tab', tab);
               window.history.replaceState(null, '', url);
             }}
+            setActiveTab={setActiveTab}
+            leadsByStatus={leadsByStatus}
           />
-          <ViewToggle
-            viewMode={viewMode}
-            setViewMode={setViewMode}
-          />
-          <LeadFilters
-            filters={{ selectedUserFilter, companyFilter, phoneFilter, dateFilterType, singleDate, startDate, endDate }}
-            setFilters={(newFilters) => {
-              // Log filter application
-              logPlacementActivity({
-                userId: user?.uid,
-                userName: user?.displayName || user?.name || "Unknown User",
-                action: AUDIT_ACTIONS.FILTER_APPLIED,
-                companyId: null,
-                companyName: null,
-                details: `Applied filters: User=${newFilters.selectedUserFilter || 'all'}, Company="${newFilters.companyFilter || ''}", Phone="${newFilters.phoneFilter || ''}", Date Type="${newFilters.dateFilterType || 'single'}", Single Date="${newFilters.singleDate || ''}", Start Date="${newFilters.startDate || ''}", End Date="${newFilters.endDate || ''}"`,
-                changes: newFilters,
-                sessionId: sessionStorage.getItem('sessionId') || 'unknown'
-              });
+        </>
+      )}
 
-              setSelectedUserFilter(newFilters.selectedUserFilter || 'all');
-              setCompanyFilter(newFilters.companyFilter || '');
-              setPhoneFilter(newFilters.phoneFilter || '');
-              setDateFilterType(newFilters.dateFilterType || 'single');
-              setSingleDate(newFilters.singleDate || '');
-              setStartDate(newFilters.startDate || '');
-              setEndDate(newFilters.endDate || '');
-            }}
-            isFilterOpen={isFilterOpen}
-            setIsFilterOpen={setIsFilterOpen}
-            allUsers={allUsers}
-            leads={leads}
-            activeTab={activeTab}
-            viewMyLeadsOnly={viewMyLeadsOnly}
-            currentUser={user}
-            getTeamMemberIds={getTeamMemberIds}
-          />
-        </div>
 
-        {/* Search in Center */}
-        <div className="flex-1 flex justify-center max-w-md h-8">
-          <input
-            type="text"
-            placeholder="Search companies or contacts..."
-            className="w-full px-3 py-1 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs h-full"
-            value={searchTerm}
-            onChange={(e) => {
-              setSearchTerm(e.target.value);
-            }}
-          />
-        </div>
 
-        {/* Microsoft 365 Connection Status */}
-        <div className="flex items-center gap-2 shrink-0 h-8">
-          <div className="flex items-center gap-2 px-2 py-1 bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-gray-200/50">
-            {ms365TestingConnection ? (
-              <div className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
-            ) : (
-              <div
-                className={`w-3 h-3 rounded-full ${
-                  ms365ConnectionStatus === 'connected'
-                    ? 'bg-green-500 shadow-green-500/30 shadow-lg'
-                    : ms365ConnectionStatus === 'weak'
-                    ? 'bg-yellow-500 shadow-yellow-500/30 shadow-lg'
-                    : 'bg-red-500 shadow-red-500/30 shadow-lg'
-                }`}
-              ></div>
-            )}
-            <img 
-              src="https://cdn-icons-png.flaticon.com/512/732/732221.png" 
-              alt="Microsoft Logo" 
-              title="Microsoft 365"
-              className="w-3 h-3 rounded-sm object-cover" 
-            />
-            {ms365ConnectionStatus !== 'connected' && !ms365TestingConnection && (
-              <button
-                onClick={connectToMs365}
-                className="ml-1 px-3 py-1 bg-blue-600 text-white text-xs font-semibold rounded-xl hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-md transition-all duration-200"
-              >
-                Connect
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Action Buttons on Right */}
-        <div className="flex gap-1 shrink-0 h-8">
-          <button
-            onClick={() => setShowAddLeadForm(true)}
-            className="px-3 py-1 bg-linear-to-r from-blue-600 to-indigo-700 text-white rounded-lg font-semibold flex items-center justify-center hover:from-blue-700 hover:to-indigo-800 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-md transition-all duration-200 text-xs h-full"
-          >
-            <PlusIcon className="h-3 w-3 mr-1" />
-            Add Company
-          </button>
-          {user && (user?.departments?.includes("admin") || 
-                     user?.departments?.includes("Admin") || 
-                     user?.department === "admin" || 
-                     user?.department === "Admin" ||
-                     user?.role === "admin" || 
-                     user?.role === "Admin") && (
-            <button
-              onClick={() => setShowBulkUploadForm(true)}
-              className="px-3 py-1 bg-green-600 text-white rounded-lg font-semibold flex items-center justify-center hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 shadow-md text-xs h-full"
-            >
-              <CloudUploadIcon className="h-3 w-3 mr-1" />
-              Bulk Upload
-            </button>
-          )}
-          {user && (user?.role === "Director" || user?.role === "Head") && !viewMyLeadsOnly && (
-            <button
-              onClick={() => setShowBulkAssignModal(true)}
-              className="px-3 py-1 bg-purple-600 text-white rounded-lg font-semibold flex items-center justify-center hover:bg-purple-700 focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 shadow-md text-xs h-full"
-            >
-              Bulk Assign
-            </button>
-          )}
-        </div>
-      </div>      <LeadsFilters
-        activeTab={activeTab}
-        onTabChange={(tab) => {
-          // Log tab change activity
-          logPlacementActivity({
-            userId: user?.uid,
-            userName: user?.displayName || user?.name || "Unknown User",
-            action: AUDIT_ACTIONS.FILTER_APPLIED,
-            companyId: null,
-            companyName: null,
-            details: `Changed tab filter to: ${tab}`,
-            changes: { tabFilter: tab },
-            sessionId: sessionStorage.getItem('sessionId') || 'unknown'
-          });
-          setActiveTab(tab);
-          // Update URL
-          const url = new URL(window.location);
-          url.searchParams.set('tab', tab);
-          window.history.replaceState(null, '', url);
-        }}
-        setActiveTab={setActiveTab}
-        leadsByStatus={leadsByStatus}
-        user={user}
-      />
-
-      <LeadsTable
-        leads={filteredLeads}
-        groupedLeads={groupedLeads}
-        activeTab={activeTab}
-        onLeadClick={(lead) => {
-          // Log the view activity
-          logPlacementActivity({
-            userId: user?.uid,
-            userName: user?.displayName || user?.name || "Unknown User",
-            action: AUDIT_ACTIONS.VIEW_LEAD,
-            companyId: lead.id,
-            companyName: lead.companyName || lead.name || "Unknown Company",
-            details: `Viewed lead details for ${lead.companyName || lead.name || "Unknown Company"}`,
-            sessionId: sessionStorage.getItem('sessionId') || 'unknown'
-          });
-
-          setSelectedLead(lead);
-          setShowLeadDetails(true);
-        }}
-        onStatusChange={handleStatusChange}
-        onScheduleMeeting={handleScheduleMeeting}
-        onDeleteLead={handleDeleteLead}
-        onAssignLead={handleAssignLead}
-        currentUserId={user?.uid}
-        currentUser={user}
-        allUsers={allUsers}
-        formatDate={formatDate}
-        order={true}
-      />
-
-      {/* Company Count Display */}
-      <div className="flex justify-between items-center mt-4 px-4 py-3 bg-gray-50 rounded-lg">
-        <div className="text-sm text-gray-700">
-          Total: {filteredLeads.length} companies loaded
-          {selectedUserFilter !== 'all' && (
-            <span className="ml-2 text-blue-600">
-              (filtered by {selectedUserFilter === 'unassigned' ? 'unassigned leads' : 
-                Object.values(allUsers).find(u => (u.uid || u.id) === selectedUserFilter)?.name || 'user'})
-            </span>
-          )}
-          {companyFilter.trim() && (
-            <span className="ml-2 text-green-600">
-              (company: "{companyFilter.trim()}")
-            </span>
-          )}
-          {phoneFilter.trim() && (
-            <span className="ml-2 text-purple-600">
-              (phone: "{phoneFilter.trim()}")
-            </span>
-          )}
-        </div>
-        <button
-          onClick={async () => {
-            // Log refresh action
+      {/* Conditionally render LeadsTable or FollowupDashboard */}
+      {showFollowUpsDashboard ? (
+        <FollowupDashboard
+          allLeads={allLeads}
+          allUsers={allUsers}
+          user={user}
+          showDashboard={showFollowUpsDashboard}
+          onClose={() => {
+            setShowFollowUpsDashboard(false);
+            const url = new URL(window.location);
+            url.searchParams.delete('show');
+            window.history.replaceState(null, '', url);
+          }}
+          onRefresh={async () => {
+            setLoading(true);
+            await fetchLeads();
+            await fetchTodayFollowUps();
+            setLoading(false);
+          }}
+          onScheduleMeeting={handleScheduleMeeting}
+          onStatusChange={handleStatusChange}
+        />
+      ) : (
+        <LeadsTable
+          leads={filteredLeads}
+          groupedLeads={groupedLeads}
+          activeTab={activeTab}
+          onLeadClick={(lead) => {
+            // Log the view activity
             logPlacementActivity({
               userId: user?.uid,
               userName: user?.displayName || user?.name || "Unknown User",
               action: AUDIT_ACTIONS.VIEW_LEAD,
-              companyId: null,
-              companyName: null,
-              details: `Refreshed leads data`,
+              companyId: lead.id,
+              companyName: lead.companyName || lead.name || "Unknown Company",
+              details: `Viewed lead details for ${lead.companyName || lead.name || "Unknown Company"}`,
               sessionId: sessionStorage.getItem('sessionId') || 'unknown'
             });
 
-            setLoading(true);
-            await fetchLeads(currentPage, pageSize);
+            setSelectedLead(lead);
+            setShowLeadDetails(true);
           }}
-          className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
-          title="Refresh data from server"
-        >
-          Refresh
-        </button>
-      </div>
+          onStatusChange={handleStatusChange}
+          onScheduleMeeting={handleScheduleMeeting}
+          onDeleteLead={handleDeleteLead}
+          onAssignLead={handleAssignLead}
+          currentUserId={user?.uid}
+          currentUser={user}
+          allUsers={allUsers}
+          formatDate={formatDate}
+          order={true}
+          showCheckboxes={false}
+          selectedLeads={[]}
+          onSelectionChange={() => {}}
+        />
+      )}
 
-      {/* Pagination Controls */}
-      {totalCompanies > pageSize && (
-        <div className="flex flex-col sm:flex-row justify-between items-center mt-4 px-4 py-3 bg-gray-50 rounded-lg gap-4">
-          {/* Page Size Selector */}
-          <div className="flex items-center gap-2">
-            <label htmlFor="pageSize" className="text-sm text-gray-700">Show:</label>
-            <select
-              id="pageSize"
-              value={pageSize}
-              onChange={(e) => {
-                const newSize = parseInt(e.target.value);
-                setPageSize(newSize);
-                setCurrentPage(1); // Reset to first page when changing page size
+      {/* Company Count Display - only show when leads table is visible */}
+      {!showFollowUpsDashboard && (
+        <div className="flex justify-between items-center mt-4 px-4 py-3 bg-gray-50 rounded-lg">
+          <div className="text-sm text-gray-700">
+            Total: {filteredLeads.length} companies loaded
+            {selectedUserFilter !== 'all' && (
+              <span className="ml-2 text-blue-600">
+                (filtered by {selectedUserFilter === 'unassigned' ? 'unassigned leads' : 
+                  Object.values(allUsers).find(u => (u.uid || u.id) === selectedUserFilter)?.name || 'user'})
+              </span>
+            )}
+            {companyFilter.trim() && (
+              <span className="ml-2 text-green-600">
+                (company: "{companyFilter.trim()}")
+              </span>
+            )}
+            {phoneFilter.trim() && (
+              <span className="ml-2 text-blue-600">
+                (phone: "{phoneFilter.trim()}")
+              </span>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowExportModal(true)}
+              className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
+              title="Export leads report with follow-ups"
+            >
+              Export Report
+            </button>
+            <button
+              onClick={async () => {
+                // Log refresh action
+                logPlacementActivity({
+                  userId: user?.uid,
+                  userName: user?.displayName || user?.name || "Unknown User",
+                  action: AUDIT_ACTIONS.VIEW_LEAD,
+                  companyId: null,
+                  companyName: null,
+                  details: `Refreshed leads data`,
+                  sessionId: sessionStorage.getItem('sessionId') || 'unknown'
+                });
+
+                setLoading(true);
+                await fetchLeads();
               }}
-              className="px-2 py-1 border rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
+              title="Refresh data from server"
             >
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-              <option value={200}>200</option>
-              <option value={500}>500</option>
-            </select>
-            <span className="text-sm text-gray-600">per page</span>
-          </div>
-
-          {/* Page Navigation */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-              disabled={currentPage === 1}
-              className="px-3 py-1 bg-white border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              Previous
+              Refresh
             </button>
-
-            <span className="text-sm text-gray-700">
-              Page {currentPage} of {Math.ceil(totalCompanies / pageSize)}
-            </span>
-
-            <button
-              onClick={() => setCurrentPage(prev => prev + 1)}
-              disabled={!hasMorePages}
-              className="px-3 py-1 bg-white border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              Next
-            </button>
-          </div>
-
-          {/* Total Count */}
-          <div className="text-sm text-gray-600">
-            Total: {totalCompanies} companies
           </div>
         </div>
       )}
@@ -2158,10 +2548,41 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
               }
 
               // Save back to Firestore
-              await setDoc(batchDocRef, {
-                ...batchData,
-                companies: encodedCompanies,
-              });
+              try {
+                await setDoc(batchDocRef, {
+                  ...batchData,
+                  companies: encodedCompanies,
+                });
+              } catch (error) {
+                if (error.message && error.message.includes('size exceeds')) {
+                  // Split the batch due to size limit
+                  const totalCompanies = encodedCompanies.length;
+                  const mid = Math.floor(totalCompanies / 2);
+                  const firstHalf = encodedCompanies.slice(0, mid);
+                  const secondHalf = encodedCompanies.slice(mid);
+
+                  // Create new batch
+                  const newBatchId = `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                  const newBatchData = {
+                    companies: firstHalf,
+                    createdAt: new Date().toISOString(),
+                  };
+                  await setDoc(doc(db, "companyleads", newBatchId), newBatchData);
+
+                  // Update old batch with second half
+                  const updatedBatchData = {
+                    ...batchData,
+                    companies: secondHalf,
+                  };
+                  await setDoc(batchDocRef, updatedBatchData);
+
+                  // Refresh data to update batchIds and local state
+                  fetchLeads();
+                  console.log('Batch split due to size limit');
+                } else {
+                  throw error;
+                }
+              }
 
               // Update local state
               setLeads(
@@ -2196,6 +2617,28 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         allUsers={allUsers}
         currentUser={user}
       />
+
+      {/* Excel Scanner Modal */}
+      {showExcelScanner && (
+        <div className="fixed inset-0 z-54 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-4xl rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh]">
+            <div className="bg-linear-to-r from-green-600 to-green-700 px-6 py-4 flex justify-between items-center shrink-0">
+              <h2 className="text-xl font-semibold text-white">Excel Upload Scanner</h2>
+              <button
+                onClick={() => setShowExcelScanner(false)}
+                className="text-white hover:text-gray-200 focus:outline-none"
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6">
+              <ExcelUploadDelete />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Bulk Assign Modal */}
       <BulkAssignModal
@@ -2236,7 +2679,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
           onFollowUpScheduled={() => {
             // Refresh today's follow-ups and main leads data when a new follow-up is scheduled
             fetchTodayFollowUps();
-            fetchLeads(currentPage, pageSize);
+            fetchLeads();
           }}
         />
       )}
@@ -2264,9 +2707,129 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         </div>
       )}
 
-    </div>
+      {/* Export Modal */}
+      {showExportModal && (
+        <div className="fixed inset-0  bg-opacity-25 backdrop-blur-sm flex items-center justify-center z-54">
+          <div className="bg-white rounded-2xl shadow-lg p-4 max-w-xs w-full mx-4">
+            {/* Header */}
+            <div className="text-center mb-3">
+              <div className="w-6 h-6 bg-gray-100 rounded-lg mx-auto mb-1.5 flex items-center justify-center">
+                <svg className="w-3.5 h-3.5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <h3 className="text-sm font-semibold text-gray-900 mb-0.5">Export Leads Report</h3>
+              <p className="text-xs text-gray-500">Generate Excel report with follow-ups</p>
+            </div>
 
-    
+            {/* View Mode Selection */}
+            <div className="mb-3">
+              <label className="block text-xs font-medium text-gray-700 mb-1.5">Current View</label>
+              <div className="bg-gray-50 rounded-lg p-2 flex gap-1.5">
+                <div className="flex items-center justify-between p-1.5 bg-white rounded-lg shadow-sm border border-gray-200 flex-1">
+                  <div className="flex items-center">
+                    <div className={`w-2.5 h-2.5 rounded-full mr-1.5 ${!viewMyLeadsOnly ? 'bg-gray-600' : 'bg-gray-300'}`}></div>
+                    <span className="text-xs font-medium text-gray-900">My Team</span>
+                  </div>
+                  {!viewMyLeadsOnly && (
+                    <div className="text-xs text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded font-medium">Active</div>
+                  )}
+                </div>
+                <div className="flex items-center justify-between p-1.5 bg-white rounded-lg shadow-sm border border-gray-200 flex-1">
+                  <div className="flex items-center">
+                    <div className={`w-2.5 h-2.5 rounded-full mr-1.5 ${viewMyLeadsOnly ? 'bg-gray-600' : 'bg-gray-300'}`}></div>
+                    <span className="text-xs font-medium text-gray-900">My Leads</span>
+                  </div>
+                  {viewMyLeadsOnly && (
+                    <div className="text-xs text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded font-medium">Active</div>
+                  )}
+                </div>
+              </div>
+              <p className="text-xs text-gray-500 mt-1.5">
+                Export includes leads from current view
+              </p>
+            </div>
+
+            {/* Status Selection */}
+            <div className="mb-4">
+              <label className="block text-xs font-medium text-gray-700 mb-1.5">Select Statuses</label>
+              <div className="grid grid-cols-2 gap-1.5">
+                {[
+                  { value: 'hot', label: 'HOT' },
+                  { value: 'warm', label: 'WARM' },
+                  { value: 'called', label: 'CALLED' },
+                  { value: 'onboarded', label: 'ONBOARDED' },
+                  { value: 'cold', label: 'COLD' }
+                ].map((status) => {
+                  const isDisabled = status.value === 'cold' && !viewMyLeadsOnly;
+                  return (
+                    <label key={status.value} className={`flex items-center p-1.5 rounded-lg border transition-all duration-200 cursor-pointer ${
+                      isDisabled
+                        ? 'bg-gray-50 border-gray-200 opacity-60 cursor-not-allowed'
+                        : exportStatuses.includes(status.value)
+                          ? 'bg-gray-100 border-gray-300'
+                          : 'bg-white border-gray-200 hover:border-gray-300'
+                    }`}>
+                      <input
+                        type="checkbox"
+                        checked={exportStatuses.includes(status.value)}
+                        disabled={isDisabled}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setExportStatuses([...exportStatuses, status.value]);
+                          } else {
+                            setExportStatuses(exportStatuses.filter(s => s !== status.value));
+                          }
+                        }}
+                        className="w-3 h-3 text-gray-600 bg-white border-gray-300 rounded focus:ring-gray-500 focus:ring-1 mr-1.5"
+                      />
+                      <span className={`text-xs font-medium ${isDisabled ? 'text-gray-400' : 'text-gray-900'}`}>
+                        {status.label}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowExportModal(false)}
+                className="flex-1 px-3 py-2 text-gray-600 bg-gray-100 rounded-lg font-medium hover:bg-gray-200 transition-all duration-200 active:scale-95 text-xs"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  exportLeadsReport(viewMyLeadsOnly ? 'myleads' : 'myteam', exportStatuses);
+                  setShowExportModal(false);
+                }}
+                disabled={exportStatuses.length === 0}
+                className={`flex-1 px-3 py-2 rounded-lg font-medium transition-all duration-200 active:scale-95 text-xs ${
+                  exportStatuses.length === 0
+                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                    : 'bg-gray-800 text-white hover:bg-gray-900'
+                }`}
+              >
+                Export
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* <BatchSplitModal
+        showBatchSplitModal={showBatchSplitModal}
+        setShowBatchSplitModal={setShowBatchSplitModal}
+        fetchLeads={fetchLeads}
+        showToast={showToast}
+        user={user}
+      /> */}
+
+
+
+    </div>    
   );
 }
 
