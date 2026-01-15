@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { addDoc, collection, doc, serverTimestamp } from "firebase/firestore";
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "../../firebase";
 import { getAuth } from "firebase/auth";
 import { Calendar, IndianRupee, X } from "lucide-react";

@@ -91,7 +91,7 @@ const PurchaseIntentModal = ({
         ...prev.requestedItems,
         {
           sno: prev.requestedItems.length + 1,
-          category: "",
+          category: prev.budgetComponent, // Set to current budget component immediately
           description: "",
           quantity: "",
           estPricePerUnit: "",
