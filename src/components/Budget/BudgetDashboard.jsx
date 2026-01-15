@@ -182,7 +182,7 @@ const getDepartmentComponents = (department) => {
 };
 
 // Action Dropdown Component
-const ActionDropdown = ({ budget, onEdit, onDelete, onView }) => {
+const ActionDropdown = ({ budget, onEdit, onDelete, onView, onActivate }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
 
@@ -249,6 +249,31 @@ const ActionDropdown = ({ budget, onEdit, onDelete, onView }) => {
               </svg>
               View Details
             </button>
+
+            {budget.status !== "active" && (
+              <button
+                onClick={() => {
+                  onActivate(budget); // Call the parent handler
+                  setIsOpen(false);
+                }}
+                className="flex items-center w-full px-3 py-1.5 text-green-600 hover:bg-gray-100"
+              >
+                <svg
+                  className="w-3.5 h-3.5 mr-2"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+                Set as Active
+              </button>
+            )}
             <button
               onClick={() => {
                 onEdit(budget);
@@ -338,6 +363,9 @@ function BudgetDashboard({
   const [usersLoaded, setUsersLoaded] = useState(false);
   const [currentUserData, setCurrentUserData] = useState(null);
   const [selectedBudgetForDelete, setSelectedBudgetForDelete] = useState(null);
+  const [activationConfirm, setActivationConfirm] = useState(false);
+  const [budgetToActivate, setBudgetToActivate] = useState(null);
+
   // View budget modal
   const [viewBudgetModal, setViewBudgetModal] = useState(false);
   const [viewingBudget, setViewingBudget] = useState(null);
@@ -367,6 +395,11 @@ function BudgetDashboard({
   });
 
   const currentFiscalYear = getCurrentFiscalYear();
+
+  const handleActivateClick = (budget) => {
+    setBudgetToActivate(budget);
+    setActivationConfirm(true);
+  };
 
   // Add this helper function to query users by email
   const getUserByEmail = useCallback(async (email) => {
@@ -1004,6 +1037,61 @@ function BudgetDashboard({
     setViewBudgetModal(true);
   };
 
+  // New handler for the Dropdown Action
+  const confirmActivation = async () => {
+    if (!budgetToActivate) return;
+    try {
+      // 1. Find all budgets for this department
+      const budgetsQuery = query(
+        collection(db, "department_budgets"),
+        where("department", "==", budgetToActivate.department) // Use state
+      );
+      const snapshot = await getDocs(budgetsQuery);
+
+      const batchPromises = [];
+
+      // 2. Loop through them
+      snapshot.forEach((docSnapshot) => {
+        const isTarget = docSnapshot.id === budgetToActivate.id;
+        const data = docSnapshot.data();
+
+        // If this is the one we want to activate
+        if (isTarget) {
+          const ref = doc(db, "department_budgets", docSnapshot.id);
+          batchPromises.push(
+            updateDoc(ref, {
+              status: "active",
+              lastUpdatedAt: serverTimestamp(),
+              updatedBy: currentUser.uid,
+            })
+          );
+        }
+        // If this is a DIFFERENT budget that is currently active, archive it
+        else if (data.status === "active") {
+          const ref = doc(db, "department_budgets", docSnapshot.id);
+          batchPromises.push(
+            updateDoc(ref, {
+              status: "archived",
+              lastUpdatedAt: serverTimestamp(),
+              updatedBy: currentUser.uid,
+            })
+          );
+        }
+      });
+
+      // 3. Execute all updates at once
+      await Promise.all(batchPromises);
+      toast.success("Budget activated successfully");
+
+      // 🆕 Reset the modal state
+      setActivationConfirm(false);
+      setBudgetToActivate(null);
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to activate budget");
+    }
+  };
+
   const tabConfig = {
     budgets: { name: "Budgets", color: "bg-sky-500" },
     intents: { name: "Purchase Intents", color: "bg-emerald-600" },
@@ -1283,6 +1371,7 @@ function BudgetDashboard({
                                     onEdit={handleEditBudget}
                                     onDelete={handleDeleteBudgetClick}
                                     onView={handleViewBudget}
+                                    onActivate={handleActivateClick}
                                   />
                                 </td>
                               </tr>
@@ -1630,6 +1719,57 @@ function BudgetDashboard({
                   )}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activationConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+            <div className="flex items-center justify-center w-12 h-12 bg-green-100 rounded-full mx-auto mb-4">
+              <svg
+                className="w-6 h-6 text-green-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+            </div>
+
+            <h3 className="text-lg font-bold text-center text-gray-900 mb-2">
+              Activate Budget?
+            </h3>
+
+            <p className="text-gray-600 text-center mb-6 text-sm">
+              Are you sure you want to activate{" "}
+              <strong>FY{budgetToActivate?.fiscalYear}</strong>?
+              <br />
+              <br />
+              <span className="text-red-500 font-medium">Warning:</span> This
+              will automatically archive any other active budgets for the{" "}
+              <strong>{budgetToActivate?.department}</strong> department.
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setActivationConfirm(false)}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmActivation}
+                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium"
+              >
+                Yes, Activate
+              </button>
             </div>
           </div>
         </div>
