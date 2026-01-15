@@ -859,7 +859,8 @@ const Admin = () => {
           </div>
           <div className="overflow-hidden">
             {(() => {
-              const sortedReports = [...timeReports].sort((a, b) => {
+              const filteredReports = timeReports.filter(report => report.name !== 'Unknown');
+              const sortedReports = [...filteredReports].sort((a, b) => {
                 if (!sortOrder) return 0;
                 const aSec = a.totalSeconds;
                 const bSec = b.totalSeconds;

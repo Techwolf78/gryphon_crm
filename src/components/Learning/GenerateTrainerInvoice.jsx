@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { db } from "../../firebase";
-import { collection, getDocs, query, where, orderBy, limit, updateDoc, doc } from "firebase/firestore";
+import { collection, getDocs, query, where, orderBy, limit, updateDoc, doc, getDoc, deleteDoc } from "firebase/firestore";
 import InvoiceModal from "./InvoiceModal";
 import EditInvoiceModal from "./Invoice/EditInvoiceModal";
 import { generateInvoicePDF } from "./invoiceUtils";
@@ -158,10 +158,45 @@ function GenerateTrainerInvoice() {
             (domainData.table1Data || []).forEach((batch) => {
               (batch.batches || []).forEach((b) => {
                 (b.trainers || []).forEach((trainer) => {
-                  const startDate =
-                    trainer.startDate || domainData.trainingStartDate || trainer.activeDates?.[0] || "";
-                  const endDate =
-                    trainer.endDate || domainData.trainingEndDate || trainer.activeDates?.slice(-1)[0] || "";
+                  // Special handling for JD domain dates
+                  let startDate = "";
+                  let endDate = "";
+                  
+                  if (domainData.domain === "JD") {
+                    // For JD trainings, try multiple possible field names
+                    startDate = trainer.startDate || trainer.StartDate || trainer.start_date || trainer.Start_Date || trainer.activeDates?.[0] || "";
+                    endDate = trainer.endDate || trainer.EndDate || trainer.end_date || trainer.End_Date || trainer.activeDates?.slice(-1)[0] || "";
+                    
+                    // If still no dates, try to get from batch or domain level
+                    if (!startDate) startDate = b.startDate || b.StartDate || batch.startDate || batch.StartDate || "";
+                    if (!endDate) endDate = b.endDate || b.EndDate || batch.endDate || batch.EndDate || "";
+                  } else {
+                    // Regular domain date extraction
+                    startDate = trainer.startDate || domainData.trainingStartDate || trainer.activeDates?.[0] || "";
+                    endDate = trainer.endDate || domainData.trainingEndDate || trainer.activeDates?.slice(-1)[0] || "";
+                  }
+
+                  // Generate activeDates if we have start/end dates but no activeDates (especially for JD)
+                  let activeDates = trainer.activeDates || [];
+                  if (!activeDates.length && startDate && endDate) {
+                    try {
+                      const start = new Date(startDate);
+                      const end = new Date(endDate);
+                      if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+                        activeDates = [];
+                        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+                          activeDates.push(d.toISOString().split('T')[0]);
+                        }
+                      }
+                    } catch (error) {
+                      console.warn('Failed to generate activeDates for trainer:', trainer.trainerName, error);
+                    }
+                  }
+
+                  // Convert Firestore timestamps to date strings if needed
+                  if (activeDates.length > 0 && typeof activeDates[0] === 'object' && activeDates[0]?.toDate) {
+                    activeDates = activeDates.map(ts => ts.toDate().toISOString().split('T')[0]);
+                  }
 
                   // Collect all topics from trainer, batch, and domain levels
                   const allTopics = new Set();
@@ -195,7 +230,7 @@ function GenerateTrainerInvoice() {
                     topics: Array.from(allTopics), // All aggregated topics
                     batches: batch.batches || [],
                     mergedBreakdown: trainer.mergedBreakdown || [],
-                    activeDates: trainer.activeDates || [],
+                    activeDates,
                     assignedHours: parseFloat(trainer.assignedHours) || 0,
                     perHourCost: parseFloat(trainer.perHourCost) || 0,
                     dailyHours: trainer.dailyHours || [],
@@ -220,96 +255,235 @@ function GenerateTrainerInvoice() {
         }
       }
 
-      // Enhanced grouping by college, trainer AND phase
+      // 🔍 ENHANCE: Fetch trainer names from trainers collection to ensure correct names
+      const trainerIds = [...new Set(trainersList.map(t => t.trainerId).filter(id => id))];
+      const trainerNamesMap = new Map();
+      const missingTrainers = new Set();
+
+      if (trainerIds.length > 0) {
+        // Batch fetch trainer details
+        const trainerPromises = trainerIds.map(async (trainerId) => {
+          try {
+            const trainerRef = doc(db, "trainers", trainerId);
+            const trainerSnap = await getDoc(trainerRef);
+            if (trainerSnap.exists()) {
+              const data = trainerSnap.data();
+              const correctName = data.name || data.trainerName || data.displayName;
+              if (correctName) {
+                trainerNamesMap.set(trainerId, correctName);
+              }
+            } else {
+              missingTrainers.add(trainerId);
+            }
+          } catch (error) {
+            console.warn(`Failed to fetch trainer ${trainerId}:`, error);
+            missingTrainers.add(trainerId);
+          }
+        });
+
+        await Promise.all(trainerPromises);
+      }
+
+      // Update trainer names in trainersList
+      trainersList.forEach(trainer => {
+        if (trainer.trainerId && trainerNamesMap.has(trainer.trainerId)) {
+          // Use the correct name from database
+          const dbName = trainerNamesMap.get(trainer.trainerId);
+          // Check if the name from database looks valid
+          if (dbName && dbName.length >= 3 && !dbName.includes("excel") && !dbName.includes("traienr") && !dbName.includes("N/A")) {
+            trainer.trainerName = dbName;
+          } else {
+            // Database has invalid name, mark as not found
+            trainer.trainerName = `Trainer ${trainer.trainerId} (Invalid Data)`;
+          }
+        } else if (trainer.trainerId && missingTrainers.has(trainer.trainerId)) {
+          // Trainer not found in database
+          trainer.trainerName = `Trainer ${trainer.trainerId} (Not Found)`;
+        } else {
+          // Fallback: check if current name looks corrupted
+          const currentName = trainer.trainerName || "";
+          if (currentName.length < 3 || currentName.includes("excel") || currentName.includes("traienr") || currentName === "N/A") {
+            trainer.trainerName = `Trainer ${trainer.trainerId || 'Unknown'} (Data Issue)`;
+          }
+        }
+      });
+
+      // Enhanced grouping by college, trainer, phase AND payment cycle
       const collegePhaseBasedGrouping = {};
+
+      // Helper function to determine payment cycle for a date
+      const getPaymentCycle = (dateStr) => {
+        if (!dateStr) return 'unknown';
+        const date = new Date(dateStr);
+        const day = date.getDate();
+        return day <= 15 ? '1-15' : '16-31';
+      };
+
+      // Helper function to get unique payment cycles for trainer assignments
+      const getPaymentCyclesForTrainer = (trainer) => {
+        const cycles = new Set();
+
+        // Check activeDates if available (more precise)
+        if (trainer.activeDates && trainer.activeDates.length > 0) {
+          trainer.activeDates.forEach(dateStr => {
+            cycles.add(getPaymentCycle(dateStr));
+          });
+        } else if (trainer.startDate && trainer.endDate) {
+          // Fallback: check trainer's date range
+          // If training spans multiple months or crosses payment cycle boundaries
+          const startCycle = getPaymentCycle(trainer.startDate);
+          const endCycle = getPaymentCycle(trainer.endDate);
+
+          cycles.add(startCycle);
+          if (startCycle !== endCycle) {
+            cycles.add(endCycle);
+          }
+        }
+
+        return Array.from(cycles).sort();
+      };
 
       trainersList.forEach((trainer) => {
           const collegeName = trainer.collegeName;
-        // For merged JD trainings, group by the merged colleges instead of individual college
-       let groupingKey;
+          
+        // Get payment cycles for this trainer
+        const paymentCycles = getPaymentCyclesForTrainer(trainer);
+        
+        // For each payment cycle, create separate grouping entries
+        paymentCycles.forEach(cycle => {
+          // For merged JD trainings, group by the merged colleges instead of individual college
+         let baseGroupingKey;
   if (trainer.isMergedTraining && trainer.domain === "JD") {
     // Sort merged colleges to ensure consistent key regardless of order
     const sortedColleges = trainer.mergedColleges
       .map(c => c.collegeName || c)
       .sort()
       .join('_');
-    groupingKey = `merged_jd_${sortedColleges}_${trainer.trainerId.trim()}_${trainer.phase.trim().toLowerCase()}`;
+    baseGroupingKey = `merged_jd_${sortedColleges}_${trainer.trainerId.trim()}_${trainer.phase.trim().toLowerCase()}`;
   } else {
     // Original logic for non-merged trainings
     const isJDDomain = trainer.domain === "JD";
-    groupingKey = isJDDomain
+    baseGroupingKey = isJDDomain
       ? `${collegeName.trim().toLowerCase()}_${trainer.trainerId.trim()}_${trainer.phase.trim().toLowerCase()}`
       : `${collegeName.trim().toLowerCase()}_${trainer.trainerId.trim()}_${trainer.phase.trim().toLowerCase()}_${trainer.projectCode.trim()}`;
   }
 
+          // Add payment cycle to the grouping key
+          const groupingKey = `${baseGroupingKey}_cycle_${cycle}`;
 
+          // Filter assignments for this payment cycle
+          let cycleAssignments = [];
+          let hasValidDatesForCycle = false;
 
-        if (!collegePhaseBasedGrouping[groupingKey]) {
-          collegePhaseBasedGrouping[groupingKey] = {
-            ...trainer,
-            totalCollegeHours: trainer.assignedHours,
-            allBatches: [trainer],
-            earliestStartDate: trainer.startDate,
-            latestEndDate: trainer.endDate,
-            // Keep track of all projects for this trainer at this college and phase
-            allProjects: [trainer.projectCode],
-            // Keep track of all domains for this trainer at this college and phase
-            allDomains: [trainer.domain],
-            // For merged trainings, track all colleges involved
-            allColleges: trainer.isMergedTraining ? trainer.mergedColleges.map(c => c.collegeName || c) : [trainer.collegeName],
-            // Aggregate all topics from all batches
-            allTopics: new Set(trainer.topics || []),
-            // Store merged training info
-            isMerged: trainer.isMergedTraining,
-            mergedColleges: trainer.mergedColleges || [],
-            operationsConfig: trainer.operationsConfig,
-          };
-        } else {
+          if (trainer.activeDates && trainer.activeDates.length > 0) {
+            // Use activeDates for precise filtering
+            cycleAssignments = trainer.activeDates.filter(dateStr => getPaymentCycle(dateStr) === cycle).sort();
+            hasValidDatesForCycle = cycleAssignments.length > 0;
+          } else if (trainer.startDate && trainer.endDate) {
+            // Fallback: check if the date range intersects with this cycle
+            const startDate = new Date(trainer.startDate);
+            const endDate = new Date(trainer.endDate);
+            const cycleStart = cycle === '1-15' ? 1 : 16;
+            const cycleEnd = cycle === '1-15' ? 15 : 31;
+
+            // Check if the training period overlaps with this payment cycle
+            const trainingStartDay = startDate.getDate();
+            const trainingEndDay = endDate.getDate();
+            const trainingMonth = startDate.getMonth();
+            const endMonth = endDate.getMonth();
+
+            // Simple overlap check - if training spans the cycle boundary
+            hasValidDatesForCycle = (trainingStartDay <= cycleEnd && trainingEndDay >= cycleStart) ||
+                                   (trainingMonth !== endMonth); // Cross-month training
+
+            if (hasValidDatesForCycle) {
+              cycleAssignments = [trainer]; // Include the whole trainer for this cycle
+            }
+          }
+
+          if (!hasValidDatesForCycle) return; // Skip this cycle if no valid dates
+
+          if (!collegePhaseBasedGrouping[groupingKey]) {
+            collegePhaseBasedGrouping[groupingKey] = {
+              ...trainer,
+              paymentCycle: cycle,
+              totalCollegeHours: 0, // Will calculate below
+              allBatches: [],
+              earliestStartDate: null,
+              latestEndDate: null,
+              // Keep track of all projects for this trainer at this college and phase
+              allProjects: [trainer.projectCode],
+              // Keep track of all domains for this trainer at this college and phase
+              allDomains: [trainer.domain],
+              // For merged trainings, track all colleges involved
+              allColleges: trainer.isMergedTraining ? trainer.mergedColleges.map(c => c.collegeName || c) : [trainer.collegeName],
+              // Aggregate all topics from all batches
+              allTopics: new Set(trainer.topics || []),
+              // Store merged training info
+              isMerged: trainer.isMergedTraining,
+              mergedColleges: trainer.mergedColleges || [],
+              operationsConfig: trainer.operationsConfig,
+            };
+          }
+
+          // Calculate hours and dates for this cycle
+          let cycleHours = 0;
+          let cycleStartDate = null;
+          let cycleEndDate = null;
+
+          if (trainer.activeDates && trainer.activeDates.length > 0) {
+            // Use activeDates for precise calculation
+            cycleHours = cycleAssignments.length * (trainer.dailyHours?.[0] || trainer.assignedHours / trainer.activeDates.length || 0);
+            if (cycleAssignments.length > 0) {
+              cycleStartDate = cycleAssignments[0];
+              cycleEndDate = cycleAssignments[cycleAssignments.length - 1];
+            }
+          } else {
+            // Fallback: split the trainer's total hours and date range proportionally
+            const totalCycles = paymentCycles.length;
+            cycleHours = trainer.assignedHours / totalCycles;
+
+            // For date range, use the full training period for each cycle
+            cycleStartDate = trainer.startDate;
+            cycleEndDate = trainer.endDate;
+          }
+
           // Add hours from this batch to total
-          // For JD domain, don't sum hours since it's merged across projects
-          if (!trainer.isMergedTraining || trainer.domain !== "JD") {
-            collegePhaseBasedGrouping[groupingKey].totalCollegeHours +=
-              trainer.assignedHours;
-          }
-          collegePhaseBasedGrouping[groupingKey].allBatches.push(trainer);
+          collegePhaseBasedGrouping[groupingKey].totalCollegeHours += cycleHours;
+          
+          // Update the grouping object's dates to cycle-specific dates
+          collegePhaseBasedGrouping[groupingKey].startDate = cycleStartDate || trainer.startDate;
+          collegePhaseBasedGrouping[groupingKey].endDate = cycleEndDate || trainer.endDate;
+          
+          // Create a cycle-specific trainer object
+          const cycleTrainer = {
+            ...trainer,
+            assignedHours: cycleHours,
+            startDate: cycleStartDate || trainer.startDate,
+            endDate: cycleEndDate || trainer.endDate,
+            activeDates: trainer.activeDates?.filter(dateStr => getPaymentCycle(dateStr) === cycle) || [],
+            dailyHours: trainer.dailyHours?.slice(0, cycleAssignments.length) || [],
+          };
+          
+          collegePhaseBasedGrouping[groupingKey].allBatches.push(cycleTrainer);
 
-          // Update dates to show the full range
-          if (
-            new Date(trainer.startDate) <
-            new Date(
-              collegePhaseBasedGrouping[groupingKey].earliestStartDate
-            )
-          ) {
-            collegePhaseBasedGrouping[groupingKey].earliestStartDate =
-              trainer.startDate;
+          // Update dates to show the cycle range
+          if (!collegePhaseBasedGrouping[groupingKey].earliestStartDate || 
+              new Date(cycleStartDate || trainer.startDate) < new Date(collegePhaseBasedGrouping[groupingKey].earliestStartDate)) {
+            collegePhaseBasedGrouping[groupingKey].earliestStartDate = cycleStartDate || trainer.startDate;
           }
-          if (
-            new Date(trainer.endDate) >
-            new Date(collegePhaseBasedGrouping[groupingKey].latestEndDate)
-          ) {
-            collegePhaseBasedGrouping[groupingKey].latestEndDate =
-              trainer.endDate;
+          if (!collegePhaseBasedGrouping[groupingKey].latestEndDate || 
+              new Date(cycleEndDate || trainer.endDate) > new Date(collegePhaseBasedGrouping[groupingKey].latestEndDate)) {
+            collegePhaseBasedGrouping[groupingKey].latestEndDate = cycleEndDate || trainer.endDate;
           }
 
           // Add unique projects and domains
-          if (
-            !collegePhaseBasedGrouping[groupingKey].allProjects.includes(
-              trainer.projectCode
-            )
-          ) {
-            collegePhaseBasedGrouping[groupingKey].allProjects.push(
-              trainer.projectCode
-            );
+          if (!collegePhaseBasedGrouping[groupingKey].allProjects.includes(trainer.projectCode)) {
+            collegePhaseBasedGrouping[groupingKey].allProjects.push(trainer.projectCode);
           }
 
-          if (
-            !collegePhaseBasedGrouping[groupingKey].allDomains.includes(
-              trainer.domain
-            )
-          ) {
-            collegePhaseBasedGrouping[groupingKey].allDomains.push(
-              trainer.domain
-            );
+          if (!collegePhaseBasedGrouping[groupingKey].allDomains.includes(trainer.domain)) {
+            collegePhaseBasedGrouping[groupingKey].allDomains.push(trainer.domain);
           }
 
           // For merged trainings, add college if not already present
@@ -326,7 +500,7 @@ function GenerateTrainerInvoice() {
               collegePhaseBasedGrouping[groupingKey].allTopics.add(topic);
             });
           }
-        }
+        });
       });
 
 
@@ -365,6 +539,7 @@ function GenerateTrainerInvoice() {
 
         const finalTrainer = {
           ...trainer,
+          assignedHours: trainer.totalCollegeHours, // Use cycle-specific hours
           topics: Array.from(trainer.allTopics), // Convert Set to Array for topics
           // Calculate total allowances from all batches (per-day rate × number of training days)
           // For JD domain, take allowances only once (not summed across batches)
@@ -406,7 +581,7 @@ function GenerateTrainerInvoice() {
       allInvoicesSnap.docs.forEach(doc => {
         const data = doc.data();
         // Create key matching the trainer lookup logic
-        const key = `${data.trainerId}_${data.collegeName}_${data.phase}`;
+        const key = `${data.trainerId}_${data.collegeName}_${data.phase}_${data.paymentCycle || 'unknown'}`;
         if (!invoiceMap.has(key)) {
           invoiceMap.set(key, []);
         }
@@ -417,7 +592,7 @@ function GenerateTrainerInvoice() {
       const updatedTrainersList = collegePhaseBasedTrainers.map((trainer) => {
         try {
           // Use the same key as used in invoice queries
-          const key = `${trainer.trainerId}_${trainer.collegeName}_${trainer.phase}`;
+          const key = `${trainer.trainerId}_${trainer.collegeName}_${trainer.phase}_${trainer.paymentCycle || 'unknown'}`;
 
           const trainerInvoices = invoiceMap.get(key) || [];
           const totalInvoiceCount = trainerInvoices.length;
@@ -569,36 +744,22 @@ function GenerateTrainerInvoice() {
   };
 
   const handleGenerateInvoice = useCallback((trainer) => {
-    // 🆕 UNDO: Store the trainer's current state before generating invoice
-    const trainerSnapshot = {
-      trainerId: trainer.trainerId,
-      collegeName: trainer.collegeName,
-      phase: trainer.phase,
-      hasExistingInvoice: trainer.hasExistingInvoice,
-      invoiceCount: trainer.invoiceCount,
-      invoiceStatus: trainer.invoiceStatus,
-      timestamp: Date.now()
-    };
+    const datesInfo = trainer?.activeDates 
+      ? `Dates: ${trainer.activeDates.length} days (${trainer.earliestStartDate || 'N/A'} to ${trainer.latestEndDate || 'N/A'})`
+      : `Date range: ${trainer?.earliestStartDate || 'N/A'} to ${trainer?.latestEndDate || 'N/A'}`;
     
-    // Store in localStorage for persistence across page refreshes
-    try {
-      const existingSnapshots = JSON.parse(localStorage.getItem('invoice_generation_snapshots') || '[]');
-      existingSnapshots.push(trainerSnapshot);
-      // Keep only last 10 snapshots to avoid storage bloat
-      if (existingSnapshots.length > 10) {
-        existingSnapshots.shift();
-      }
-      localStorage.setItem('invoice_generation_snapshots', JSON.stringify(existingSnapshots));
-    } catch (error) {
-      console.warn('Failed to store trainer snapshot:', error);
-    }
-    
+    console.log('🚀 HANDLE GENERATE INVOICE called for trainer:', trainer?.trainerName, 'ID:', trainer?.trainerId, 'Cycle:', trainer?.paymentCycle, '|', datesInfo);
     setSelectedTrainer(trainer);
     setModalMode('edit');
     setShowInvoiceModal(true);
   }, []);
 
   const handleViewInvoice = useCallback((trainer) => {
+    const datesInfo = trainer?.activeDates 
+      ? `Dates: ${trainer.activeDates.length} days (${trainer.earliestStartDate || 'N/A'} to ${trainer.latestEndDate || 'N/A'})`
+      : `Date range: ${trainer?.earliestStartDate || 'N/A'} to ${trainer?.latestEndDate || 'N/A'}`;
+    
+    console.log('👁️ HANDLE VIEW INVOICE called for trainer:', trainer?.trainerName, 'ID:', trainer?.trainerId, 'Cycle:', trainer?.paymentCycle, '|', datesInfo);
     setSelectedTrainer(trainer);
     setModalMode('view');
     setShowInvoiceModal(true);
@@ -1023,6 +1184,54 @@ function GenerateTrainerInvoice() {
     }
   }, [fetchTrainers]);
 
+  // Handle invoice deletion (for old combined invoices that need to be split)
+  const handleDeleteInvoice = useCallback(async (trainer) => {
+    console.log('🗑️ HANDLE DELETE INVOICE called for trainer:', trainer?.trainerName, 'ID:', trainer?.trainerId, 'Cycle:', trainer?.paymentCycle);
+    
+    const confirmDelete = window.confirm(
+      `Are you sure you want to delete the invoice for ${trainer.trainerName} (${trainer.paymentCycle} cycle)?\n\nThis action cannot be undone.`
+    );
+
+    if (!confirmDelete) return;
+
+    try {
+      // Find and delete the invoice document
+      console.log('🔍 QUERYING for invoice deletion - trainerId:', trainer.trainerId, 'collegeName:', trainer.collegeName, 'phase:', trainer.phase, 'paymentCycle:', trainer.paymentCycle);
+      
+      const q = query(
+        collection(db, "invoices"),
+        where("trainerId", "==", trainer.trainerId),
+        where("collegeName", "==", trainer.collegeName),
+        where("phase", "==", trainer.phase),
+        where("paymentCycle", "==", trainer.paymentCycle)
+      );
+
+      const querySnapshot = await getDocs(q);
+      console.log('📋 Query results:', querySnapshot.size, 'documents found');
+
+      if (!querySnapshot.empty) {
+        const invoiceDoc = querySnapshot.docs[0];
+        const invoiceRef = doc(db, "invoices", invoiceDoc.id);
+        console.log('🗑️ DELETING invoice document ID:', invoiceDoc.id);
+
+        await deleteDoc(invoiceRef);
+
+        // Clear cache and refresh data
+        clearCacheFromStorage();
+        setCachedData(null);
+        setLastFetchTime(null);
+        await fetchTrainers(true); // Force refresh
+
+        setToast({ type: 'success', message: `Invoice deleted successfully. You can now generate separate invoices for each payment cycle.` });
+      } else {
+        setToast({ type: 'error', message: "Invoice not found" });
+      }
+    } catch (error) {
+      console.error('Error deleting invoice:', error);
+      setToast({ type: 'error', message: "Failed to delete invoice" });
+    }
+  }, [fetchTrainers]);
+
   return (
     <div className="min-h-screen bg-gray-50">
       {loading ? (
@@ -1050,20 +1259,22 @@ function GenerateTrainerInvoice() {
                   )}
                 </div>
                 
-                <button
-                  onClick={handleRefreshData}
-                  disabled={refreshing}
-                  className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-all shadow-sm ${
-                    refreshing
-                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                      : getCacheStatus().isExpired
-                      ? 'bg-amber-500 text-white hover:bg-amber-600'
-                      : 'bg-blue-500 text-white hover:bg-blue-600'
-                  }`}
-                >
-                  <FiRefreshCw className={`${refreshing ? 'animate-spin' : ''} text-xs`} />
-                  {refreshing ? 'Refreshing...' : 'Refresh'}
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleRefreshData}
+                    disabled={refreshing}
+                    className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-all shadow-sm ${
+                      refreshing
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        : getCacheStatus().isExpired
+                        ? 'bg-amber-500 text-white hover:bg-amber-600'
+                        : 'bg-blue-500 text-white hover:bg-blue-600'
+                    }`}
+                  >
+                    <FiRefreshCw className={`${refreshing ? 'animate-spin' : ''} text-xs`} />
+                    {refreshing ? 'Refreshing...' : 'Refresh'}
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -1121,6 +1332,7 @@ function GenerateTrainerInvoice() {
                 handleGenerateInvoice={handleGenerateInvoice}
                 handleApproveInvoice={handleApproveInvoice}
                 handleViewInvoice={handleViewInvoice}
+                handleDeleteInvoice={handleDeleteInvoice}
                 downloadingInvoice={downloadingInvoice}
                 getDownloadStatus={getDownloadStatus}
                 formatDate={formatDate}

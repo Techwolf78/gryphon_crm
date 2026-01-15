@@ -639,9 +639,9 @@ const FollowUp = ({ lead, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-lg flex items-center justify-center z-[9999] px-2 py-2">
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-lg flex items-center justify-center z-9999 px-2 py-2">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[95vh] overflow-y-auto animate-modalIn">
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-3">
+        <div className="bg-linear-to-r from-blue-600 to-indigo-700 text-white p-3">
           <div className="flex justify-between items-start">
             <div>
               <h2 className="text-lg font-bold flex items-center gap-2">
@@ -744,7 +744,7 @@ const FollowUp = ({ lead, onClose }) => {
                     <button
                       onClick={handleCalendarRetry}
                       disabled={isRetrying}
-                      className="bg-amber-600 text-white px-3 py-1.5 rounded text-xs hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 min-w-[80px] justify-center"
+                      className="bg-amber-600 text-white px-3 py-1.5 rounded text-xs hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 min-w-20 justify-center"
                     >
                       {isRetrying ? (
                         <>
@@ -1013,7 +1013,7 @@ const FollowUp = ({ lead, onClose }) => {
                 <button
                   type="submit"
                   disabled={loading || isCreatingEvent || !remarks.trim()}
-                  className="bg-gradient-to-r from-blue-600 to-indigo-700 hover:opacity-90 text-white px-5 py-2 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  className="bg-linear-to-r from-blue-600 to-indigo-700 hover:opacity-90 text-white px-5 py-2 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                 >
                   {loading
                     ? "Saving..."
@@ -1099,7 +1099,7 @@ const FollowUp = ({ lead, onClose }) => {
         </div>
 
         {showDeleteConfirm && (
-          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[10000]">
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-10000">
             <div className="bg-white rounded-lg shadow-xl p-6 max-w-sm w-full">
               <h2 className="text-lg font-bold mb-2">Cancel Meeting?</h2>
               <p className="mb-4 text-gray-700">
@@ -1130,7 +1130,7 @@ const FollowUp = ({ lead, onClose }) => {
 
         {snackbar && (
           <div
-            className="fixed bottom-6 right-6 z-[12000] flex items-end"
+            className="fixed bottom-6 right-6 z-12000 flex items-end"
             aria-live="polite"
             aria-atomic="true"
           >

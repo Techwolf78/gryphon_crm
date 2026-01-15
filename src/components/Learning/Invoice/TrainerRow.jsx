@@ -23,13 +23,19 @@ function TrainerRow({
   handleGenerateInvoice,
   handleApproveInvoice,
   handleViewInvoice,
+  handleDeleteInvoice,
   downloadingInvoice,
   getDownloadStatus,
-  formatDate,
-  recentlyGeneratedInvoices,
-  handleUndoInvoice,
-  countdownTimers
+  formatDate
 }) {
+  console.log('🔍 TrainerRow received item:', {
+    trainerName: item.trainerName,
+    trainerId: item.trainerId,
+    assignedHours: item.assignedHours,
+    totalCollegeHours: item.totalCollegeHours,
+    paymentCycle: item.paymentCycle,
+    allBatches: item.allBatches?.length
+  });
   const [invoiceData, setInvoiceData] = useState(null);
 
   // Fetch current invoice data from Firebase
@@ -45,15 +51,26 @@ function TrainerRow({
               collection(db, "invoices"),
               where("trainerId", "==", item.trainerId),
               where("collegeName", "==", item.collegeName),
-              where("phase", "==", item.phase)
+              where("phase", "==", item.phase),
+              where("paymentCycle", "==", item.paymentCycle)
             )
           : query(
               collection(db, "invoices"),
               where("trainerId", "==", item.trainerId),
               where("collegeName", "==", item.collegeName),
               where("phase", "==", item.phase),
-              where("projectCode", "==", item.projectCode)
+              where("projectCode", "==", item.projectCode),
+              where("paymentCycle", "==", item.paymentCycle)
             );
+
+        console.log('🔍 TrainerRow fetching invoice for:', {
+          trainerId: item.trainerId,
+          collegeName: item.collegeName,
+          phase: item.phase,
+          paymentCycle: item.paymentCycle,
+          projectCode: item.projectCode,
+          isMerged: item.isMerged
+        });
 
         const querySnapshot = await getDocs(q);
 
@@ -64,9 +81,20 @@ function TrainerRow({
             ...invoiceDoc.data(),
           };
           
+          console.log('✅ TrainerRow found invoice:', {
+            trainer: item.trainerName,
+            cycle: item.paymentCycle,
+            billNumber: fetchedInvoiceData.billNumber,
+            netPayment: fetchedInvoiceData.netPayment,
+            totalAmount: fetchedInvoiceData.totalAmount
+          });
+          
           setInvoiceData(fetchedInvoiceData);
         } else {
-          // No invoice found - this is expected for trainers without invoices
+          console.log('❌ TrainerRow no invoice found for:', {
+            trainer: item.trainerName,
+            cycle: item.paymentCycle
+          });
         }
       } catch (fetchError) {
         console.error(`🚨 TrainerRow invoice fetch failed for ${item.trainerName}:`, fetchError);
@@ -172,6 +200,13 @@ function TrainerRow({
             to {formatDate(item.latestEndDate)}
           </div>
           
+          {item.paymentCycle && (
+            <div className="inline-flex items-center text-xs text-blue-600 bg-blue-50 px-1 py-0.5 rounded truncate">
+              <FiCalendar className="mr-1 text-xs" />
+              Cycle: {item.paymentCycle}
+            </div>
+          )}
+          
           <div className="flex items-center gap-1 text-xs text-gray-600">
             <FaRupeeSign className="text-green-500 shrink-0 text-xs" />
             <span className="truncate">
@@ -197,7 +232,7 @@ function TrainerRow({
             <div className="text-sm font-semibold text-green-600">
               {(() => {
                 // Calculate net payment for pending trainers using default values
-                const trainingFees = Math.round((item.perHourCost || 0) * (item.totalCollegeHours || 0));
+                const trainingFees = Math.round((item.perHourCost || 0) * (item.assignedHours || item.totalCollegeHours || 0));
                 const gstAmount = 0; // Default to NA (no GST)
                 const taxableAmount = trainingFees + gstAmount;
                 const tdsAmount = Math.round((taxableAmount * 0.1)); // Default 10% TDS
@@ -247,23 +282,18 @@ function TrainerRow({
         <div className="space-y-2 min-w-0">
           {item.hasExistingInvoice ? (
             <>
-              {/* Check if this trainer has a recently generated invoice for undo */}
-              {(() => {
-                const undoInvoice = recentlyGeneratedInvoices?.find(inv => 
-                  inv.trainerId === item.trainerId && 
-                  inv.collegeName === item.collegeName && 
-                  inv.phase === item.phase
-                );
-                const hasUndoOption = !!undoInvoice;
-                const timeLeft = hasUndoOption ? countdownTimers?.[undoInvoice?.id] || Math.max(0, Math.ceil((undoInvoice?.expiresAt - Date.now()) / 1000)) : 0;
-                
-                return (
-                  <>
-                    {/* Compact Action Buttons - Single Row */}  
-                    <div className="flex gap-1 w-full">
+              {/* Compact Action Buttons - Single Row */}
+              <div className="flex gap-1 w-full">
                       {/* View button - icon only, minimal width */}
                       <button
-                        onClick={() => handleViewInvoice(item)}
+                        onClick={() => {
+                          const datesInfo = item.activeDates 
+                            ? `Dates: ${item.activeDates.length} days (${item.earliestStartDate || 'N/A'} to ${item.latestEndDate || 'N/A'})`
+                            : `Date range: ${item.earliestStartDate || 'N/A'} to ${item.latestEndDate || 'N/A'}`;
+                          
+                          console.log('👁️ VIEW BUTTON clicked for trainer:', item.trainerName, 'ID:', item.trainerId, 'Cycle:', item.paymentCycle, '|', datesInfo);
+                          handleViewInvoice(item);
+                        }}
                         className="inline-flex items-center justify-center w-6 h-6 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-all shrink-0"
                       >
                         <FaEye className="w-3 h-3" />
@@ -279,7 +309,10 @@ function TrainerRow({
 
                       {/* Download button */}
                       <button
-                        onClick={() => handleDownloadInvoice(item)}
+                        onClick={() => {
+                          console.log('📥 DOWNLOAD BUTTON clicked for trainer:', item.trainerName, 'ID:', item.trainerId, 'Cycle:', item.paymentCycle);
+                          handleDownloadInvoice(item);
+                        }}
                         disabled={
                           downloadingInvoice ===
                           `${item.trainerId}_${item.collegeName}_${item.phase}`
@@ -293,50 +326,47 @@ function TrainerRow({
                       {/* Approve button for generated invoices */}
                       {invoiceData && invoiceData.status === "generated" && (
                         <button
-                          onClick={() => handleApproveInvoice(item)}
+                          onClick={() => {
+                            console.log('✅ APPROVE BUTTON clicked for trainer:', item.trainerName, 'ID:', item.trainerId, 'Cycle:', item.paymentCycle);
+                            handleApproveInvoice(item);
+                          }}
                           className="flex-1 inline-flex items-center justify-center px-2 py-1 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700 transition-all"
                         >
                           <FiCheckCircle className="w-3 h-3 mr-1" />
                           Approve
                         </button>
                       )}
+
+                      {/* Delete button for generated invoices (for splitting old combined invoices) */}
+                      {invoiceData && (invoiceData.status === "generated" || invoiceData.status === "approved" || invoiceData.status === "pending") && (
+                        <button
+                          onClick={() => {
+                            console.log('🗑️ DELETE BUTTON clicked for trainer:', item.trainerName, 'ID:', item.trainerId, 'Cycle:', item.paymentCycle);
+                            handleDeleteInvoice(item);
+                          }}
+                          className="inline-flex items-center justify-center w-6 h-6 text-xs font-medium text-red-700 bg-white border border-red-300 rounded hover:bg-red-50 transition-all shrink-0"
+                          title="Delete invoice (for splitting old combined invoices)"
+                        >
+                          <FiTrash2 className="w-3 h-3" />
+                        </button>
+                      )}
                       
                       {/* Resubmit button for rejected invoices */}
                       {invoiceData && invoiceData.status === "rejected" && (
                         <button
-                          onClick={() => handleEditInvoice(item)}
+                          onClick={() => {
+                            console.log('🔄 RESUBMIT BUTTON clicked for trainer:', item.trainerName, 'ID:', item.trainerId, 'Cycle:', item.paymentCycle);
+                            handleEditInvoice(item);
+                          }}
                           className="flex-1 inline-flex items-center justify-center px-2 py-1 text-xs font-semibold text-white bg-linear-to-r from-amber-500 to-orange-500 rounded hover:from-amber-600 hover:to-orange-600 transition-all duration-200 shadow-sm hover:shadow-md border border-amber-400 hover:border-amber-500"
                         >
                           <FiRefreshCw className="w-3 h-3 mr-1" />
                           Resubmit
                         </button>
                       )}
-                      
-                      {/* Undo button */}
-                      {hasUndoOption && timeLeft > 0 && (
-                        <button
-                          onClick={() => handleUndoInvoice(undoInvoice)}
-                          className="flex-1 inline-flex items-center justify-center px-2 py-1 text-xs font-medium text-white bg-red-500 rounded hover:bg-red-600 transition-all"
-                        >
-                          <FiTrash2 className="w-3 h-3 mr-1" />
-                          Undo
-                        </button>
-                      )}
                     </div>
                     
-                    {/* Show countdown timer below buttons if undo is available */}
-                    {hasUndoOption && timeLeft > 0 && (
-                      <div className="text-center mt-1">
-                        <span className="text-xs text-red-600 font-mono bg-red-50 px-2 py-0.5 rounded">
-                          Undo expires in {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
-                        </span>
-                      </div>
-                    )}
-                  </>
-                );
-              })()}
-              
-              {/* Enhanced Remarks Section - Only show non-rejection remarks */}
+                    {/* Enhanced Remarks Section - Only show non-rejection remarks */}
               {invoiceData?.remarks && invoiceData?.status !== "rejected" && (
                 <div className="bg-gray-50 p-3 rounded-lg border">
                   <div className="text-xs text-gray-600">
@@ -359,7 +389,14 @@ function TrainerRow({
             <>
               <div className="flex justify-center">
                 <button
-                  onClick={() => handleGenerateInvoice(item)}
+                  onClick={() => {
+                    const datesInfo = item.activeDates 
+                      ? `Dates: ${item.activeDates.length} days (${item.earliestStartDate || 'N/A'} to ${item.latestEndDate || 'N/A'})`
+                      : `Date range: ${item.earliestStartDate || 'N/A'} to ${item.latestEndDate || 'N/A'}`;
+                    
+                    console.log('📄 GENERATE INVOICE BUTTON clicked for trainer:', item.trainerName, 'ID:', item.trainerId, 'Cycle:', item.paymentCycle, '|', datesInfo);
+                    handleGenerateInvoice(item);
+                  }}
                   className="w-full inline-flex items-center justify-center px-2 py-1.5 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all shadow-sm hover:shadow-md border border-blue-600"
                 >
                   <FiFileText className="w-4 h-4 mr-1" />

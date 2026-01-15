@@ -9,7 +9,7 @@ const ContractsTable = ({ contracts = [], onDelete, onUpdate, onEdit, onView }) 
   }
 
   return (
-    <div className="w-full overflow-x-auto">
+    <div className="w-full overflow-hidden">
       <table className="min-w-full table-auto border-collapse max-w-full">
         <thead>
           <tr className="text-left bg-gray-50">

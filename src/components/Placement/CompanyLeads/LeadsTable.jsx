@@ -8,6 +8,7 @@ const statusColorMap = {
   cold: "text-blue-600 hover:bg-blue-50",
   called: "text-blue-600 hover:bg-blue-50",
   onboarded: "text-blue-600 hover:bg-blue-50",
+  dead: "text-red-600 hover:bg-red-50",
 };
 
 const statusBgColorMap = {
@@ -16,6 +17,7 @@ const statusBgColorMap = {
   cold: { bg: "from-blue-50 to-blue-100", border: "border-blue-200", hover: "hover:from-blue-100 hover:to-blue-200", icon: "bg-blue-600", leftBorder: "border-l-blue-200" },
   called: { bg: "from-blue-50 to-blue-100", border: "border-blue-200", hover: "hover:from-blue-100 hover:to-blue-200", icon: "bg-blue-600", leftBorder: "border-l-blue-200" },
   onboarded: { bg: "from-blue-50 to-blue-100", border: "border-blue-200", hover: "hover:from-blue-100 hover:to-blue-200", icon: "bg-blue-600", leftBorder: "border-l-blue-200" },
+  dead: { bg: "from-red-50 to-red-100", border: "border-red-200", hover: "hover:from-red-100 hover:to-red-200", icon: "bg-red-600", leftBorder: "border-l-red-200" },
 };
 
 function LeadsTable({

@@ -7,6 +7,8 @@ import {
 } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getDatabase } from "firebase/database";
+import { getStorage } from "firebase/storage";
+// ...existing code...
 
 const firebaseConfig = {
   apiKey: "AIzaSyD9SBw0ZckY3ht0CwH39C5pPRWwkR2zR4M",
@@ -19,7 +21,17 @@ const firebaseConfig = {
   measurementId: "G-0V7B973Q8T"
 };
 
+
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+
+// Initialize App Check (disabled for now due to configuration issues)
+// if (import.meta.env.PROD) {
+//   initializeAppCheck(app, {
+//     provider: new ReCaptchaV3Provider('6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI'), // Test reCAPTCHA key
+//     isTokenAutoRefreshEnabled: true
+//   });
+// }
+
 const auth = getAuth(app);
 
 export const setAuthPersistence = async (rememberMe) => {
@@ -37,6 +49,7 @@ export const setAuthPersistence = async (rememberMe) => {
 setPersistence(auth, browserSessionPersistence).catch(console.error);
 
 const db = getFirestore(app);
+const storage = getStorage(app);
 
 // Secondary app for admin operations
 let secondaryApp;
@@ -52,4 +65,4 @@ try {
 
 const rtdb = getDatabase(app);
 
-export { app, auth, db, secondaryApp, secondaryAuth, rtdb };
+export { app, auth, db, storage, secondaryApp, secondaryAuth, rtdb };

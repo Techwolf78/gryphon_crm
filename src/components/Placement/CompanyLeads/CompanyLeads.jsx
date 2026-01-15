@@ -29,11 +29,13 @@ import { useAuth } from "../../../context/AuthContext";
 import { useMsal } from "@azure/msal-react";
 import { InteractionRequiredAuthError } from "@azure/msal-browser";
 
+import { INDUSTRY_OPTIONS } from "../../../utils/constants";
+
 import { logPlacementActivity, AUDIT_ACTIONS } from "../../../utils/placementAuditLogger";
 import ViewToggle from "./ViewToggle";
 import * as XLSX from 'xlsx-js-style';
 import { saveAs } from 'file-saver';
-// import BatchSplitModal from "./BatchSplitModal";
+import BatchSplitModal from "./BatchSplitModal";
 
 
 
@@ -138,7 +140,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
   const [exportStatuses, setExportStatuses] = useState(['hot', 'warm', 'called', 'onboarded']); // Default selected statuses (cold only available for myleads)
 
   // Batch Split modal state
-  // const [showBatchSplitModal, setShowBatchSplitModal] = useState(false);
+  const [showBatchSplitModal, setShowBatchSplitModal] = useState(false);
 
 
 
@@ -873,8 +875,17 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
       // Filter by industry
       if (industryFilter.trim()) {
         const industry = (lead.industry || '').toLowerCase().trim();
-        if (industry !== industryFilter.trim().toLowerCase()) {
-          return false;
+        const filterValue = industryFilter.trim().toLowerCase();
+        if (filterValue === 'other') {
+          // For "Other", include leads whose industry is not in the predefined options (excluding "Other")
+          const predefinedIndustries = INDUSTRY_OPTIONS.filter(opt => opt.toLowerCase() !== 'other').map(opt => opt.toLowerCase());
+          if (predefinedIndustries.includes(industry)) {
+            return false;
+          }
+        } else {
+          if (industry !== filterValue) {
+            return false;
+          }
         }
       }
 
@@ -1118,6 +1129,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
 
   const handleStatusChange = async (leadId, newStatus) => {
     try {
+      const normalizedStatus = newStatus.toLowerCase();
       // Mark as transitioning for animation
       setLeads((prevLeads) =>
         prevLeads.map((l) =>
@@ -1169,22 +1181,22 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
 
             const updatedCompany = {
               ...decodedCompany,
-              status: newStatus,
+              status: normalizedStatus,
               updatedAt: new Date().toISOString(),
               ...assignmentData,
             };
             // Add status-specific timestamp when status changes
-            if (newStatus === "called") {
+            if (normalizedStatus === "called") {
               updatedCompany.calledAt = new Date().toISOString();
-            } else if (newStatus === "warm") {
+            } else if (normalizedStatus === "warm") {
               updatedCompany.warmAt = new Date().toISOString();
-            } else if (newStatus === "cold") {
+            } else if (normalizedStatus === "cold") {
               updatedCompany.coldAt = new Date().toISOString();
-            } else if (newStatus === "hot") {
+            } else if (normalizedStatus === "hot") {
               updatedCompany.hotAt = new Date().toISOString();
-            } else if (newStatus === "onboarded") {
+            } else if (normalizedStatus === "onboarded") {
               updatedCompany.onboardedAt = new Date().toISOString();
-            } else if (newStatus === "dead") {
+            } else if (normalizedStatus === "dead") {
               updatedCompany.deadAt = new Date().toISOString();
             }
             // Unicode-safe encoding: encodeURIComponent + btoa
@@ -1212,22 +1224,22 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
 
             const updatedCompany = {
               ...decodedCompany,
-              status: newStatus,
+              status: normalizedStatus,
               updatedAt: new Date().toISOString(),
               ...assignmentData,
             };
             // Add status-specific timestamp when status changes
-            if (newStatus === "called") {
+            if (normalizedStatus === "called") {
               updatedCompany.calledAt = new Date().toISOString();
-            } else if (newStatus === "warm") {
+            } else if (normalizedStatus === "warm") {
               updatedCompany.warmAt = new Date().toISOString();
-            } else if (newStatus === "cold") {
+            } else if (normalizedStatus === "cold") {
               updatedCompany.coldAt = new Date().toISOString();
-            } else if (newStatus === "hot") {
+            } else if (normalizedStatus === "hot") {
               updatedCompany.hotAt = new Date().toISOString();
-            } else if (newStatus === "onboarded") {
+            } else if (normalizedStatus === "onboarded") {
               updatedCompany.onboardedAt = new Date().toISOString();
-            } else if (newStatus === "dead") {
+            } else if (normalizedStatus === "dead") {
               updatedCompany.deadAt = new Date().toISOString();
             }
             // Unicode-safe encoding: encodeURIComponent + btoa
@@ -1288,28 +1300,28 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
       } : {};
 
       // Add calledAt timestamp when status changes to "called"
-      const calledAtData = newStatus === "called" ? { calledAt: new Date().toISOString() } : {};
-      const warmAtData = newStatus === "warm" ? { warmAt: new Date().toISOString() } : {};
-      const coldAtData = newStatus === "cold" ? { coldAt: new Date().toISOString() } : {};
-      const hotAtData = newStatus === "hot" ? { hotAt: new Date().toISOString() } : {};
-      const onboardedAtData = newStatus === "onboarded" ? { onboardedAt: new Date().toISOString() } : {};
-      const deadAtData = newStatus === "dead" ? { deadAt: new Date().toISOString() } : {};
+      const calledAtData = normalizedStatus === "called" ? { calledAt: new Date().toISOString() } : {};
+      const warmAtData = normalizedStatus === "warm" ? { warmAt: new Date().toISOString() } : {};
+      const coldAtData = normalizedStatus === "cold" ? { coldAt: new Date().toISOString() } : {};
+      const hotAtData = normalizedStatus === "hot" ? { hotAt: new Date().toISOString() } : {};
+      const onboardedAtData = normalizedStatus === "onboarded" ? { onboardedAt: new Date().toISOString() } : {};
+      const deadAtData = normalizedStatus === "dead" ? { deadAt: new Date().toISOString() } : {};
 
       setLeads((prevLeads) =>
         prevLeads.map((l) =>
           l.id === leadId
-            ? { ...l, status: newStatus, updatedAt: new Date().toISOString(), ...localAssignmentData, ...calledAtData, ...warmAtData, ...coldAtData, ...hotAtData, ...onboardedAtData, ...deadAtData, isTransitioning: false }
+            ? { ...l, status: normalizedStatus, updatedAt: new Date().toISOString(), ...localAssignmentData, ...calledAtData, ...warmAtData, ...coldAtData, ...hotAtData, ...onboardedAtData, ...deadAtData, isTransitioning: false }
             : l
         )
       );
 
       // Switch to "called" tab when status is changed to "called"
-      if (newStatus === "called") {
+      if (normalizedStatus === "called") {
         setActiveTab("called");
       }
 
       // ✅ If marked as onboarded → open AddJD modal
-      if (newStatus === "onboarded") {
+      if (normalizedStatus === "onboarded") {
         setSelectedCompanyForJD(lead);  // send company info to AddJD
         setShowAddJDForm(true);
       }
@@ -1610,14 +1622,17 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
   };
 
   const handleDeleteLead = async (leadId) => {
+    console.log('Move to dead - Starting for leadId:', leadId);
     try {
       const lead = leads.find((l) => l.id === leadId);
+      console.log('Move to dead - Lead data:', lead);
       if (!lead || !lead.batchId) return;
 
-      // Confirm deletion - now it's actually marking as deleted
+      // Confirm deletion - now it's actually marking as dead
       if (!window.confirm(`Are you sure you want to mark this lead as dead? It will be moved to the Dead tab.`)) {
         return;
       }
+      console.log('Move to dead - User confirmed, proceeding with update');
 
       // Log the delete activity
       logPlacementActivity({
@@ -1651,10 +1666,11 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
 
             const updatedCompany = {
               ...decodedCompany,
-              status: "deleted",
-              deletedAt: new Date().toISOString(),
+              status: "dead",
+              deadAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
             };
+            console.log('Array structure - Updated company data for lead', leadId, ':', updatedCompany);
             // Unicode-safe encoding: encodeURIComponent + btoa
             const updatedJsonString = JSON.stringify(updatedCompany);
             const updatedUriEncoded = encodeURIComponent(updatedJsonString);
@@ -1676,6 +1692,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
               deadAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
             };
+            console.log('Map structure - Updated company data for lead', leadId, ':', updatedCompany);
             // Unicode-safe encoding: encodeURIComponent + btoa
             const updatedJsonString = JSON.stringify(updatedCompany);
             const updatedUriEncoded = encodeURIComponent(updatedJsonString);
@@ -1735,9 +1752,10 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
 
       // Switch to "dead" tab
       setActiveTab("dead");
+      console.log('Move to dead - Successfully completed for leadId:', leadId);
     } catch (error) {
       handleFirestoreIndexError(error, "lead deletion");
-      alert("Failed to mark the lead as deleted. Please try again.");
+      alert("Failed to mark the lead as dead. Please try again.");
     }
   };
 
@@ -2317,7 +2335,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
                   Bulk Assign
                 </button>
               )}
-              {/* {user && (user?.departments?.includes("admin") || 
+              {user && (user?.departments?.includes("admin") || 
                          user?.departments?.includes("Admin") || 
                          user?.department === "admin" || 
                          user?.department === "Admin" ||
@@ -2325,11 +2343,14 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
                          user?.role === "Admin") && (
                 <button
                   onClick={() => setShowBatchSplitModal(true)}
-                  className="px-3 py-1 bg-red-600 text-white rounded-lg font-semibold flex items-center justify-center hover:bg-red-700 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 shadow-md text-xs h-full"
+                  title="Split Batches"
+                  className="px-2 py-1 bg-red-600 text-white rounded-lg font-semibold flex items-center justify-center hover:bg-red-700 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 shadow-md text-xs h-full"
                 >
-                  Split Batches
+                  <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                  </svg>
                 </button>
-              )} */}
+              )}
             </div>
           </div>
 
@@ -2819,13 +2840,13 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         </div>
       )}
 
-      {/* <BatchSplitModal
+      <BatchSplitModal
         showBatchSplitModal={showBatchSplitModal}
         setShowBatchSplitModal={setShowBatchSplitModal}
         fetchLeads={fetchLeads}
         showToast={showToast}
         user={user}
-      /> */}
+      />
 
 
 

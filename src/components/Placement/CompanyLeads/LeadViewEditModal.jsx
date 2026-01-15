@@ -8,6 +8,7 @@ const statusOptions = [
   "Warm",
   "Cold",
   "Onboarded",
+  "Dead",
 ];
 
 const LeadViewEditModal = ({

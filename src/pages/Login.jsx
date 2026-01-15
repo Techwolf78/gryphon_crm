@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import { FaEye, FaEyeSlash, FaEnvelope, FaLock, FaInfoCircle, FaCheckCircle, FaExclamationTriangle } from "react-icons/fa";
+import CalculatorModal from "../components/common/CalculatorModal";
 
 export default function LoginPage() {
   const { login, user } = useContext(AuthContext);
@@ -23,6 +24,11 @@ export default function LoginPage() {
     email: false,
     password: false
   });
+  const [showModal, setShowModal] = useState(true);
+
+  const handleEnter = () => {
+    setShowModal(false);
+  };
 
   // Check for caps lock
   const handleKeyDown = (e) => {
@@ -117,14 +123,28 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (user) {
-      const roleRoutes = {
-        admin: "/dashboard",
-        sales: "/dashboard/sales",
-        placement: "/dashboard/placement",
-        learning: "/dashboard/learning-development",
-        marketing: "/dashboard/marketing",
+      // Use department-based routing similar to Dashboard component
+      const userDepts = Array.isArray(user.departments) ? user.departments : (user.department ? [user.department] : []);
+      
+      // Map departments to routes (same logic as Dashboard component)
+      const departmentMapping = {
+        'sales': '/dashboard/sales',
+        'learning & development': '/dashboard/learning-development',
+        'l & d': '/dashboard/learning-development',
+        'ld': '/dashboard/learning-development',
+        'learning-development': '/dashboard/learning-development',
+        'placement': '/dashboard/placement',
+        'marketing': '/dashboard/marketing',
+        'dm': '/dashboard/marketing',
+        'admin': '/dashboard'
       };
-      navigate(roleRoutes[user.role] || "/");
+
+      // Use the first department that maps to a valid route, or default to dashboard
+      const redirectPath = userDepts
+        .map(dept => departmentMapping[dept.toLowerCase()])
+        .find(mapped => mapped) || '/dashboard';
+      
+      navigate(redirectPath);
     }
   }, [user, navigate]);
 
@@ -282,9 +302,10 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-gray-50 to-gray-100 py-4 px-4">
+      {showModal && <CalculatorModal onClose={handleEnter} />}
       {showPasswordReset && <PasswordResetModal />}
-
-      <div className="w-full max-w-4xl bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col lg:flex-row">
+      {!showModal && (
+        <div className="w-full max-w-4xl bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col lg:flex-row">
         {/* Left Side - Branding */}
         <div className="lg:w-1/2 bg-linear-to-br from-[#1C398E] to-[#3886FF] text-white p-6 lg:p-8 relative overflow-hidden">
           <div className="absolute -top-32 -left-32 w-64 h-64 rounded-full bg-white/10"></div>
@@ -523,6 +544,7 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
-    </div>
-  );
+    )}
+  </div>
+);
 }

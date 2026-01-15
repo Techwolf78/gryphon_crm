@@ -2,7 +2,7 @@ import React, { useCallback, useState } from 'react';
 import specializationOptions from './specializationOptions';
 import { parseSalaryInput, parseStipendInput, formatSalary, formatStipend } from "../../../utils/salaryUtils";
 
-function AddJDForm({ formData, setFormData, formErrors, handleFileChange, onClose, placementUsers, isLoadingUsers, jobFiles, setJobFiles }) {
+function AddJDForm({ formData, setFormData, formErrors, handleFileChange, onClose, placementUsers, isLoadingUsers, jobFiles, fileUploadProgress, removeFile }) {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [otherRound, setOtherRound] = useState('');
   const [validationErrors, setValidationErrors] = useState({});
@@ -56,11 +56,50 @@ function AddJDForm({ formData, setFormData, formErrors, handleFileChange, onClos
     const { value, checked } = e.target;
     setHasUnsavedChanges(true);
     setFormData(prev => {
-      if (checked) {
-        return { ...prev, specialization: [...prev.specialization, value] };
+      if (value === 'Other') {
+        if (checked) {
+          // When "Other" is checked, add it to specialization array
+          return { ...prev, specialization: [...prev.specialization, value] };
+        } else {
+          // When "Other" is unchecked, remove it and custom specializations
+          const filteredSpecs = prev.specialization.filter(spec => 
+            spec !== 'Other' && specializationOptions[prev.course]?.includes(spec)
+          );
+          return { 
+            ...prev, 
+            specialization: filteredSpecs,
+            otherSpecializations: ''
+          };
+        }
       } else {
-        return { ...prev, specialization: prev.specialization.filter(spec => spec !== value) };
+        // For regular specializations
+        if (checked) {
+          return { ...prev, specialization: [...prev.specialization, value] };
+        } else {
+          return { ...prev, specialization: prev.specialization.filter(spec => spec !== value) };
+        }
       }
+    });
+  };
+
+  const handleOtherSpecializationsChange = (e) => {
+    const value = e.target.value;
+    setHasUnsavedChanges(true);
+    setFormData(prev => {
+      // Parse comma-separated values and trim whitespace
+      const customSpecs = value.split(',').map(spec => spec.trim()).filter(spec => spec.length > 0);
+      
+      // Keep standard specializations and "Other"
+      const standardAndOtherSpecs = prev.specialization.filter(spec => 
+        specializationOptions[prev.course]?.includes(spec) || spec === 'Other'
+      );
+      
+      // Combine with custom specs
+      return {
+        ...prev,
+        otherSpecializations: value,
+        specialization: [...standardAndOtherSpecs, ...customSpecs]
+      };
     });
   };
 
@@ -174,7 +213,7 @@ function AddJDForm({ formData, setFormData, formErrors, handleFileChange, onClos
                 value={formData.course}
                 onChange={(e) => {
                   setHasUnsavedChanges(true);
-                  setFormData({ ...formData, course: e.target.value, specialization: [] });
+                  setFormData({ ...formData, course: e.target.value, specialization: [], otherSpecializations: "" });
                 }}
                 className={`w-full px-3 py-2 text-sm border focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white ${
                   formErrors.course ? "border-red-500" : "border-gray-300"
@@ -221,22 +260,35 @@ function AddJDForm({ formData, setFormData, formErrors, handleFileChange, onClos
               formErrors.specialization ? "border-red-500" : "border-gray-300"
             }`}>
               {formData.course ? (
-                <div className="flex flex-wrap gap-3">
-                  {specializationOptions[formData.course]?.map((spec) => (
-                    <div key={spec} className="flex items-center">
-                      <input
-                        type="checkbox"
-                        id={spec}
-                        value={spec}
+                <div>
+                  <div className="flex flex-wrap gap-3">
+                    {specializationOptions[formData.course]?.map((spec) => (
+                      <div key={spec} className="flex items-center">
+                        <input
+                          type="checkbox"
+                          id={spec}
+                          value={spec}
                         checked={formData.specialization.includes(spec)}
-                        onChange={handleSpecializationChange}
-                        className="h-3 w-3 text-blue-600 focus:ring-blue-500 border-gray-300"
+                          onChange={handleSpecializationChange}
+                          className="h-3 w-3 text-blue-600 focus:ring-blue-500 border-gray-300"
+                        />
+                        <label htmlFor={spec} className="ml-2 text-xs text-gray-700">
+                          {spec}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                  {formData.specialization.includes('Other') && (
+                    <div className="mt-3">
+                      <input
+                        type="text"
+                        value={formData.otherSpecializations}
+                        onChange={handleOtherSpecializationsChange}
+                        placeholder="Enter specializations separated by commas"
+                        className="w-full px-3 py-2 text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       />
-                      <label htmlFor={spec} className="ml-2 text-xs text-gray-700">
-                        {spec}
-                      </label>
                     </div>
-                  ))}
+                  )}
                 </div>
               ) : (
                 <p className="text-gray-500 text-xs">Select a course first</p>
@@ -551,6 +603,7 @@ function AddJDForm({ formData, setFormData, formErrors, handleFileChange, onClos
                 <option>Online</option>
                 <option>Offline</option>
                 <option>Hybrid</option>
+                <option>Online / Offline</option>
               </select>
             </div>
             <div className="bg-white p-3 border border-gray-100">
@@ -624,13 +677,28 @@ function AddJDForm({ formData, setFormData, formErrors, handleFileChange, onClos
                 <div className="space-y-1">
                   {Array.from(jobFiles).map((file, index) => (
                     <div key={index} className="flex items-center justify-between bg-gray-50 px-2 py-1 rounded text-xs">
-                      <span className="text-gray-700 truncate">{file.name}</span>
+                      <span className="text-gray-700 truncate flex-1">
+                        {file.isStored ? (
+                          <span className="flex items-center">
+                            📎 {file.name}
+                            <span className="ml-2 text-green-600 text-xs">(Uploaded)</span>
+                          </span>
+                        ) : file.isNew ? (
+                          <span className="flex items-center">
+                            📄 {file.name}
+                            {fileUploadProgress && fileUploadProgress[index] !== undefined && (
+                              <span className="ml-2 text-blue-600 text-xs">
+                                ({Math.round(fileUploadProgress[index])}%)
+                              </span>
+                            )}
+                          </span>
+                        ) : (
+                          file.name || file
+                        )}
+                      </span>
                       <button
                         type="button"
-                        onClick={() => {
-                          const updatedFiles = Array.from(jobFiles).filter((_, i) => i !== index);
-                          setJobFiles(updatedFiles);
-                        }}
+                        onClick={() => removeFile(index)}
                         className="text-red-500 hover:text-red-700 ml-2"
                       >
                         ×
@@ -640,7 +708,7 @@ function AddJDForm({ formData, setFormData, formErrors, handleFileChange, onClos
                 </div>
               </div>
             )}
-            <p className="mt-2 text-xs text-gray-500">These files will be included in the email sent to college TPO(s) and stored with the job listing (only the file names are stored unless you upload files to the central file store).</p>
+            <p className="mt-2 text-xs text-gray-500">These files will be uploaded to Firebase Storage and included in the email sent to college TPO(s) with download links.</p>
           </div>
         </div>
       </div>      {/* Internal Use Only */}

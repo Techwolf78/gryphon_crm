@@ -74,7 +74,7 @@ const Roadmap = () => {
             <div className="px-4 py-2">
               {/* Months Header */}
               <div className="flex items-center mb-4">
-                <div className="w-[120px] md:w-[160px]"></div>
+                <div className="w-[120px] md:w-40"></div>
                 <div className="flex-1 pl-8 grid grid-cols-7 gap-2">
                   {["Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].map(
                     (month, index) => (
@@ -236,7 +236,7 @@ const Roadmap = () => {
                     start: 4,
                     span: 3,
                     color: "bg-gradient-to-r from-emerald-50 to-emerald-100",
-                    status: "Completed (10 Oct - 5 Dec)",
+                    status: "Completed (10 Oct - 25 Dec)",
                     icon: (
                       <svg
                         className="w-5 h-5 mr-3"
@@ -255,14 +255,14 @@ const Roadmap = () => {
                     ),
                     text: "text-slate-800",
                     desc: "Student placements with companies,<br>interviews,<br>and onboarding support.",
-                    ariaDesc: "Placement Phase: Student placements with companies, interviews, and onboarding support. Completed from October 10 to December 5.",
+                    ariaDesc: "Placement Phase: Student placements with companies, interviews, and onboarding support. Completed from October 10 to December 25.",
                   },
                   {
                     label: "Digital Marketing",
                     start: 6,
                     span: 1,
-                    color: "bg-gradient-to-r from-amber-400 to-amber-500",
-                    status: "In Progress (15 Dec - 25 Dec)",
+                    color: "bg-gradient-to-r from-emerald-400 to-emerald-500",
+                    status: "Completed (15 Dec - 27 Dec)",
                     icon: (
                       <svg
                         className="w-5 h-5 mr-3"
@@ -272,13 +272,16 @@ const Roadmap = () => {
                         viewBox="0 0 24 24"
                         aria-hidden="true"
                       >
-                        <circle cx="12" cy="12" r="10" />
-                        <path d="M12 8v4l2 2" />
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M5 13l4 4L19 7"
+                        />
                       </svg>
                     ),
                     text: "text-white",
                     desc: "Launch of task tracking system,<br>analytics,<br>and reporting.",
-                    ariaDesc: "Digital Marketing: Launch of task tracking system, analytics, and reporting. In Progress from December 15 to December 25.",
+                    ariaDesc: "Digital Marketing: Launch of task tracking system, analytics, and reporting. Completed from December 15 to December 27.",
                   },
                 ].map((item, idx, arr) => (
                   <React.Fragment key={item.label}>
@@ -330,7 +333,7 @@ const Roadmap = () => {
                     user feedback and technical discoveries.
                   </div>
                   <div className="text-xs text-slate-400">
-                    Last updated: December 5, 2025
+                    Last updated: January 10, 2026
                   </div>
                 </div>
               </div>

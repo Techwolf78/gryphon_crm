@@ -12,8 +12,24 @@ const roundToNearestWhole = (num) => {
 };
 
 function InvoiceModal({ trainer, onClose, onInvoiceGenerated, onToast }) {
-    const [invoiceData, setInvoiceData] = useState({
-    billNumber: `INV-${Date.now()}`,
+  const hasLoggedRef = useRef(false);
+
+  useEffect(() => {
+    if (!hasLoggedRef.current && trainer) {
+      const datesInfo = trainer.activeDates 
+        ? `Dates: ${trainer.activeDates.length} days (${trainer.earliestStartDate || 'N/A'} to ${trainer.latestEndDate || 'N/A'})`
+        : `Date range: ${trainer.earliestStartDate || 'N/A'} to ${trainer.latestEndDate || 'N/A'}`;
+      
+      console.log('📋 INVOICE MODAL opened for trainer:', trainer.trainerName, 'ID:', trainer.trainerId, 'Cycle:', trainer.paymentCycle, 'Mode: generate |', datesInfo);
+      hasLoggedRef.current = true;
+    }
+  }, [trainer]);
+
+  const [invoiceData, setInvoiceData] = useState({
+    billNumber: trainer?.paymentCycle 
+      ? `INV-${Date.now()}-${trainer.paymentCycle.replace('-', '')}` 
+      : `INV-${Date.now()}`,
+    trainerName: trainer?.trainerName || "",
     projectCode: Array.isArray(trainer?.allProjects) ? trainer.allProjects.join(", ") : trainer?.projectCode || "",
     domain: trainer?.domain || "",
     topics: Array.isArray(trainer?.topics) ? trainer.topics.join(", ") : "",
@@ -21,7 +37,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated, onToast }) {
     endDate: trainer?.latestEndDate || "",
     billingDate: new Date().toISOString().split("T")[0],
     trainingRate: trainer?.perHourCost || 0,
-    totalHours: trainer?.totalCollegeHours || 0,
+    totalHours: trainer?.assignedHours || 0,
     tds: 10,
     adhocAdjustment: 0,
     conveyance: trainer?.totalConveyance || 0,
@@ -48,7 +64,8 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated, onToast }) {
     gst: trainer?.gst,
     isMerged: trainer?.isMerged,
     projectCode: trainer?.projectCode,
-  }), [trainer?.trainerId, trainer?.collegeName, trainer?.phase, trainer?.gst, trainer?.isMerged, trainer?.projectCode]);
+    paymentCycle: trainer?.paymentCycle,
+  }), [trainer?.trainerId, trainer?.collegeName, trainer?.phase, trainer?.gst, trainer?.isMerged, trainer?.projectCode, trainer?.paymentCycle]);
 
   useEffect(() => {
     const fetchTrainerBankDetails = async () => {
@@ -62,6 +79,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated, onToast }) {
           const data = trainerSnap.data();
           setInvoiceData((prev) => ({
             ...prev,
+            trainerName: data.name || data.trainerName || data.displayName || prev.trainerName,
             bankName: data.bankName || "",
             accountNumber: data.accountNumber || "",
             ifscCode: data.ifsc || "",
@@ -87,23 +105,29 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated, onToast }) {
     const checkExistingInvoice = async () => {
       if (!queryDeps.trainerId || !queryDeps.collegeName) return;
 
+      console.log('🔍 CHECKING EXISTING INVOICE for trainer:', queryDeps.trainerId, 'college:', queryDeps.collegeName, 'phase:', queryDeps.phase, 'paymentCycle:', trainer?.paymentCycle, 'projectCode:', queryDeps.projectCode);
+
       try {
         const q = queryDeps.isMerged
           ? query(
               collection(db, "invoices"),
               where("trainerId", "==", queryDeps.trainerId),
               where("collegeName", "==", queryDeps.collegeName),
-              where("phase", "==", queryDeps.phase)
+              where("phase", "==", queryDeps.phase),
+              where("paymentCycle", "==", trainer?.paymentCycle)
             )
           : query(
               collection(db, "invoices"),
               where("trainerId", "==", queryDeps.trainerId),
               where("collegeName", "==", queryDeps.collegeName),
               where("phase", "==", queryDeps.phase),
-              where("projectCode", "==", queryDeps.projectCode)
+              where("projectCode", "==", queryDeps.projectCode),
+              where("paymentCycle", "==", trainer?.paymentCycle)
             );
 
         const querySnapshot = await getDocs(q);
+        console.log('📋 Existing invoice query results:', querySnapshot.size, 'documents found for payment cycle:', trainer?.paymentCycle);
+        
         if (!querySnapshot.empty) {
           // Get the most recent invoice
           const latestInvoiceDoc = querySnapshot.docs[querySnapshot.docs.length - 1];
@@ -111,6 +135,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated, onToast }) {
             id: latestInvoiceDoc.id,
             ...latestInvoiceDoc.data(),
           };
+          console.log('📄 FOUND EXISTING INVOICE:', latestInvoice.billNumber, 'for cycle:', latestInvoice.paymentCycle, 'dates:', latestInvoice.startDate, 'to', latestInvoice.endDate);
           setExistingInvoice(latestInvoice);
           setViewMode(true); // Automatically set to view mode if invoice exists
 
@@ -121,6 +146,10 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated, onToast }) {
             billingDate: latestInvoice.billingDate || new Date().toISOString().split("T")[0],
             gst: latestInvoice.gst !== undefined ? String(latestInvoice.gst) : (queryDeps.gst ? "0" : "NA"),
           }));
+        } else {
+          console.log('✅ NO EXISTING INVOICE found for this payment cycle - ready to create new invoice');
+          setExistingInvoice(null);
+          setViewMode(false);
         }
       } catch (error) {
         console.error('Error checking for existing invoice:', error);
@@ -160,11 +189,11 @@ const handleSubmit = async (e) => {
     const invoiceToSave = {
       ...invoiceData,
       trainerId: trainer?.trainerId,
-      trainerName: trainer?.trainerName,
       businessName: trainer?.businessName,
       formId: trainer?.formId,
       phase: trainer?.phase,
       projectCode: trainer?.projectCode,
+      paymentCycle: trainer?.paymentCycle,
       totalAmount: calculateTotalAmount(),
       netPayment: calculateNetPayment(),
       updatedAt: new Date(),
@@ -176,6 +205,14 @@ const handleSubmit = async (e) => {
     };
 
     invoiceToSave.createdAt = new Date();
+    console.log('💾 SAVING INVOICE to Firebase:', {
+      trainer: invoiceToSave.trainerName,
+      id: invoiceToSave.trainerId,
+      cycle: invoiceToSave.paymentCycle,
+      billNumber: invoiceToSave.billNumber,
+      totalAmount: invoiceToSave.totalAmount,
+      netPayment: invoiceToSave.netPayment
+    });
     await addDoc(collection(db, "invoices"), invoiceToSave);
     onToast({ type: 'success', message: "Invoice generated successfully!" });
 
@@ -259,10 +296,18 @@ const handleSubmit = async (e) => {
           <div className="mb-2 p-1.5 bg-gray-50 rounded-lg">
             <h3 className="text-sm font-semibold text-gray-800 mb-1.5">Trainer Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-1 text-xs">
-              <div><span className="font-medium">Name:</span> {trainer?.trainerName}</div>
+              <div><span className="font-medium">Name:</span> {invoiceData.trainerName || trainer?.trainerName}</div>
               <div><span className="font-medium">ID:</span> {trainer?.trainerId}</div>
               <div><span className="font-medium">College:</span> {trainer?.businessName}</div>
               <div><span className="font-medium">Phase:</span> {trainer?.phase}</div>
+              {trainer?.paymentCycle && (
+                <div className="col-span-2">
+                  <span className="font-medium">Payment Cycle:</span> 
+                  <span className="ml-1 bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs font-medium">
+                    {trainer.paymentCycle} (Days {trainer.paymentCycle})
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 

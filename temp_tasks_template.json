@@ -1,0 +1,1002 @@
+[
+  {
+    "id": "dmtask0001",
+    "description": "Create promotional video for new product launch",
+    "assignedTo": "John Smith",
+    "role": "Video Editor",
+    "status": "completed",
+    "startDate": "2025-10-15",
+    "dueDate": "2025-10-25",
+    "createdAt": "2025-10-10T10:00:00Z"
+  },
+  {
+    "id": "dmtask0002",
+    "description": "Design social media graphics for Facebook campaign",
+    "assignedTo": "Sarah Johnson",
+    "role": "Graphic Designer",
+    "status": "in_progress",
+    "startDate": "2025-11-20",
+    "dueDate": "2025-11-30",
+    "createdAt": "2025-11-18T14:30:00Z"
+  },
+  {
+    "id": "dmtask0003",
+    "description": "Write blog post about industry trends",
+    "assignedTo": "Mike Davis",
+    "role": "Content Writer",
+    "status": "not_started",
+    "startDate": "2026-01-01",
+    "dueDate": "2026-01-10",
+    "createdAt": "2025-12-28T09:15:00Z"
+  },
+  {
+    "id": "dmtask0004",
+    "description": "Develop landing page for marketing campaign",
+    "assignedTo": "Alex Chen",
+    "role": "Developer",
+    "status": "completed",
+    "startDate": "2025-10-05",
+    "dueDate": "2025-10-20",
+    "createdAt": "2025-10-03T11:45:00Z"
+  },
+  {
+    "id": "dmtask0005",
+    "description": "Oversee team performance and assign tasks",
+    "assignedTo": "Emma Wilson",
+    "role": "Manager",
+    "status": "in_progress",
+    "startDate": "2025-12-01",
+    "dueDate": "2025-12-31",
+    "createdAt": "2025-11-28T08:00:00Z"
+  },
+  {
+    "id": "dmtask0006",
+    "description": "Edit product demo video for YouTube",
+    "assignedTo": "John Smith",
+    "role": "Video Editor",
+    "status": "completed",
+    "startDate": "2025-10-10",
+    "dueDate": "2025-10-20",
+    "createdAt": "2025-10-08T13:20:00Z"
+  },
+  {
+    "id": "dmtask0007",
+    "description": "Create infographic for email newsletter",
+    "assignedTo": "Sarah Johnson",
+    "role": "Graphic Designer",
+    "status": "cancelled",
+    "startDate": "2025-11-15",
+    "dueDate": "2025-11-25",
+    "createdAt": "2025-11-12T10:30:00Z"
+  },
+  {
+    "id": "dmtask0008",
+    "description": "Research and write case study article",
+    "assignedTo": "Mike Davis",
+    "role": "Content Writer",
+    "status": "completed",
+    "startDate": "2025-10-20",
+    "dueDate": "2025-11-05",
+    "createdAt": "2025-10-18T15:45:00Z"
+  },
+  {
+    "id": "dmtask0009",
+    "description": "Fix bugs in marketing website",
+    "assignedTo": "Alex Chen",
+    "role": "Developer",
+    "status": "in_progress",
+    "startDate": "2025-12-01",
+    "dueDate": "2025-12-15",
+    "createdAt": "2025-11-28T12:00:00Z"
+  },
+  {
+    "id": "dmtask0010",
+    "description": "Conduct team performance review",
+    "assignedTo": "Emma Wilson",
+    "role": "Manager",
+    "status": "completed",
+    "startDate": "2025-11-01",
+    "dueDate": "2025-11-30",
+    "createdAt": "2025-10-28T09:00:00Z"
+  },
+  {
+    "id": "dmtask0011",
+    "description": "Create animated explainer video",
+    "assignedTo": "John Smith",
+    "role": "Video Editor",
+    "status": "in_progress",
+    "startDate": "2025-12-05",
+    "dueDate": "2025-12-20",
+    "createdAt": "2025-12-03T11:15:00Z"
+  },
+  {
+    "id": "dmtask0012",
+    "description": "Design logo for new brand campaign",
+    "assignedTo": "Sarah Johnson",
+    "role": "Graphic Designer",
+    "status": "not_started",
+    "startDate": "2026-01-10",
+    "dueDate": "2026-01-25",
+    "createdAt": "2026-01-08T14:20:00Z"
+  },
+  {
+    "id": "dmtask0013",
+    "description": "Write SEO-optimized article series",
+    "assignedTo": "Mike Davis",
+    "role": "Content Writer",
+    "status": "completed",
+    "startDate": "2025-10-15",
+    "dueDate": "2025-11-01",
+    "createdAt": "2025-10-12T16:30:00Z"
+  },
+  {
+    "id": "dmtask0014",
+    "description": "Implement tracking pixels on website",
+    "assignedTo": "Alex Chen",
+    "role": "Developer",
+    "status": "completed",
+    "startDate": "2025-11-10",
+    "dueDate": "2025-11-20",
+    "createdAt": "2025-11-08T10:45:00Z"
+  },
+  {
+    "id": "dmtask0015",
+    "description": "Plan Q1 marketing strategy",
+    "assignedTo": "Emma Wilson",
+    "role": "Manager",
+    "status": "in_progress",
+    "startDate": "2025-12-01",
+    "dueDate": "2025-12-15",
+    "createdAt": "2025-11-20T08:30:00Z"
+  },
+  {
+    "id": "dmtask0016",
+    "description": "Edit customer testimonial video",
+    "assignedTo": "John Smith",
+    "role": "Video Editor",
+    "status": "completed",
+    "startDate": "2025-10-20",
+    "dueDate": "2025-10-30",
+    "createdAt": "2025-10-18T12:10:00Z"
+  },
+  {
+    "id": "dmtask0017",
+    "description": "Create social media banner templates",
+    "assignedTo": "Sarah Johnson",
+    "role": "Graphic Designer",
+    "status": "completed",
+    "startDate": "2025-11-05",
+    "dueDate": "2025-11-15",
+    "createdAt": "2025-11-03T13:25:00Z"
+  },
+  {
+    "id": "dmtask0018",
+    "description": "Write press release for product launch",
+    "assignedTo": "Mike Davis",
+    "role": "Content Writer",
+    "status": "cancelled",
+    "startDate": "2025-10-15",
+    "dueDate": "2025-10-25",
+    "createdAt": "2025-10-12T14:40:00Z"
+  },
+  {
+    "id": "dmtask0019",
+    "description": "Optimize website loading speed",
+    "assignedTo": "Alex Chen",
+    "role": "Developer",
+    "status": "in_progress",
+    "startDate": "2025-12-10",
+    "dueDate": "2025-12-25",
+    "createdAt": "2025-12-08T11:55:00Z"
+  },
+  {
+    "id": "dmtask0020",
+    "description": "Review team KPIs and set goals",
+    "assignedTo": "Emma Wilson",
+    "role": "Manager",
+    "status": "completed",
+    "startDate": "2025-11-01",
+    "dueDate": "2025-11-15",
+    "createdAt": "2025-10-28T09:20:00Z"
+  },
+  {
+    "id": "dmtask0021",
+    "description": "Create product tutorial video series",
+    "assignedTo": "John Smith",
+    "role": "Video Editor",
+    "status": "not_started",
+    "startDate": "2026-01-01",
+    "dueDate": "2026-01-15",
+    "createdAt": "2025-12-25T10:05:00Z"
+  },
+  {
+    "id": "dmtask0022",
+    "description": "Design email newsletter template",
+    "assignedTo": "Sarah Johnson",
+    "role": "Graphic Designer",
+    "status": "in_progress",
+    "startDate": "2025-12-15",
+    "dueDate": "2025-12-28",
+    "createdAt": "2025-12-13T15:35:00Z"
+  },
+  {
+    "id": "dmtask0023",
+    "description": "Write monthly newsletter content",
+    "assignedTo": "Mike Davis",
+    "role": "Content Writer",
+    "status": "completed",
+    "startDate": "2025-10-20",
+    "dueDate": "2025-11-01",
+    "createdAt": "2025-10-18T16:50:00Z"
+  },
+  {
+    "id": "dmtask0024",
+    "description": "Update CMS with new features",
+    "assignedTo": "Alex Chen",
+    "role": "Developer",
+    "status": "completed",
+    "startDate": "2025-11-01",
+    "dueDate": "2025-11-15",
+    "createdAt": "2025-10-28T12:30:00Z"
+  },
+  {
+    "id": "dmtask0025",
+    "description": "Organize team building event",
+    "assignedTo": "Emma Wilson",
+    "role": "Manager",
+    "status": "cancelled",
+    "startDate": "2025-10-15",
+    "dueDate": "2025-11-01",
+    "createdAt": "2025-10-10T08:45:00Z"
+  },
+  {
+    "id": "dmtask0026",
+    "description": "Edit promotional video for social media",
+    "assignedTo": "John Smith",
+    "role": "Video Editor",
+    "status": "completed",
+    "startDate": "2025-11-10",
+    "dueDate": "2025-11-20",
+    "createdAt": "2025-11-08T13:40:00Z"
+  },
+  {
+    "id": "dmtask0027",
+    "description": "Create brand style guide graphics",
+    "assignedTo": "Sarah Johnson",
+    "role": "Graphic Designer",
+    "status": "completed",
+    "startDate": "2025-10-05",
+    "dueDate": "2025-10-20",
+    "createdAt": "2025-10-03T14:55:00Z"
+  },
+  {
+    "id": "dmtask0028",
+    "description": "Write product descriptions for website",
+    "assignedTo": "Mike Davis",
+    "role": "Content Writer",
+    "status": "in_progress",
+    "startDate": "2025-12-25",
+    "dueDate": "2026-01-05",
+    "createdAt": "2025-12-23T17:05:00Z"
+  },
+  {
+    "id": "dmtask0029",
+    "description": "Implement user authentication system",
+    "assignedTo": "Alex Chen",
+    "role": "Developer",
+    "status": "completed",
+    "startDate": "2025-10-01",
+    "dueDate": "2025-10-20",
+    "createdAt": "2025-09-28T11:20:00Z"
+  },
+  {
+    "id": "dmtask0030",
+    "description": "Conduct quarterly team assessment",
+    "assignedTo": "Emma Wilson",
+    "role": "Manager",
+    "status": "in_progress",
+    "startDate": "2025-12-01",
+    "dueDate": "2025-12-31",
+    "createdAt": "2025-11-15T09:35:00Z"
+  },
+  {
+    "id": "dmtask0031",
+    "description": "Create video content calendar",
+    "assignedTo": "John Smith",
+    "role": "Video Editor",
+    "status": "not_started",
+    "startDate": "2026-01-10",
+    "dueDate": "2026-01-20",
+    "createdAt": "2026-01-08T11:50:00Z"
+  },
+  {
+    "id": "dmtask0032",
+    "description": "Design presentation slides for client meeting",
+    "assignedTo": "Sarah Johnson",
+    "role": "Graphic Designer",
+    "status": "completed",
+    "startDate": "2025-11-15",
+    "dueDate": "2025-11-25",
+    "createdAt": "2025-11-13T15:10:00Z"
+  },
+  {
+    "id": "dmtask0033",
+    "description": "Write technical documentation",
+    "assignedTo": "Mike Davis",
+    "role": "Content Writer",
+    "status": "completed",
+    "startDate": "2025-10-10",
+    "dueDate": "2025-10-25",
+    "createdAt": "2025-10-08T16:25:00Z"
+  },
+  {
+    "id": "dmtask0034",
+    "description": "Fix mobile responsiveness issues",
+    "assignedTo": "Alex Chen",
+    "role": "Developer",
+    "status": "cancelled",
+    "startDate": "2025-11-10",
+    "dueDate": "2025-11-20",
+    "createdAt": "2025-11-08T12:45:00Z"
+  },
+  {
+    "id": "dmtask0035",
+    "description": "Plan annual marketing budget",
+    "assignedTo": "Emma Wilson",
+    "role": "Manager",
+    "status": "completed",
+    "startDate": "2025-11-01",
+    "dueDate": "2025-11-20",
+    "createdAt": "2025-10-25T08:55:00Z"
+  },
+  {
+    "id": "dmtask0036",
+    "description": "Edit webinar recording for distribution",
+    "assignedTo": "John Smith",
+    "role": "Video Editor",
+    "status": "in_progress",
+    "startDate": "2025-12-20",
+    "dueDate": "2026-01-01",
+    "createdAt": "2025-12-18T11:30:00Z"
+  },
+  {
+    "id": "dmtask0037",
+    "description": "Create Instagram story templates",
+    "assignedTo": "Sarah Johnson",
+    "role": "Graphic Designer",
+    "status": "not_started",
+    "startDate": "2026-01-05",
+    "dueDate": "2026-01-15",
+    "createdAt": "2026-01-03T14:15:00Z"
+  },
+  {
+    "id": "dmtask0038",
+    "description": "Write social media content strategy",
+    "assignedTo": "Mike Davis",
+    "role": "Content Writer",
+    "status": "completed",
+    "startDate": "2025-10-15",
+    "dueDate": "2025-11-01",
+    "createdAt": "2025-10-12T17:40:00Z"
+  },
+  {
+    "id": "dmtask0039",
+    "description": "Implement analytics tracking",
+    "assignedTo": "Alex Chen",
+    "role": "Developer",
+    "status": "completed",
+    "startDate": "2025-11-20",
+    "dueDate": "2025-12-01",
+    "createdAt": "2025-11-18T13:05:00Z"
+  },
+  {
+    "id": "dmtask0040",
+    "description": "Organize department restructuring",
+    "assignedTo": "Emma Wilson",
+    "role": "Manager",
+    "status": "in_progress",
+    "startDate": "2025-12-15",
+    "dueDate": "2026-01-15",
+    "createdAt": "2025-12-10T09:50:00Z"
+  },
+  {
+    "id": "dmtask0041",
+    "description": "Create product demo video",
+    "assignedTo": "John Smith",
+    "role": "Video Editor",
+    "status": "completed",
+    "startDate": "2025-10-10",
+    "dueDate": "2025-10-20",
+    "createdAt": "2025-10-08T10:20:00Z"
+  },
+  {
+    "id": "dmtask0042",
+    "description": "Design website mockups",
+    "assignedTo": "Sarah Johnson",
+    "role": "Graphic Designer",
+    "status": "completed",
+    "startDate": "2025-11-15",
+    "dueDate": "2025-11-30",
+    "createdAt": "2025-11-13T15:45:00Z"
+  },
+  {
+    "id": "dmtask0043",
+    "description": "Write FAQ content for website",
+    "assignedTo": "Mike Davis",
+    "role": "Content Writer",
+    "status": "cancelled",
+    "startDate": "2025-10-20",
+    "dueDate": "2025-11-01",
+    "createdAt": "2025-10-18T16:55:00Z"
+  },
+  {
+    "id": "dmtask0044",
+    "description": "Develop e-commerce functionality",
+    "assignedTo": "Alex Chen",
+    "role": "Developer",
+    "status": "completed",
+    "startDate": "2025-11-01",
+    "dueDate": "2025-11-20",
+    "createdAt": "2025-10-28T11:40:00Z"
+  },
+  {
+    "id": "dmtask0045",
+    "description": "Conduct employee satisfaction survey",
+    "assignedTo": "Emma Wilson",
+    "role": "Manager",
+    "status": "completed",
+    "startDate": "2025-10-15",
+    "dueDate": "2025-11-01",
+    "createdAt": "2025-10-10T08:25:00Z"
+  },
+  {
+    "id": "dmtask0046",
+    "description": "Edit training video series",
+    "assignedTo": "John Smith",
+    "role": "Video Editor",
+    "status": "in_progress",
+    "startDate": "2026-01-01",
+    "dueDate": "2026-01-10",
+    "createdAt": "2025-12-27T12:15:00Z"
+  },
+  {
+    "id": "dmtask0047",
+    "description": "Create brand identity package",
+    "assignedTo": "Sarah Johnson",
+    "role": "Graphic Designer",
+    "status": "completed",
+    "startDate": "2025-10-10",
+    "dueDate": "2025-10-25",
+    "createdAt": "2025-10-08T14:30:00Z"
+  },
+  {
+    "id": "dmtask0048",
+    "description": "Write whitepaper on industry trends",
+    "assignedTo": "Mike Davis",
+    "role": "Content Writer",
+    "status": "in_progress",
+    "startDate": "2026-01-01",
+    "dueDate": "2026-01-15",
+    "createdAt": "2025-12-30T17:20:00Z"
+  },
+  {
+    "id": "dmtask0049",
+    "description": "Implement database optimization",
+    "assignedTo": "Alex Chen",
+    "role": "Developer",
+    "status": "completed",
+    "startDate": "2025-11-01",
+    "dueDate": "2025-11-15",
+    "createdAt": "2025-10-28T13:35:00Z"
+  },
+  {
+    "id": "dmtask0050",
+    "description": "Plan team development workshop",
+    "assignedTo": "Emma Wilson",
+    "role": "Manager",
+    "status": "not_started",
+    "startDate": "2026-01-01",
+    "dueDate": "2026-01-15",
+    "createdAt": "2025-12-28T09:40:00Z"
+  },
+  {
+    "id": "dmtask0051",
+    "description": "Create animated logo reveal",
+    "assignedTo": "John Smith",
+    "role": "Video Editor",
+    "status": "completed",
+    "startDate": "2025-11-15",
+    "dueDate": "2025-11-25",
+    "createdAt": "2025-11-13T11:50:00Z"
+  },
+  {
+    "id": "dmtask0052",
+    "description": "Design mobile app UI mockups",
+    "assignedTo": "Sarah Johnson",
+    "role": "Graphic Designer",
+    "status": "cancelled",
+    "startDate": "2025-10-20",
+    "dueDate": "2025-11-01",
+    "createdAt": "2025-10-18T15:05:00Z"
+  },
+  {
+    "id": "dmtask0053",
+    "description": "Write user guide documentation",
+    "assignedTo": "Mike Davis",
+    "role": "Content Writer",
+    "status": "completed",
+    "startDate": "2025-11-10",
+    "dueDate": "2025-11-25",
+    "createdAt": "2025-11-08T16:10:00Z"
+  },
+  {
+    "id": "dmtask0054",
+    "description": "Develop API integration",
+    "assignedTo": "Alex Chen",
+    "role": "Developer",
+    "status": "in_progress",
+    "startDate": "2025-12-30",
+    "dueDate": "2026-01-10",
+    "createdAt": "2025-12-28T12:55:00Z"
+  },
+  {
+    "id": "dmtask0055",
+    "description": "Review department performance metrics",
+    "assignedTo": "Emma Wilson",
+    "role": "Manager",
+    "status": "completed",
+    "startDate": "2025-11-01",
+    "dueDate": "2025-11-15",
+    "createdAt": "2025-10-25T08:15:00Z"
+  },
+  {
+    "id": "dmtask0056",
+    "description": "Edit customer interview video",
+    "assignedTo": "John Smith",
+    "role": "Video Editor",
+    "status": "completed",
+    "startDate": "2025-10-20",
+    "dueDate": "2025-10-30",
+    "createdAt": "2025-10-18T10:35:00Z"
+  },
+  {
+    "id": "dmtask0057",
+    "description": "Create data visualization graphics",
+    "assignedTo": "Sarah Johnson",
+    "role": "Graphic Designer",
+    "status": "in_progress",
+    "startDate": "2026-01-15",
+    "dueDate": "2026-01-30",
+    "createdAt": "2026-01-13T14:50:00Z"
+  },
+  {
+    "id": "dmtask0058",
+    "description": "Write blog series on best practices",
+    "assignedTo": "Mike Davis",
+    "role": "Content Writer",
+    "status": "completed",
+    "startDate": "2025-10-20",
+    "dueDate": "2025-11-05",
+    "createdAt": "2025-10-18T17:45:00Z"
+  },
+  {
+    "id": "dmtask0059",
+    "description": "Implement security updates",
+    "assignedTo": "Alex Chen",
+    "role": "Developer",
+    "status": "completed",
+    "startDate": "2025-10-10",
+    "dueDate": "2025-10-20",
+    "createdAt": "2025-10-08T13:20:00Z"
+  },
+  {
+    "id": "dmtask0060",
+    "description": "Organize annual team retreat",
+    "assignedTo": "Emma Wilson",
+    "role": "Manager",
+    "status": "cancelled",
+    "startDate": "2025-11-15",
+    "dueDate": "2025-12-01",
+    "createdAt": "2025-11-10T09:05:00Z"
+  },
+  {
+    "id": "dmtask0061",
+    "description": "Create motion graphics for presentation",
+    "assignedTo": "John Smith",
+    "role": "Video Editor",
+    "status": "not_started",
+    "startDate": "2026-01-10",
+    "dueDate": "2026-01-25",
+    "createdAt": "2026-01-08T11:25:00Z"
+  },
+  {
+    "id": "dmtask0062",
+    "description": "Design packaging artwork",
+    "assignedTo": "Sarah Johnson",
+    "role": "Graphic Designer",
+    "status": "completed",
+    "startDate": "2025-10-20",
+    "dueDate": "2025-11-01",
+    "createdAt": "2025-10-18T15:30:00Z"
+  },
+  {
+    "id": "dmtask0063",
+    "description": "Write product marketing copy",
+    "assignedTo": "Mike Davis",
+    "role": "Content Writer",
+    "status": "in_progress",
+    "startDate": "2026-01-20",
+    "dueDate": "2026-02-01",
+    "createdAt": "2026-01-18T16:40:00Z"
+  },
+  {
+    "id": "dmtask0064",
+    "description": "Develop automated testing framework",
+    "assignedTo": "Alex Chen",
+    "role": "Developer",
+    "status": "completed",
+    "startDate": "2025-11-01",
+    "dueDate": "2025-11-20",
+    "createdAt": "2025-10-28T12:10:00Z"
+  },
+  {
+    "id": "dmtask0065",
+    "description": "Plan resource allocation strategy",
+    "assignedTo": "Emma Wilson",
+    "role": "Manager",
+    "status": "in_progress",
+    "startDate": "2026-01-01",
+    "dueDate": "2026-01-28",
+    "createdAt": "2025-12-25T08:50:00Z"
+  },
+  {
+    "id": "dmtask0066",
+    "description": "Edit virtual event recording",
+    "assignedTo": "John Smith",
+    "role": "Video Editor",
+    "status": "completed",
+    "startDate": "2025-11-15",
+    "dueDate": "2025-11-25",
+    "createdAt": "2025-11-13T10:55:00Z"
+  },
+  {
+    "id": "dmtask0067",
+    "description": "Create icon set for mobile app",
+    "assignedTo": "Sarah Johnson",
+    "role": "Graphic Designer",
+    "status": "completed",
+    "startDate": "2025-10-10",
+    "dueDate": "2025-10-20",
+    "createdAt": "2025-10-08T14:05:00Z"
+  },
+  {
+    "id": "dmtask0068",
+    "description": "Write email marketing campaigns",
+    "assignedTo": "Mike Davis",
+    "role": "Content Writer",
+    "status": "cancelled",
+    "startDate": "2025-10-20",
+    "dueDate": "2025-11-01",
+    "createdAt": "2025-10-18T17:15:00Z"
+  },
+  {
+    "id": "dmtask0069",
+    "description": "Implement cloud migration",
+    "assignedTo": "Alex Chen",
+    "role": "Developer",
+    "status": "completed",
+    "startDate": "2025-11-01",
+    "dueDate": "2025-11-15",
+    "createdAt": "2025-10-28T13:45:00Z"
+  },
+  {
+    "id": "dmtask0070",
+    "description": "Conduct stakeholder interviews",
+    "assignedTo": "Emma Wilson",
+    "role": "Manager",
+    "status": "completed",
+    "startDate": "2025-10-15",
+    "dueDate": "2025-11-01",
+    "createdAt": "2025-10-10T09:30:00Z"
+  },
+  {
+    "id": "dmtask0071",
+    "description": "Create stop-motion animation",
+    "assignedTo": "John Smith",
+    "role": "Video Editor",
+    "status": "in_progress",
+    "startDate": "2026-01-01",
+    "dueDate": "2026-01-15",
+    "createdAt": "2025-12-30T11:40:00Z"
+  },
+  {
+    "id": "dmtask0072",
+    "description": "Design trade show booth graphics",
+    "assignedTo": "Sarah Johnson",
+    "role": "Graphic Designer",
+    "status": "not_started",
+    "startDate": "2026-01-01",
+    "dueDate": "2026-01-15",
+    "createdAt": "2025-12-28T15:55:00Z"
+  },
+  {
+    "id": "dmtask0073",
+    "description": "Write case study series",
+    "assignedTo": "Mike Davis",
+    "role": "Content Writer",
+    "status": "completed",
+    "startDate": "2025-11-10",
+    "dueDate": "2025-11-25",
+    "createdAt": "2025-11-08T16:20:00Z"
+  },
+  {
+    "id": "dmtask0074",
+    "description": "Develop chatbot functionality",
+    "assignedTo": "Alex Chen",
+    "role": "Developer",
+    "status": "in_progress",
+    "startDate": "2025-12-25",
+    "dueDate": "2026-01-05",
+    "createdAt": "2025-12-23T12:35:00Z"
+  },
+  {
+    "id": "dmtask0075",
+    "description": "Plan cross-department collaboration",
+    "assignedTo": "Emma Wilson",
+    "role": "Manager",
+    "status": "completed",
+    "startDate": "2025-10-20",
+    "dueDate": "2025-11-15",
+    "createdAt": "2025-10-28T08:40:00Z"
+  },
+  {
+    "id": "dmtask0076",
+    "description": "Edit documentary style video",
+    "assignedTo": "John Smith",
+    "role": "Video Editor",
+    "status": "completed",
+    "startDate": "2025-10-20",
+    "dueDate": "2025-11-01",
+    "createdAt": "2025-10-18T10:45:00Z"
+  },
+  {
+    "id": "dmtask0077",
+    "description": "Create infographic series",
+    "assignedTo": "Sarah Johnson",
+    "role": "Graphic Designer",
+    "status": "completed",
+    "startDate": "2025-11-15",
+    "dueDate": "2025-11-30",
+    "createdAt": "2025-11-13T14:25:00Z"
+  },
+  {
+    "id": "dmtask0078",
+    "description": "Write thought leadership articles",
+    "assignedTo": "Mike Davis",
+    "role": "Content Writer",
+    "status": "in_progress",
+    "startDate": "2026-01-15",
+    "dueDate": "2026-02-01",
+    "createdAt": "2026-01-13T17:50:00Z"
+  },
+  {
+    "id": "dmtask0079",
+    "description": "Implement machine learning features",
+    "assignedTo": "Alex Chen",
+    "role": "Developer",
+    "status": "completed",
+    "startDate": "2025-10-01",
+    "dueDate": "2025-10-20",
+    "createdAt": "2025-09-28T13:15:00Z"
+  },
+  {
+    "id": "dmtask0080",
+    "description": "Organize leadership development program",
+    "assignedTo": "Emma Wilson",
+    "role": "Manager",
+    "status": "not_started",
+    "startDate": "2026-01-01",
+    "dueDate": "2026-01-30",
+    "createdAt": "2025-12-28T09:55:00Z"
+  },
+  {
+    "id": "dmtask0081",
+    "description": "Create 360-degree video experience",
+    "assignedTo": "John Smith",
+    "role": "Video Editor",
+    "status": "completed",
+    "startDate": "2025-11-15",
+    "dueDate": "2025-11-30",
+    "createdAt": "2025-11-13T11:05:00Z"
+  },
+  {
+    "id": "dmtask0082",
+    "description": "Design AR/VR interface graphics",
+    "assignedTo": "Sarah Johnson",
+    "role": "Graphic Designer",
+    "status": "cancelled",
+    "startDate": "2025-10-20",
+    "dueDate": "2025-11-01",
+    "createdAt": "2025-10-18T15:40:00Z"
+  },
+  {
+    "id": "dmtask0083",
+    "description": "Write technical specifications",
+    "assignedTo": "Mike Davis",
+    "role": "Content Writer",
+    "status": "completed",
+    "startDate": "2025-11-10",
+    "dueDate": "2025-11-25",
+    "createdAt": "2025-11-08T16:30:00Z"
+  },
+  {
+    "id": "dmtask0084",
+    "description": "Develop blockchain integration",
+    "assignedTo": "Alex Chen",
+    "role": "Developer",
+    "status": "completed",
+    "startDate": "2025-10-01",
+    "dueDate": "2025-10-20",
+    "createdAt": "2025-09-28T12:50:00Z"
+  },
+  {
+    "id": "dmtask0085",
+    "description": "Plan digital transformation strategy",
+    "assignedTo": "Emma Wilson",
+    "role": "Manager",
+    "status": "in_progress",
+    "startDate": "2026-01-01",
+    "dueDate": "2026-01-31",
+    "createdAt": "2025-12-20T08:20:00Z"
+  },
+  {
+    "id": "dmtask0086",
+    "description": "Edit live stream recording",
+    "assignedTo": "John Smith",
+    "role": "Video Editor",
+    "status": "completed",
+    "startDate": "2025-11-15",
+    "dueDate": "2025-11-25",
+    "createdAt": "2025-11-13T10:25:00Z"
+  },
+  {
+    "id": "dmtask0087",
+    "description": "Create motion design templates",
+    "assignedTo": "Sarah Johnson",
+    "role": "Graphic Designer",
+    "status": "in_progress",
+    "startDate": "2026-01-01",
+    "dueDate": "2026-01-20",
+    "createdAt": "2025-12-29T14:45:00Z"
+  },
+  {
+    "id": "dmtask0088",
+    "description": "Write API documentation",
+    "assignedTo": "Mike Davis",
+    "role": "Content Writer",
+    "status": "completed",
+    "startDate": "2025-10-20",
+    "dueDate": "2025-11-01",
+    "createdAt": "2025-10-18T17:35:00Z"
+  },
+  {
+    "id": "dmtask0089",
+    "description": "Implement IoT connectivity",
+    "assignedTo": "Alex Chen",
+    "role": "Developer",
+    "status": "cancelled",
+    "startDate": "2025-11-10",
+    "dueDate": "2025-11-25",
+    "createdAt": "2025-11-08T13:40:00Z"
+  },
+  {
+    "id": "dmtask0090",
+    "description": "Conduct market research analysis",
+    "assignedTo": "Emma Wilson",
+    "role": "Manager",
+    "status": "completed",
+    "startDate": "2025-10-15",
+    "dueDate": "2025-11-01",
+    "createdAt": "2025-10-10T09:15:00Z"
+  },
+  {
+    "id": "dmtask0091",
+    "description": "Create VR training module",
+    "assignedTo": "John Smith",
+    "role": "Video Editor",
+    "status": "not_started",
+    "startDate": "2026-01-01",
+    "dueDate": "2026-01-20",
+    "createdAt": "2025-12-28T11:55:00Z"
+  },
+  {
+    "id": "dmtask0092",
+    "description": "Design gamification elements",
+    "assignedTo": "Sarah Johnson",
+    "role": "Graphic Designer",
+    "status": "completed",
+    "startDate": "2025-10-20",
+    "dueDate": "2025-11-05",
+    "createdAt": "2025-10-18T15:10:00Z"
+  },
+  {
+    "id": "dmtask0093",
+    "description": "Write interactive content",
+    "assignedTo": "Mike Davis",
+    "role": "Content Writer",
+    "status": "in_progress",
+    "startDate": "2026-01-15",
+    "dueDate": "2026-02-01",
+    "createdAt": "2026-01-13T16:45:00Z"
+  },
+  {
+    "id": "dmtask0094",
+    "description": "Develop AI-powered features",
+    "assignedTo": "Alex Chen",
+    "role": "Developer",
+    "status": "completed",
+    "startDate": "2025-10-10",
+    "dueDate": "2025-10-25",
+    "createdAt": "2025-10-08T12:25:00Z"
+  },
+  {
+    "id": "dmtask0095",
+    "description": "Plan innovation workshop series",
+    "assignedTo": "Emma Wilson",
+    "role": "Manager",
+    "status": "completed",
+    "startDate": "2025-11-01",
+    "dueDate": "2025-11-20",
+    "createdAt": "2025-10-28T08:35:00Z"
+  },
+  {
+    "id": "dmtask0096",
+    "description": "Edit holographic presentation",
+    "assignedTo": "John Smith",
+    "role": "Video Editor",
+    "status": "completed",
+    "startDate": "2025-11-15",
+    "dueDate": "2025-11-30",
+    "createdAt": "2025-11-13T10:40:00Z"
+  },
+  {
+    "id": "dmtask0097",
+    "description": "Create holographic interface designs",
+    "assignedTo": "Sarah Johnson",
+    "role": "Graphic Designer",
+    "status": "cancelled",
+    "startDate": "2025-10-20",
+    "dueDate": "2025-11-01",
+    "createdAt": "2025-10-18T14:55:00Z"
+  },
+  {
+    "id": "dmtask0098",
+    "description": "Write quantum computing whitepaper",
+    "assignedTo": "Mike Davis",
+    "role": "Content Writer",
+    "status": "completed",
+    "startDate": "2025-11-10",
+    "dueDate": "2025-11-25",
+    "createdAt": "2025-11-08T17:05:00Z"
+  },
+  {
+    "id": "dmtask0099",
+    "description": "Develop quantum algorithm implementation",
+    "assignedTo": "Alex Chen",
+    "role": "Developer",
+    "status": "in_progress",
+    "startDate": "2026-01-01",
+    "dueDate": "2026-02-01",
+    "createdAt": "2025-12-30T13:50:00Z"
+  },
+  {
+    "id": "dmtask0100",
+    "description": "Lead quantum technology initiative",
+    "assignedTo": "Emma Wilson",
+    "role": "Manager",
+    "status": "not_started",
+    "startDate": "2026-01-01",
+    "dueDate": "2026-01-31",
+    "createdAt": "2025-12-28T09:45:00Z"
+  }
+]

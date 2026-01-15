@@ -8,9 +8,13 @@ const LeadTransferModal = ({ show, onClose, users, leads }) => {
   const [loading, setLoading] = useState(false);
   const [counts, setCounts] = useState({ hot: 0, warm: 0, cold: 0, closed: 0 });
 
-  // Get sales users
-  const salesUsers = Object.values(users).filter(
-    (user) => user.department === "Sales" || (Array.isArray(user.departments) && user.departments.includes("Sales"))
+  // Get sales and admin users
+  const transferUsers = Object.values(users).filter(
+    (user) => 
+      user.department === "Sales" || 
+      (Array.isArray(user.departments) && user.departments.includes("Sales")) ||
+      user.department === "Admin" || 
+      (Array.isArray(user.departments) && user.departments.includes("Admin"))
   );
 
   // Calculate counts when selectedUser changes
@@ -90,7 +94,7 @@ const LeadTransferModal = ({ show, onClose, users, leads }) => {
             className="w-full p-2 border border-gray-300 rounded-md"
           >
             <option value="">Select User</option>
-            {salesUsers.map((user) => (
+            {transferUsers.map((user) => (
               <option key={user.uid} value={user.uid}>
                 {user.name}
               </option>
@@ -128,7 +132,7 @@ const LeadTransferModal = ({ show, onClose, users, leads }) => {
             className="w-full p-2 border border-gray-300 rounded-md"
           >
             <option value="">Select User</option>
-            {salesUsers
+            {transferUsers
               .filter((user) => user.uid !== selectedUser)
               .map((user) => (
                 <option key={user.uid} value={user.uid}>

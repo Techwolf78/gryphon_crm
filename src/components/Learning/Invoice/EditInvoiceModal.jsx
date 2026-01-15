@@ -60,25 +60,49 @@ function EditInvoiceModal({ trainer, onClose, onInvoiceUpdated, onToast }) {
               collection(db, "invoices"),
               where("trainerId", "==", trainer.trainerId),
               where("collegeName", "==", trainer.collegeName),
-              where("phase", "==", trainer.phase)
+              where("phase", "==", trainer.phase),
+              where("paymentCycle", "==", trainer.paymentCycle)
             )
           : query(
               collection(db, "invoices"),
               where("trainerId", "==", trainer.trainerId),
               where("collegeName", "==", trainer.collegeName),
               where("phase", "==", trainer.phase),
-              where("projectCode", "==", trainer.projectCode)
+              where("projectCode", "==", trainer.projectCode),
+              where("paymentCycle", "==", trainer.paymentCycle)
             );
+
+        console.log('🔍 EditInvoiceModal fetching invoice for:', {
+          trainerId: trainer.trainerId,
+          collegeName: trainer.collegeName,
+          phase: trainer.phase,
+          paymentCycle: trainer.paymentCycle,
+          projectCode: trainer.projectCode,
+          isMerged: trainer.isMerged
+        });
 
         const querySnapshot = await getDocs(q);
 
         if (!querySnapshot.empty) {
           const invoiceDoc = querySnapshot.docs[0];
           const data = invoiceDoc.data();
+          console.log('✅ EditInvoiceModal found invoice:', {
+            trainer: trainer.trainerName,
+            cycle: trainer.paymentCycle,
+            billNumber: data.billNumber,
+            netPayment: data.netPayment,
+            totalAmount: data.totalAmount,
+            totalHours: data.totalHours
+          });
           setInvoiceData({
             ...data,
             billingDate: data.billingDate || new Date().toISOString().split("T")[0],
             gst: String(data.gst || 'NA'),
+          });
+        } else {
+          console.log('❌ EditInvoiceModal no invoice found for:', {
+            trainer: trainer.trainerName,
+            cycle: trainer.paymentCycle
           });
         }
       } catch (error) {
@@ -134,14 +158,16 @@ function EditInvoiceModal({ trainer, onClose, onInvoiceUpdated, onToast }) {
               collection(db, "invoices"),
               where("trainerId", "==", trainer.trainerId),
               where("collegeName", "==", trainer.collegeName),
-              where("phase", "==", trainer.phase)
+              where("phase", "==", trainer.phase),
+              where("paymentCycle", "==", trainer.paymentCycle)
             )
           : query(
               collection(db, "invoices"),
               where("trainerId", "==", trainer.trainerId),
               where("collegeName", "==", trainer.collegeName),
               where("phase", "==", trainer.phase),
-              where("projectCode", "==", trainer.projectCode)
+              where("projectCode", "==", trainer.projectCode),
+              where("paymentCycle", "==", trainer.paymentCycle)
             );
         
         const currentInvoiceSnapshot = await getDocs(currentInvoiceQuery);
@@ -164,14 +190,16 @@ function EditInvoiceModal({ trainer, onClose, onInvoiceUpdated, onToast }) {
             collection(db, "invoices"),
             where("trainerId", "==", trainer.trainerId),
             where("collegeName", "==", trainer.collegeName),
-            where("phase", "==", trainer.phase)
+            where("phase", "==", trainer.phase),
+            where("paymentCycle", "==", trainer.paymentCycle)
           )
         : query(
             collection(db, "invoices"),
             where("trainerId", "==", trainer.trainerId),
             where("collegeName", "==", trainer.collegeName),
             where("phase", "==", trainer.phase),
-            where("projectCode", "==", trainer.projectCode)
+            where("projectCode", "==", trainer.projectCode),
+            where("paymentCycle", "==", trainer.paymentCycle)
           );
 
       const querySnapshot = await getDocs(q);
