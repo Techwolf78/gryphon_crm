@@ -24,6 +24,8 @@ import { exportPurchaseIntents } from "./utils/ExportIntent";
 import { Plus, PlusIcon } from "lucide-react";
 import ManageCSDD from "./ManageCSDD";
 import { toast } from "react-toastify";
+import { budgetComponents, componentColors } from "./config/department";
+
 
 // Lazy load components
 const BudgetForm = lazy(() => import("./BudgetForm"));
@@ -43,105 +45,6 @@ const ComponentLoader = () => (
   </div>
 );
 
-// Budget component types organized by department
-const budgetComponents = {
-  sales: {
-    emails: "Email Subscriptions",
-    laptops: "Laptops",
-    tshirts: "T-shirts",
-    printmedia: "Print Media",
-    diwaligifts: "Diwali Gifts",
-  },
-  cr: {
-    emails: "Email Subscriptions",
-    laptops: "Laptops",
-    tshirts: "T-shirts",
-    printmedia: "Print Media",
-    gifts: "Diwali & Other Gifts",
-  },
-  lnd: {
-    laptops: "Laptops",
-    printmedia: "Print Media",
-    trainertshirts: "Trainer T-shirts",
-    tshirts: "T-shirts",
-  },
-  hr: {
-    tshirts: "T-shirts",
-    email: "Email Subscriptions",
-    laptops: "Laptops",
-    ca: "CA Consultancy",
-  },
-  dm: {
-    laptops: "Laptops",
-    email: "Email Subscriptions",
-    printmedia: "Print Media",
-    tshirts: "T-shirts",
-    trademarks: "Trademarks / Domains",
-    adobe: "Adobe Creative Cloud",
-    envato: "Envato Subscription",
-    canva: "Canva Pro",
-    softwareinstallation: "Software Installation",
-    simcard: "SIM Card / Network Tools",
-    elevenlabs: "Eleven Labs Subscription",
-    performancemarketing: "Performance Marketing",
-  },
-  admin: {
-    emails: "Email Subscriptions",
-    pt: "Promotional Tools",
-    laptops: "Laptops",
-    tshirts: "T-shirts",
-    printmedia: "Print Media",
-    diwaligifts: "Diwali Gifts",
-  },
-  purchase: {
-    emails: "Email Subscriptions",
-    pt: "Promotional Tools",
-    laptops: "Laptops",
-    tshirts: "T-shirts",
-    printmedia: "Print Media",
-    diwaligifts: "Diwali Gifts",
-  },
-  placement: {
-    emails: "Email Subscriptions",
-    laptops: "Laptops",
-    tshirts: "T-shirts",
-    printmedia: "Print Media",
-    training_materials: "Training Materials",
-    placement_events: "Placement Events",
-    diwaligifts: "Diwali Gifts",
-    travel_expenses: "Travel Expenses",
-  },
-  management: {
-    emails: "Email Subscriptions",
-  },
-};
-
-// Component colors mapping
-const componentColors = {
-  emails: "bg-blue-100 text-blue-800 border-blue-200",
-  pt: "bg-purple-100 text-purple-800 border-purple-200",
-  laptops: "bg-sky-100 text-sky-800 border-sky-200",
-  tshirts: "bg-indigo-100 text-indigo-800 border-indigo-200",
-  printmedia: "bg-cyan-100 text-cyan-800 border-cyan-200",
-  diwaligifts: "bg-pink-100 text-pink-800 border-pink-200",
-  gifts: "bg-orange-100 text-orange-800 border-orange-200",
-  trainertshirts: "bg-green-100 text-green-800 border-green-200",
-  esic: "bg-red-100 text-red-800 border-red-200",
-  email: "bg-blue-100 text-blue-800 border-blue-200",
-  ca: "bg-gray-100 text-gray-800 border-gray-200",
-  trademarks: "bg-yellow-100 text-yellow-800 border-yellow-200",
-  adobe: "bg-red-100 text-red-800 border-red-200",
-  envato: "bg-green-100 text-green-800 border-green-200",
-  canva: "bg-blue-100 text-blue-800 border-blue-200",
-  softwareinstallation: "bg-purple-100 text-purple-800 border-purple-200",
-  simcard: "bg-indigo-100 text-indigo-800 border-indigo-200",
-  elevenlabs: "bg-amber-100 text-amber-800 border-amber-200",
-  performancemarketing: "bg-pink-100 text-pink-800 border-pink-200",
-  training_materials: "bg-teal-100 text-teal-800 border-teal-200",
-  placement_events: "bg-violet-100 text-violet-800 border-violet-200",
-  corporate_gifts: "bg-rose-100 text-rose-800 border-rose-200",
-  travel_expenses: "bg-lime-100 text-lime-800 border-lime-200",
-};
 
 // Indian Fiscal Year → April 1 to March 31
 const getCurrentFiscalYear = () => {
@@ -834,36 +737,35 @@ function BudgetDashboard({
     return map[department?.toLowerCase()] || department?.toUpperCase();
   };
 
-  const generatePurchaseOrderNumber = useCallback(async (
-    department,
-    fiscalYear,
-    budgetId
-  ) => {
-    const deptCode = getDepartmentCode(department);
-    const prefix = department?.toLowerCase() === "dm" ? "ICEM" : "GA";
+  const generatePurchaseOrderNumber = useCallback(
+    async (department, fiscalYear, budgetId) => {
+      const deptCode = getDepartmentCode(department);
+      const prefix = department?.toLowerCase() === "dm" ? "ICEM" : "GA";
 
-    const budgetRef = doc(db, "department_budgets", budgetId);
+      const budgetRef = doc(db, "department_budgets", budgetId);
 
-    // Run a transaction to safely increment the counter
-    const nextNumber = await runTransaction(db, async (transaction) => {
-      const budgetDoc = await transaction.get(budgetRef);
+      // Run a transaction to safely increment the counter
+      const nextNumber = await runTransaction(db, async (transaction) => {
+        const budgetDoc = await transaction.get(budgetRef);
 
-      if (!budgetDoc.exists()) {
-        throw new Error("Budget document not found!");
-      }
+        if (!budgetDoc.exists()) {
+          throw new Error("Budget document not found!");
+        }
 
-      const currentCount = budgetDoc.data().poCounter || 0;
-      const newCount = currentCount + 1;
+        const currentCount = budgetDoc.data().poCounter || 0;
+        const newCount = currentCount + 1;
 
-      transaction.update(budgetRef, { poCounter: increment(1) });
+        transaction.update(budgetRef, { poCounter: increment(1) });
 
-      return newCount;
-    });
+        return newCount;
+      });
 
-    return `${prefix}/${fiscalYear}/${deptCode}/${nextNumber
-      .toString()
-      .padStart(2, "0")}`;
-  }, []);
+      return `${prefix}/${fiscalYear}/${deptCode}/${nextNumber
+        .toString()
+        .padStart(2, "0")}`;
+    },
+    []
+  );
 
   const handleCreatePurchaseOrder = useCallback(
     async (orderData) => {
@@ -974,7 +876,14 @@ function BudgetDashboard({
         throw error;
       }
     },
-    [currentUser, department, currentFiscalYear, activeBudget, departmentBudget, generatePurchaseOrderNumber]
+    [
+      currentUser,
+      department,
+      currentFiscalYear,
+      activeBudget,
+      departmentBudget,
+      generatePurchaseOrderNumber,
+    ]
   );
 
   const handleUpdatePurchaseOrder = async (updatedOrder) => {
