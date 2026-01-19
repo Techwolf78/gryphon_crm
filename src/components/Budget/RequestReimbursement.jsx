@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "../../firebase";
+import { toast } from "react-toastify";
 
 export default function RequestReimbursement({
   department = "admin",
@@ -34,7 +35,7 @@ export default function RequestReimbursement({
   const [rows, setRows] = useState([emptyRow]);
   const [purpose, setPurpose] = useState("");
   const [formDate, setFormDate] = useState(
-    new Date().toISOString().slice(0, 10)
+    new Date().toISOString().slice(0, 10),
   );
   const [advanceReceived, setAdvanceReceived] = useState("");
   const [csddComponent, setCsddComponent] = useState("");
@@ -166,6 +167,7 @@ export default function RequestReimbursement({
         department,
         fiscalYear,
         date: formDate,
+        budgetId: currentBudget?.id,
         createdBy: currentUser.uid,
         createdAt: serverTimestamp(),
         status: "submitted",
@@ -185,14 +187,14 @@ export default function RequestReimbursement({
 
       await addDoc(collection(db, "csdd_expenses"), data);
 
-      alert("Reimbursement submitted successfully!");
+      toast("Reimbursement submitted successfully!");
 
       // Reset form and close modal
       resetForm();
       onClose();
     } catch (err) {
       console.error("Submission error:", err);
-      alert("Error submitting reimbursement. Please try again.");
+      toast.error("Error submitting reimbursement. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -217,7 +219,7 @@ export default function RequestReimbursement({
     ) {
       if (
         window.confirm(
-          "Are you sure you want to close? All unsaved data will be lost."
+          "Are you sure you want to close? All unsaved data will be lost.",
         )
       ) {
         resetForm();
@@ -638,7 +640,7 @@ export default function RequestReimbursement({
                 title="Amount to be Received"
                 value={amountToBeReceived}
                 subtitle={`Advance settled: ₹ ${amountToBeSettled.toLocaleString(
-                  "en-IN"
+                  "en-IN",
                 )}`}
                 variant="success"
               />

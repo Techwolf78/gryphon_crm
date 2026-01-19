@@ -3,6 +3,7 @@ import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "../../firebase";
 import { getAuth } from "firebase/auth";
 import { Calendar, IndianRupee, X } from "lucide-react";
+import { toast } from "react-toastify";
 
 /**
  * CreateVoucher Modal
@@ -164,7 +165,7 @@ export default function CreateVoucher({
   const employeeBalance = useMemo(() => {
     if (!employeeIdTrimmed) return 0;
     return Number(
-      currentBudget?.employeeAdvanceBalances?.[employeeIdTrimmed] || 0
+      currentBudget?.employeeAdvanceBalances?.[employeeIdTrimmed] || 0,
     );
   }, [currentBudget, employeeIdTrimmed]);
 
@@ -260,6 +261,7 @@ export default function CreateVoucher({
     const payload = {
       isVoucher: true,
       type: "voucher",
+      budgetId: currentBudget?.id,
       name: form.name.trim(),
       employeeId: employeeIdTrimmed,
       department: form.department || department || "",
@@ -295,11 +297,11 @@ export default function CreateVoucher({
 
     try {
       await addDoc(collection(db, "csdd_expenses"), payload);
-      alert("Voucher submitted successfully.");
+      toast.success("Voucher submitted successfully");
       handleClose();
     } catch (err) {
       console.error("Error submitting voucher:", err);
-      alert("Failed to submit voucher. Check console for details.");
+      toast.error("Failed to submit voucher. Check console for details.");
     } finally {
       setLoading(false);
     }
@@ -558,7 +560,7 @@ export default function CreateVoucher({
                     onChange={(e) =>
                       update(
                         "noOfPeople",
-                        Math.max(1, parseInt(e.target.value || 1))
+                        Math.max(1, parseInt(e.target.value || 1)),
                       )
                     }
                     className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white"

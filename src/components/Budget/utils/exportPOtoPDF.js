@@ -55,7 +55,7 @@ export const exportPurchaseOrderToPDF = async (order, vendorData) => {
     "9th Floor, Olympia Business House, Baner, Pune - 411045",
     120,
     29,
-    { align: "center" }
+    { align: "center" },
   );
   docPDF.setFont("helvetica", "bold");
   docPDF.setFontSize(12);
@@ -72,17 +72,14 @@ export const exportPurchaseOrderToPDF = async (order, vendorData) => {
   docPDF.text(
     `PO No. : ${order.poNumber || `PO-${order.id?.slice(-6)}`}`,
     15,
-    58
+    58,
   );
 
   // 🧾 Vendor Table
   autoTable(docPDF, {
     startY: 70,
     body: [
-      [
-        "Vendor Name:",
-        vendorData.contact || "_______________________",
-      ],
+      ["Vendor Name:", vendorData.contact || "_______________________"],
       ["Business Name:", vendorData.name || "_______________________"],
       ["Address:", vendorData.address || "_______________________"],
       ["Phone:", vendorData.phone || "_______________________"],
@@ -152,7 +149,7 @@ export const exportPurchaseOrderToPDF = async (order, vendorData) => {
       const halfGst = (gst.gstAmount || 0) / 2;
       itemRows.push(
         ["", "", "SGST ", "9%", formatNum(halfGst), formatNum(halfGst)],
-        ["", "", "CGST ", "9%", formatNum(halfGst), formatNum(halfGst)]
+        ["", "", "CGST ", "9%", formatNum(halfGst), formatNum(halfGst)],
       );
     } else {
       // 🚛 Out-of-State Vendor: Show IGST (Full Amount)
@@ -257,7 +254,7 @@ export const exportPurchaseOrderToPDF = async (order, vendorData) => {
     `${order.department?.toUpperCase() || "DEPARTMENT"} BUDGET SUMMARY`,
     105,
     20,
-    { align: "center" }
+    { align: "center" },
   );
 
   const rows = [];
@@ -336,7 +333,7 @@ export const exportPurchaseOrderToPDF = async (order, vendorData) => {
     },
     didParseCell: (data) => {
       const spent = parseFloat(
-        (data.row.raw?.[4] || "0").toString().replace(/,/g, "")
+        (data.row.raw?.[4] || "0").toString().replace(/,/g, ""),
       );
       const description = data.row.raw?.[1] || "";
       const isTotalRow = data.row.raw?.[0] === "TOTAL";
@@ -362,6 +359,30 @@ export const exportPurchaseOrderToPDF = async (order, vendorData) => {
         data.cell.styles.textColor = [40, 40, 40];
         data.cell.styles.fillColor = [230, 230, 230];
       }
+    },
+  });
+
+  // ✍️ Signatures
+  autoTable(docPDF, {
+    startY: docPDF.lastAutoTable.finalY + 10,
+    body: [
+      ["", ""],
+      ["Signature\n\n(Founder & Director)", "Signature\n\n(Co-Founder)"],
+    ],
+    theme: "grid",
+    styles: {
+      fontSize: 9,
+      halign: "center",
+      minCellHeight: 20,
+      textColor: [40, 40, 40],
+      lineColor: [0, 0, 0],
+    },
+    columnStyles: {
+      0: { cellWidth: 36 },
+      1: { cellWidth: 36 },
+      2: { cellWidth: 36 },
+      3: { cellWidth: 36 },
+      4: { cellWidth: 36 },
     },
   });
 
