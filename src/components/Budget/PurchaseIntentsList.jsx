@@ -30,32 +30,38 @@ const PurchaseIntentsList = ({
     }));
   };
 
-  // Add this function to get the component name for any intent
-  const getComponentName = (intent) => {
-    // Safely get the component key from intent
-    const componentKey =
-      intent?.selectedBudgetComponent || intent?.budgetComponent;
-
-    if (!componentKey) {
-      return "Unknown Component";
+  // ✅ IMPROVED: Smart Component Name Formatter
+  const getComponentName = (intentOrKey) => {
+    // Handle both passing the full intent object OR just the key string
+    let componentKey;
+    if (typeof intentOrKey === "string") {
+      componentKey = intentOrKey;
+    } else {
+      componentKey =
+        intentOrKey?.selectedBudgetComponent || intentOrKey?.budgetComponent;
     }
 
-    if (getComponentsForItem) {
-      // Use the provided function to get department-specific components
+    if (!componentKey) return "Unknown Component";
+
+    // 1. Try to get specific department name if function provided
+    if (getComponentsForItem && typeof intentOrKey === "object") {
       try {
-        const deptComponents = getComponentsForItem(intent);
-        return deptComponents?.[componentKey] || componentKey;
+        const deptComponents = getComponentsForItem(intentOrKey);
+        if (deptComponents?.[componentKey]) return deptComponents[componentKey];
       } catch (error) {
-        console.error("Error getting department components:", error);
-        return componentKey;
+        // ignore
       }
     }
 
-    // Fallback to current department's components
-    if (budgetComponents && typeof budgetComponents === "object") {
-      return budgetComponents[componentKey] || componentKey;
+    // 2. Try the passed budgetComponents prop
+    if (budgetComponents?.[componentKey]) {
+      return budgetComponents[componentKey];
     }
-    return componentKey;
+
+    // 3. Fallback: Prettify the ID (e.g. "office_party" -> "Office Party")
+    return componentKey
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (l) => l.toUpperCase());
   };
 
   // Add this function to get component color
@@ -194,6 +200,17 @@ const PurchaseIntentsList = ({
     return "No items";
   };
 
+  // ✅ IMPROVED: Get unique components list from ACTUAL data
+  // This ensures custom components added to the DB show up in the filter
+  const getUniqueComponents = () => {
+    const usedComponents = new Set();
+    intents.forEach((intent) => {
+      const key = intent.selectedBudgetComponent || intent.budgetComponent;
+      if (key) usedComponents.add(key);
+    });
+    return Array.from(usedComponents);
+  };
+
   return (
     <div className="space-y-4" onClick={handleClickOutside}>
       {/* Filters */}
@@ -232,32 +249,12 @@ const PurchaseIntentsList = ({
               className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs"
             >
               <option value="">All Components</option>
-              {getComponentsForItem
-                ? // For multiple departments, show unique components from all intents
-                  [
-                    ...new Set(
-                      intents
-                        .map(
-                          (intent) =>
-                            intent.selectedBudgetComponent ||
-                            intent.budgetComponent
-                        )
-                        .filter(Boolean)
-                    ),
-                  ].map((componentKey) => (
-                    <option key={componentKey} value={componentKey}>
-                      {getComponentName({
-                        selectedBudgetComponent: componentKey,
-                        budgetComponent: componentKey,
-                      })}
-                    </option>
-                  ))
-                : // For single department, show from budgetComponents
-                  Object.entries(budgetComponents).map(([key, label]) => (
-                    <option key={key} value={key}>
-                      {label}
-                    </option>
-                  ))}
+              {/* ✅ Dynamically map whatever is in the list, plus prettify the name */}
+              {getUniqueComponents().map((key) => (
+                <option key={key} value={key}>
+                  {getComponentName(key)}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -376,7 +373,7 @@ const PurchaseIntentsList = ({
                 <tr key={intent.id} className="hover:bg-gray-50">
                   {showDepartment && (
                     <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-900">
-                      {intent.department.toUpperCase() || "Unknown"}
+                      {intent.department?.toUpperCase() || "Unknown"}
                     </td>
                   )}
                   <td className="px-4 py-3">
@@ -403,13 +400,22 @@ const PurchaseIntentsList = ({
                         intent
                       )}`}
                     >
-                      {getComponentName(intent)} {/* ✅ NEW WAY */}
+                      {getComponentName(intent)}
                     </span>
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                    ₹
-                    {intent.estimatedTotal?.toLocaleString("en-In") ||
-                      intent.totalEstimate?.toLocaleString("en-In")}
+                    <div className="flex flex-col">
+                      <span className="font-semibold">
+                        ₹
+                        {intent.estimatedTotal?.toLocaleString("en-In") ||
+                          intent.totalEstimate?.toLocaleString("en-In")}
+                      </span>
+                      {intent.includeGST && (
+                        <span className="text-[10px] text-gray-500">
+                          (Incl. GST)
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     <span
@@ -654,12 +660,28 @@ const PurchaseIntentsList = ({
                       <dt className="font-medium text-gray-500">
                         Total Estimate
                       </dt>
-                      <dd className="text-gray-900 font-semibold">
+                      <dd className="text-gray-900 font-semibold flex items-center gap-1">
                         ₹
                         {viewModal.estimatedTotal?.toLocaleString("en-IN") ||
                           viewModal.totalEstimate?.toLocaleString("en-IN")}
+                        {viewModal.includeGST && (
+                          <span className="text-xs text-gray-500 font-normal">
+                            (Incl. GST)
+                          </span>
+                        )}
                       </dd>
                     </div>
+                    {/* Add Base Price display if GST is included */}
+                    {viewModal.includeGST && viewModal.baseTotal && (
+                      <div>
+                        <dt className="font-medium text-gray-500">
+                          Base Cost (Excl. GST)
+                        </dt>
+                        <dd className="text-gray-600">
+                          ₹{viewModal.baseTotal.toLocaleString("en-IN")}
+                        </dd>
+                      </div>
+                    )}
                     <div>
                       <dt className="font-medium text-gray-500">Status</dt>
                       <dd>
@@ -855,6 +877,7 @@ const PurchaseIntentsList = ({
                       <svg
                         className="animate-spin -ml-1 mr-1.5 h-3.5 w-3.5 text-white"
                         fill="none"
+                        stroke="currentColor"
                         viewBox="0 0 24 24"
                       >
                         <circle

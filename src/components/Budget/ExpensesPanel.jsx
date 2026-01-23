@@ -1,8 +1,12 @@
-import { useState, useMemo } from "react";
-import { Building2, Wifi, Wrench, Zap, Home, Lock, Users } from "lucide-react";
+import { useState, useMemo, lazy, Suspense } from "react";
+import { Wifi, Wrench, Zap, Home, Lock, Users } from "lucide-react";
 import FixedCostExpenseModal from "./FixedCostExpenseModal";
 import EmployeeSalaryModal from "./EmployeeSalaryModal";
 import CsddCostsPanel from "./CSDDCostsPanel";
+
+// 1. Import the Settlement Log Table we created earlier
+// Using lazy load to keep performance high, or standard import if you prefer
+const SettlementLogTable = lazy(() => import("./SettlementLogTable"));
 
 const hrExpenseCategories = [
   {
@@ -60,7 +64,7 @@ function ExpensesPanel({
 
   const renderExpenseModal = () => {
     const selected = hrExpenseCategories.find(
-      (e) => e.key === activeExpenseType
+      (e) => e.key === activeExpenseType,
     );
     if (!selected) return null;
 
@@ -124,10 +128,13 @@ function ExpensesPanel({
     );
   }
 
+  // Helper to get the ID for the logs
+  const currentBudgetId = activeBudgets?.[0]?.id;
+
   return (
     <div className="space-y-8">
       {/* ---------------------- */}
-      {/* 🎯 TOP NAVIGATION - SMOOTH UNDERLINE */}
+      {/* 🎯 TOP NAVIGATION */}
       {/* ---------------------- */}
       <div className="border-b border-gray-200">
         <nav className="flex space-x-8">
@@ -205,7 +212,6 @@ function ExpensesPanel({
                       <div className="p-3 rounded-xl bg-gray-100 group-hover:bg-gray-200 transition-colors">
                         <Icon className="w-6 h-6 text-gray-700" />
                       </div>
-
                       <div>
                         <h3 className="text-lg font-semibold text-gray-900 mb-1">
                           {exp.label}
@@ -217,7 +223,6 @@ function ExpensesPanel({
                         </p>
                       </div>
                     </div>
-
                     <div className="absolute bottom-0 left-0 w-full h-[3px] bg-gray-100 group-hover:bg-blue-500 transition-all rounded-b-xl" />
                   </button>
                 );
@@ -229,12 +234,30 @@ function ExpensesPanel({
         )}
 
         {activeTab === "csdd" && (
-          <CsddCostsPanel
-            department="purchase"
-            fiscalYear={activeBudgets?.[0]?.fiscalYear}
-            currentUser={currentUser}
-            currentBudget={activeBudgets?.[0] || null}
-          />
+          <div className="space-y-10">
+            {/* 1. Main CSDD Cost Visualization */}
+            <CsddCostsPanel
+              department="purchase"
+              fiscalYear={activeBudgets?.[0]?.fiscalYear}
+              currentUser={currentUser}
+              currentBudget={activeBudgets?.[0] || null}
+            />
+
+            {/* 2. Audit Trail for CSDD Settlements */}
+            {currentBudgetId && (
+              <div className=" border-t border-gray-200">
+                <Suspense
+                  fallback={
+                    <div className="p-4 text-center text-gray-500">
+                      Loading logs...
+                    </div>
+                  }
+                >
+                  <SettlementLogTable budgetId={currentBudgetId} />
+                </Suspense>
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>

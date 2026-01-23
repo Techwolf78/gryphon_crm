@@ -9,11 +9,14 @@ import {
   doc,
   increment,
   serverTimestamp,
+  runTransaction,
 } from "firebase/firestore";
 import { db } from "../../firebase";
 import exportVoucherToPDF from "./utils/exportVoucherToPDF.js";
 import exportReimbursementPDF from "./utils/exportReimbursementPDF.js";
 import SettlementModal from "./SettlementModal.jsx";
+import exportCashVoucherToPDF from "./utils/exportCashVoucherToPDF.js";
+import { toast } from "react-toastify";
 
 export default function ViewRequests({
   department,
@@ -28,7 +31,7 @@ export default function ViewRequests({
   const [actionLoading, setActionLoading] = useState(null);
   const [showSettlementModal, setShowSettlementModal] = useState(false);
   const [searchText, setSearchText] = useState("");
-  const [filterStatus, setFilterStatus] = useState("submitted");
+  const [filterStatus, setFilterStatus] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
@@ -39,7 +42,7 @@ export default function ViewRequests({
   const totalPages = Math.ceil(requests.length / pageSize);
   const paginated = requests.slice(
     (currentPage - 1) * pageSize,
-    currentPage * pageSize
+    currentPage * pageSize,
   );
 
   useEffect(() => {
@@ -53,7 +56,7 @@ export default function ViewRequests({
       q = query(
         csddCollection,
         where("department", "==", department),
-        where("fiscalYear", "==", fiscalYear)
+        where("fiscalYear", "==", fiscalYear),
       );
     }
 
@@ -79,7 +82,7 @@ export default function ViewRequests({
           (r) =>
             (r.name || "").toLowerCase().includes(s) ||
             (r.purpose || "").toLowerCase().includes(s) ||
-            (r.employeeId || "").toLowerCase().includes(s)
+            (r.employeeId || "").toLowerCase().includes(s),
         );
       }
 
@@ -124,58 +127,64 @@ export default function ViewRequests({
     setActionLoading(request.id);
 
     try {
-      const ref = doc(db, "csdd_expenses", request.id);
+      await runTransaction(db, async (transaction) => {
+        const budgetIdToUse = request.budgetId || currentBudget?.id;
 
-      // First update request status
-      await updateDoc(ref, {
-        status: "approved",
-        approvedAt: serverTimestamp(),
-        approvedBy: currentUser?.uid,
+        if (!budgetIdToUse) {
+          throw new Error("Budget ID missing. Cannot process approval.");
+        }
+        // 1. References
+        const requestRef = doc(db, "csdd_expenses", request.id);
+
+        // 2. Prepare Budget Logic
+        // We check conditions here to see if we need to touch the budget doc
+        if (budgetIdToUse && request.csddComponent && request.totalAmount > 0) {
+          const budgetRef = doc(db, "department_budgets", budgetIdToUse);
+
+          // Calculate values safely
+          const advanceUsed = Number(
+            request.advanceUsed || request.totalAmount || 0,
+          );
+          const usedFromBalance = Number(request.usedFromEmployeeBalance || 0);
+
+          const budgetUpdate = {
+            lastUpdatedAt: serverTimestamp(),
+            updatedBy: currentUser?.uid,
+          };
+
+          // A. Deduct from Department Budget
+          if (advanceUsed > 0) {
+            budgetUpdate[`csddExpenses.${request.csddComponent}.spent`] =
+              increment(advanceUsed);
+            budgetUpdate["summary.totalSpent"] = increment(advanceUsed);
+          }
+
+          // B. Adjust Employee Advance Balance
+          if (usedFromBalance > 0 && request.employeeId) {
+            budgetUpdate[`employeeAdvanceBalances.${request.employeeId}`] =
+              increment(-usedFromBalance);
+          }
+
+          // QUEUE BUDGET UPDATE (Within Transaction)
+          transaction.update(budgetRef, budgetUpdate);
+        }
+
+        // 3. QUEUE REQUEST STATUS UPDATE (Within Transaction)
+        transaction.update(requestRef, {
+          status: "approved",
+          approvedAt: serverTimestamp(),
+          approvedBy: currentUser?.uid,
+        });
       });
 
-      // ---- Budget update ----
-      if (
-        currentBudget?.id &&
-        request.csddComponent &&
-        request.totalAmount > 0
-      ) {
-        const budgetRef = doc(db, "department_budgets", currentBudget.id);
-
-        // ❌ DO NOT RECALCULATE ANYTHING
-        // ✔ USE values stored in request:
-
-        const advanceUsed = Number(
-          request.advanceUsed || request.totalAmount || 0
-        );
-        const usedFromBalance = Number(request.usedFromEmployeeBalance || 0);
-
-        const budgetUpdate = {
-          lastUpdatedAt: serverTimestamp(),
-          updatedBy: currentUser?.uid,
-        };
-
-        // 1️⃣ Deduct from department budget (ONLY the final sanctioned amount)
-        if (advanceUsed > 0) {
-          budgetUpdate[`csddExpenses.${request.csddComponent}.spent`] =
-            increment(advanceUsed);
-
-          budgetUpdate["summary.totalSpent"] = increment(advanceUsed);
-        }
-
-        // 2️⃣ Reduce the employee's advance balance by the amount used
-        if (usedFromBalance > 0 && request.employeeId) {
-          budgetUpdate[`employeeAdvanceBalances.${request.employeeId}`] =
-            increment(-usedFromBalance);
-        }
-
-        await updateDoc(budgetRef, budgetUpdate);
-      }
-
+      // Success (Transaction automatically commits here)
       setActionLoading(null);
+      toast.success("Approved Successfully")
+      // Optional: Add a success toast here
     } catch (err) {
-      console.error(err);
+      console.error("Transaction failed: ", err);
       setActionLoading(null);
-      alert("Approval failed");
+      toast.error("Approval failed. Please try again.");
     }
   };
 
@@ -193,10 +202,11 @@ export default function ViewRequests({
       });
 
       setActionLoading(null);
+      toast.success("Rejected Successfully")
     } catch (err) {
       console.error(err);
       setActionLoading(null);
-      alert("Rejection failed");
+      toast.success("Rejection Failed");
     }
   };
 
@@ -387,12 +397,12 @@ export default function ViewRequests({
                   <div className="flex items-center gap-2">
                     <div
                       className={`w-2 h-2 rounded-full ${getStatusDot(
-                        req.status
+                        req.status,
                       )}`}
                     />
                     <span
                       className={`px-3 py-1.5 rounded-full text-xs font-semibold capitalize ${typeBadge(
-                        req.type
+                        req.type,
                       )}`}
                     >
                       {req.type === "voucher"
@@ -402,7 +412,7 @@ export default function ViewRequests({
                   </div>
                   <span
                     className={`px-3 py-1.5 rounded-full text-xs font-semibold ${badge(
-                      req.status
+                      req.status,
                     )}`}
                   >
                     {req.status}
@@ -744,7 +754,7 @@ export default function ViewRequests({
                     >
                       {page}
                     </button>
-                  )
+                  ),
                 )}
               </div>
 
@@ -825,7 +835,7 @@ export default function ViewRequests({
                 <DetailCard
                   label="Amount"
                   value={`₹${selectedRequest.totalAmount?.toLocaleString(
-                    "en-IN"
+                    "en-IN",
                   )}`}
                   highlight
                 />
@@ -908,7 +918,7 @@ export default function ViewRequests({
                                   ₹{value.toLocaleString("en-IN")}
                                 </td>
                               </tr>
-                            )
+                            ),
                           )}
                         </tbody>
                       </table>
@@ -989,11 +999,37 @@ export default function ViewRequests({
                 {(selectedRequest.type === "voucher" ||
                   selectedRequest.type === "reimbursement") && (
                   <button
-                    onClick={() =>
-                      selectedRequest.type === "voucher"
-                        ? exportVoucherToPDF(selectedRequest, currentBudget)
-                        : exportReimbursementPDF(selectedRequest, currentBudget)
-                    }
+                    onClick={() => {
+                      // 1. Handle Reimbursement
+                      if (selectedRequest.type === "reimbursement") {
+                        return exportReimbursementPDF(
+                          selectedRequest,
+                          currentBudget,
+                        );
+                      }
+
+                      // 2. Handle Voucher (Cash vs Normal)
+                      if (selectedRequest.type === "voucher") {
+                        // Check the 'modeOfPayment' field from your database
+                        const isCash =
+                          selectedRequest.modeOfPayment?.toLowerCase() ===
+                          "cash";
+
+                        if (isCash) {
+                          // Use the new Cash PDF generator
+                          return exportCashVoucherToPDF(
+                            selectedRequest,
+                            currentBudget,
+                          );
+                        } else {
+                          // Use the standard PDF generator
+                          return exportVoucherToPDF(
+                            selectedRequest,
+                            currentBudget,
+                          );
+                        }
+                      }
+                    }}
                     className="px-6 py-2.5 text-white bg-blue-600 border border-blue-600 rounded-xl hover:bg-blue-700 transition duration-200 font-medium flex items-center gap-2"
                   >
                     <svg
@@ -1009,10 +1045,13 @@ export default function ViewRequests({
                         d="M12 4v16m8-8H4"
                       />
                     </svg>
-                    Export PDF
+                    {/* Dynamic Label for clarity */}
+                    Export{" "}
+                    {selectedRequest.modeOfPayment === "Cash"
+                      ? "Cash Voucher"
+                      : "PDF"}
                   </button>
                 )}
-
                 {/* RIGHT SIDE BUTTONS */}
                 <div className="flex gap-3">
                   <button

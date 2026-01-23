@@ -21,14 +21,18 @@ import { exportPurchaseOrders } from "../components/Budget/utils/ExportPO";
 import { exportPurchaseIntents } from "../components/Budget/utils/ExportIntent";
 import ViewBudgetModal from "../components/Budget/ViewBudgetModal";
 import { toast } from "react-toastify";
+import {
+  BarChart4,
+  Edit,
+  LucideEye,
+  Plus,
+  Trash2,
+  TriangleAlert,
+} from "lucide-react";
 
 // Lazy load components
-const BudgetForm = lazy(() => import("../components/Budget/BudgetForm"));
 const BudgetUpdateForm = lazy(() =>
   import("../components/Budget/BudgetUpdateForm")
-);
-const PurchaseIntentModal = lazy(() =>
-  import("../components/Budget/PurchaseIntentModal")
 );
 const PurchaseOrderModal = lazy(() =>
   import("../components/Budget/PurchaseOrderModal")
@@ -239,19 +243,7 @@ const ActionDropdown = ({ budget, onEdit, onDelete, onView, onSelect }) => {
               }}
               className="flex items-center w-full px-3 py-1.5 text-green-600 hover:bg-gray-100 whitespace-nowrap"
             >
-              <svg
-                className="w-3.5 h-3.5 mr-2"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                />
-              </svg>
+              <BarChart4 className="w-3.5 h-3.5 mr-2" />
               Change Overview
             </button>
             <button
@@ -261,25 +253,7 @@ const ActionDropdown = ({ budget, onEdit, onDelete, onView, onSelect }) => {
               }}
               className="flex items-center w-full px-3 py-1.5 text-gray-700 hover:bg-gray-100 whitespace-nowrap"
             >
-              <svg
-                className="w-3.5 h-3.5 mr-2"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                />
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                />
-              </svg>
+              <LucideEye className="w-3.5 h-3.5 mr-2" />
               View Details
             </button>
             <button
@@ -289,19 +263,7 @@ const ActionDropdown = ({ budget, onEdit, onDelete, onView, onSelect }) => {
               }}
               className="flex items-center w-full px-3 py-1.5 text-blue-600 hover:bg-gray-100 whitespace-nowrap"
             >
-              <svg
-                className="w-3.5 h-3.5 mr-2"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                />
-              </svg>
+              <Edit className="w-3.5 h-3.5 mr-2" />
               Edit Budget
             </button>
             <button
@@ -311,19 +273,7 @@ const ActionDropdown = ({ budget, onEdit, onDelete, onView, onSelect }) => {
               }}
               className="flex items-center w-full px-3 py-1.5 text-emerald-600 hover:bg-gray-100 whitespace-nowrap"
             >
-              <svg
-                className="w-3.5 h-3.5 mr-2"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 4v16m8-8H4"
-                />
-              </svg>
+              <Plus className="w-3.5 h-3.5 mr-2" />
               Export Budget
             </button>
             <button
@@ -333,19 +283,7 @@ const ActionDropdown = ({ budget, onEdit, onDelete, onView, onSelect }) => {
               }}
               className="flex items-center w-full px-3 py-1.5 text-red-600 hover:bg-gray-100 whitespace-nowrap"
             >
-              <svg
-                className="w-3.5 h-3.5 mr-2"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                />
-              </svg>
+              <Trash2 className="w-3.5 h-3.5 mr-2" />
               Delete Budget
             </button>
           </div>
@@ -1177,19 +1115,7 @@ function Purchase() {
                   }}
                   className="bg-emerald-600 text-white px-3 py-2 rounded-lg font-semibold hover:opacity-90 transition-all shadow-[inset_0_1px_3px_rgba(255,255,255,0.3),0_3px_5px_rgba(0,0,0,0.4)] active:shadow-[inset_0_3px_5px_rgba(0,0,0,0.4)] active:translate-y-0.5 flex items-center text-xs"
                 >
-                  <svg
-                    className="w-3.5 h-3.5 mr-1.5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 4v16m8-8H4"
-                    />
-                  </svg>
+                  <Plus className="w-3.5 h-3.5 mr-2" />
                   Export
                 </button>
               )}
@@ -1391,19 +1317,7 @@ function Purchase() {
                   ) : (
                     <div className="text-center py-8">
                       <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 max-w-md mx-auto">
-                        <svg
-                          className="w-10 h-10 text-yellow-500 mx-auto mb-3"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.35 16.5c-.77.833.192 2.5 1.732 2.5z"
-                          />
-                        </svg>
+                        <TriangleAlert className="w-10 h-10 text-yellow-500 mx-auto mb-3" />
                         <h3 className="text-base font-semibold text-yellow-800 mb-1.5">
                           No Budgets Found
                         </h3>
@@ -1516,27 +1430,45 @@ function Purchase() {
                 <div className="bg-linear-to-r from-indigo-500/10 to-purple-500/10 backdrop-blur-sm rounded-2xl p-4 border border-white/20 shadow-lg">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 bg-linear-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
-                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                      </svg>
+                      <BarChart4 className="w-4 h-4 text-white" />
                     </div>
                     <div>
-                      <h2 className="text-lg font-bold text-gray-900">Budget Analytics</h2>
-                      <p className="text-sm text-gray-600 mt-1">Comprehensive budget performance overview across all departments</p>
+                      <h2 className="text-lg font-bold text-gray-900">
+                        Budget Analytics
+                      </h2>
+                      <p className="text-sm text-gray-600 mt-1">
+                        Comprehensive budget performance overview across all
+                        departments
+                      </p>
                     </div>
                   </div>
                   <div className="mt-4 flex items-center gap-4">
                     <div className="bg-white/60 backdrop-blur-sm rounded-xl px-4 py-2 border border-white/40">
-                      <span className="text-sm font-medium text-gray-600">Fiscal Year:</span>
-                      <span className="ml-2 font-bold text-gray-900">FY{currentFiscalYear}</span>
+                      <span className="text-sm font-medium text-gray-600">
+                        Fiscal Year:
+                      </span>
+                      <span className="ml-2 font-bold text-gray-900">
+                        FY{currentFiscalYear}
+                      </span>
                     </div>
                     <div className="bg-white/60 backdrop-blur-sm rounded-xl px-4 py-2 border border-white/40">
-                      <span className="text-sm font-medium text-gray-600">Total Budgets:</span>
-                      <span className="ml-2 font-bold text-gray-900">{budgetHistory.length}</span>
+                      <span className="text-sm font-medium text-gray-600">
+                        Total Budgets:
+                      </span>
+                      <span className="ml-2 font-bold text-gray-900">
+                        {budgetHistory.length}
+                      </span>
                     </div>
                     <div className="bg-white/60 backdrop-blur-sm rounded-xl px-4 py-2 border border-white/40">
-                      <span className="text-sm font-medium text-gray-600">Active Budgets:</span>
-                      <span className="ml-2 font-bold text-emerald-600">{budgetHistory.filter(b => b.status === 'active').length}</span>
+                      <span className="text-sm font-medium text-gray-600">
+                        Active Budgets:
+                      </span>
+                      <span className="ml-2 font-bold text-emerald-600">
+                        {
+                          budgetHistory.filter((b) => b.status === "active")
+                            .length
+                        }
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -1547,30 +1479,59 @@ function Purchase() {
                       <table className="w-full text-sm">
                         <thead className="bg-gray-50/80 border-b border-gray-200/50">
                           <tr>
-                            <th className="text-left py-3 px-4 font-semibold text-gray-700">Department</th>
-                            <th className="text-left py-3 px-4 font-semibold text-gray-700">Fiscal Year</th>
-                            <th className="text-left py-3 px-4 font-semibold text-gray-700">Total Budget</th>
-                            <th className="text-left py-3 px-4 font-semibold text-gray-700">Total Spent</th>
-                            <th className="text-left py-3 px-4 font-semibold text-gray-700">Remaining</th>
-                            <th className="text-left py-3 px-4 font-semibold text-gray-700">Utilization</th>
-                            <th className="text-left py-3 px-4 font-semibold text-gray-700">Status</th>
+                            <th className="text-left py-3 px-4 font-semibold text-gray-700">
+                              Department
+                            </th>
+                            <th className="text-left py-3 px-4 font-semibold text-gray-700">
+                              Fiscal Year
+                            </th>
+                            <th className="text-left py-3 px-4 font-semibold text-gray-700">
+                              Total Budget
+                            </th>
+                            <th className="text-left py-3 px-4 font-semibold text-gray-700">
+                              Total Spent
+                            </th>
+                            <th className="text-left py-3 px-4 font-semibold text-gray-700">
+                              Remaining
+                            </th>
+                            <th className="text-left py-3 px-4 font-semibold text-gray-700">
+                              Utilization
+                            </th>
+                            <th className="text-left py-3 px-4 font-semibold text-gray-700">
+                              Status
+                            </th>
                           </tr>
                         </thead>
                         <tbody>
                           {budgetHistory
                             .sort((a, b) => {
                               // Sort active budgets first, then by fiscal year (newest first)
-                              if (a.status === "active" && b.status !== "active") return -1;
-                              if (a.status !== "active" && b.status === "active") return 1;
+                              if (
+                                a.status === "active" &&
+                                b.status !== "active"
+                              )
+                                return -1;
+                              if (
+                                a.status !== "active" &&
+                                b.status === "active"
+                              )
+                                return 1;
 
                               // If both have same status, sort by fiscal year (newest first)
-                              const yearA = parseInt(a.fiscalYear.split("-")[0]);
-                              const yearB = parseInt(b.fiscalYear.split("-")[0]);
+                              const yearA = parseInt(
+                                a.fiscalYear.split("-")[0]
+                              );
+                              const yearB = parseInt(
+                                b.fiscalYear.split("-")[0]
+                              );
                               return yearB - yearA;
                             })
                             .map((budget) => {
-                              const utilizationRate = budget.summary?.totalBudget
-                                ? (budget.summary.totalSpent / budget.summary.totalBudget) * 100
+                              const utilizationRate = budget.summary
+                                ?.totalBudget
+                                ? (budget.summary.totalSpent /
+                                    budget.summary.totalBudget) *
+                                  100
                                 : 0;
 
                               const getUtilizationColor = (rate) => {
@@ -1591,9 +1552,11 @@ function Purchase() {
                                   purchase: "from-cyan-500 to-cyan-600",
                                   admin: "from-gray-500 to-gray-600",
                                   management: "from-slate-500 to-slate-600",
-                                  cr: "from-violet-500 to-violet-600"
+                                  cr: "from-violet-500 to-violet-600",
                                 };
-                                return colors[dept] || "from-gray-500 to-gray-600";
+                                return (
+                                  colors[dept] || "from-gray-500 to-gray-600"
+                                );
                               };
 
                               return (
@@ -1608,7 +1571,11 @@ function Purchase() {
                                   {/* Department */}
                                   <td className="py-3 px-4">
                                     <div className="flex items-center gap-3">
-                                      <div className={`w-8 h-8 bg-linear-to-br ${getDepartmentColor(budget.department)} rounded-lg flex items-center justify-center shadow-sm`}>
+                                      <div
+                                        className={`w-8 h-8 bg-linear-to-br ${getDepartmentColor(
+                                          budget.department
+                                        )} rounded-lg flex items-center justify-center shadow-sm`}
+                                      >
                                         <span className="text-white font-bold text-xs uppercase">
                                           {budget.department.substring(0, 2)}
                                         </span>
@@ -1629,14 +1596,20 @@ function Purchase() {
                                   {/* Total Budget */}
                                   <td className="py-3 px-4">
                                     <span className="font-bold text-gray-900">
-                                      ₹{budget.summary?.totalBudget?.toLocaleString("en-IN") || "0"}
+                                      ₹
+                                      {budget.summary?.totalBudget?.toLocaleString(
+                                        "en-IN"
+                                      ) || "0"}
                                     </span>
                                   </td>
 
                                   {/* Total Spent */}
                                   <td className="py-3 px-4">
                                     <span className="text-gray-700">
-                                      ₹{budget.summary?.totalSpent?.toLocaleString("en-IN") || "0"}
+                                      ₹
+                                      {budget.summary?.totalSpent?.toLocaleString(
+                                        "en-IN"
+                                      ) || "0"}
                                     </span>
                                   </td>
 
@@ -1644,12 +1617,18 @@ function Purchase() {
                                   <td className="py-3 px-4">
                                     <span
                                       className={`font-semibold ${
-                                        (budget.summary?.totalBudget || 0) - (budget.summary?.totalSpent || 0) >= 0
+                                        (budget.summary?.totalBudget || 0) -
+                                          (budget.summary?.totalSpent || 0) >=
+                                        0
                                           ? "text-emerald-600"
                                           : "text-red-600"
                                       }`}
                                     >
-                                      ₹{((budget.summary?.totalBudget || 0) - (budget.summary?.totalSpent || 0)).toLocaleString("en-IN")}
+                                      ₹
+                                      {(
+                                        (budget.summary?.totalBudget || 0) -
+                                        (budget.summary?.totalSpent || 0)
+                                      ).toLocaleString("en-IN")}
                                     </span>
                                   </td>
 
@@ -1659,8 +1638,15 @@ function Purchase() {
                                       <div className="flex-1 min-w-20">
                                         <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
                                           <div
-                                            className={`h-2 rounded-full ${getUtilizationColor(utilizationRate)} transition-all duration-500`}
-                                            style={{ width: `${Math.min(utilizationRate, 100)}%` }}
+                                            className={`h-2 rounded-full ${getUtilizationColor(
+                                              utilizationRate
+                                            )} transition-all duration-500`}
+                                            style={{
+                                              width: `${Math.min(
+                                                utilizationRate,
+                                                100
+                                              )}%`,
+                                            }}
                                           ></div>
                                         </div>
                                       </div>
@@ -1694,13 +1680,27 @@ function Purchase() {
                 ) : (
                   <div className="bg-white/70 backdrop-blur-sm border border-white/30 rounded-2xl p-12 text-center shadow-lg">
                     <div className="w-16 h-16 bg-amber-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                      <svg className="w-8 h-8 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                      <svg
+                        className="w-8 h-8 text-amber-600"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                        />
                       </svg>
                     </div>
-                    <h3 className="text-xl font-bold text-amber-800 mb-2">No Budget History Found</h3>
+                    <h3 className="text-xl font-bold text-amber-800 mb-2">
+                      No Budget History Found
+                    </h3>
                     <p className="text-amber-700 text-sm leading-relaxed max-w-md mx-auto">
-                      No budgets have been created yet. Start by creating your first budget to see analytics and performance insights here.
+                      No budgets have been created yet. Start by creating your
+                      first budget to see analytics and performance insights
+                      here.
                     </p>
                   </div>
                 )}
@@ -1781,19 +1781,7 @@ function Purchase() {
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
             <div className="p-4">
               <div className="flex items-center justify-center w-10 h-10 mx-auto bg-red-100 rounded-full mb-3">
-                <svg
-                  className="w-5 h-5 text-red-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"
-                  />
-                </svg>
+                <TriangleAlert className="w-5 h-5 text-red-600" />
               </div>
               <h3 className="text-base font-semibold text-gray-900 text-center mb-1.5">
                 Delete Budget?
@@ -1821,25 +1809,7 @@ function Purchase() {
                 >
                   {deletingBudget ? (
                     <>
-                      <svg
-                        className="animate-spin -ml-1 mr-1.5 h-3.5 w-3.5 text-white"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                      >
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                        ></circle>
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                        ></path>
-                      </svg>
+                      <Trash2 />
                       Deleting...
                     </>
                   ) : (

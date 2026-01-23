@@ -29,6 +29,9 @@ const PurchaseIntentModal = ({
     requiredBy: "",
   });
 
+  // New state for GST
+  const [includeGST, setIncludeGST] = useState(false);
+
   useEffect(() => {
     if (!show) {
       // Reset form when modal closes
@@ -48,6 +51,7 @@ const PurchaseIntentModal = ({
         ],
         requiredBy: "",
       });
+      setIncludeGST(false); // Reset GST
     }
   }, [show]);
 
@@ -59,7 +63,7 @@ const PurchaseIntentModal = ({
       ...prev,
       requestedItems: prev.requestedItems.map((item) => ({
         ...item,
-        category: formData.budgetComponent, // sync with selected budget component
+        category: formData.budgetComponent,
       })),
     }));
   }, [formData.budgetComponent]);
@@ -69,7 +73,7 @@ const PurchaseIntentModal = ({
       if (i === index) {
         const updatedItem = { ...item, [field]: value };
 
-        // Auto-calculate estTotal when quantity or price changes
+        // Auto-calculate estTotal (BASE PRICE) when quantity or price changes
         if (field === "quantity" || field === "estPricePerUnit") {
           const quantity = parseFloat(updatedItem.quantity) || 0;
           const price = parseFloat(updatedItem.estPricePerUnit) || 0;
@@ -91,7 +95,7 @@ const PurchaseIntentModal = ({
         ...prev.requestedItems,
         {
           sno: prev.requestedItems.length + 1,
-          category: prev.budgetComponent, // Set to current budget component immediately
+          category: prev.budgetComponent,
           description: "",
           quantity: "",
           estPricePerUnit: "",
@@ -114,16 +118,22 @@ const PurchaseIntentModal = ({
     }
   };
 
-  const calculateTotalEstimate = () => {
+  // Calculates BASE Total (without GST)
+  const calculateBaseTotal = () => {
     return formData.requestedItems.reduce((total, item) => {
       return total + (item.estTotal || 0);
     }, 0);
   };
 
+  // Calculates Final Total (with GST if checked)
+  const calculateFinalTotal = () => {
+    const base = calculateBaseTotal();
+    return includeGST ? base * 1.18 : base; // Adding 18% GST
+  };
+
   const getRemainingBudget = () => {
     if (!currentBudget || !formData.budgetComponent) return 0;
 
-    // Check across all expense groups
     const component =
       currentBudget.departmentExpenses?.[formData.budgetComponent] ||
       currentBudget.fixedCosts?.[formData.budgetComponent] ||
@@ -162,13 +172,13 @@ const PurchaseIntentModal = ({
       }
     }
 
-    const estimatedTotal = calculateTotalEstimate();
+    const estimatedTotal = calculateFinalTotal();
     const remainingBudget = getRemainingBudget();
 
     if (estimatedTotal > remainingBudget) {
       if (
         !confirm(
-          `This purchase intent (₹${estimatedTotal.toLocaleString()}) exceeds the remaining budget (₹${remainingBudget.toLocaleString()}). Do you want to proceed?`
+          `This purchase intent (₹${estimatedTotal.toLocaleString()}) exceeds the remaining budget (₹${remainingBudget.toLocaleString()}). Do you want to proceed?`,
         )
       ) {
         return;
@@ -190,7 +200,9 @@ const PurchaseIntentModal = ({
         estPricePerUnit: parseFloat(item.estPricePerUnit) || 0,
         estTotal: item.estTotal || 0,
       })),
-      estimatedTotal,
+      estimatedTotal, // This is the Grand Total (Base + GST if checked)
+      includeGST, // 🔹 Pass the flag
+      baseTotal: calculateBaseTotal(), // 🔹 Helper for PO creation later
       requiredBy: formData.requiredBy || "",
       selectedBudgetComponent: formData.budgetComponent,
       status: "submitted",
@@ -213,33 +225,34 @@ const PurchaseIntentModal = ({
         document.activeElement.type === "number" &&
         document.activeElement.contains(e.target)
       ) {
-        e.preventDefault(); // stop value change
+        e.preventDefault();
       }
     };
-
     window.addEventListener("wheel", preventScrollChange, { passive: false });
-
     return () => window.removeEventListener("wheel", preventScrollChange);
   }, []);
 
   if (!show) return null;
 
-  const estimatedTotal = calculateTotalEstimate();
+  const baseTotal = calculateBaseTotal();
+  const grandTotal = calculateFinalTotal();
   const remainingBudget = getRemainingBudget();
-  const exceedsBudget = estimatedTotal > remainingBudget;
+  const exceedsBudget = grandTotal > remainingBudget;
 
-  const availableCategories = Object.entries(budgetComponents || {})
-    .filter(([key]) => currentBudget?.departmentExpenses?.[key])
-    .map(([key, label]) => ({
+  const availableCategories = Object.keys(
+    currentBudget?.departmentExpenses || {},
+  )
+    .filter((key) => key !== "employeeSalary")
+    .map((key) => ({
       value: key,
-      label: label,
+      label:
+        budgetComponents?.[key] || key.charAt(0).toUpperCase() + key.slice(1),
     }));
 
-  // ====== BUDGET CHECK ======
   const hasBudget =
     currentBudget &&
     Object.keys(currentBudget).length > 0 &&
-    currentBudget.csddExpenses; // or any key you rely on
+    currentBudget.csddExpenses;
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-1000">
@@ -275,9 +288,6 @@ const PurchaseIntentModal = ({
               <p className="text-gray-600">
                 The CSDD budget for FY {fiscalYear} has not been created yet.
               </p>
-              <p className="text-gray-500 mt-1">
-                Please ask Finance/Admin to set it up.
-              </p>
             </div>
           </div>
         ) : (
@@ -286,31 +296,39 @@ const PurchaseIntentModal = ({
             className="overflow-y-auto max-h-[calc(90vh-85px)]"
           >
             <div className="p-6 space-y-6">
-
-              {/* Basic Information Section */}
+              {/* Basic Information */}
               <div className="space-y-4">
                 <div className="flex items-center gap-2 mb-4">
                   <div className="w-1 h-6 bg-blue-500 rounded-full"></div>
-                  <h3 className="text-lg font-bold text-gray-900">Basic Information</h3>
+                  <h3 className="text-lg font-bold text-gray-900">
+                    Basic Information
+                  </h3>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <label className="block text-sm font-medium text-gray-700">Intent Title *</label>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Intent Title *
+                    </label>
                     <input
                       type="text"
                       value={formData.title}
                       onChange={(e) =>
-                        setFormData((prev) => ({ ...prev, title: e.target.value }))
+                        setFormData((prev) => ({
+                          ...prev,
+                          title: e.target.value,
+                        }))
                       }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                       placeholder="e.g., Laptops for New Team Members"
                       required
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <label className="block text-sm font-medium text-gray-700">Budget Component *</label>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Budget Component *
+                    </label>
                     <select
                       value={formData.budgetComponent}
                       onChange={(e) =>
@@ -319,7 +337,7 @@ const PurchaseIntentModal = ({
                           budgetComponent: e.target.value,
                         }))
                       }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                       required
                     >
                       <option value="">Select Component</option>
@@ -331,7 +349,9 @@ const PurchaseIntentModal = ({
                     </select>
                     {formData.budgetComponent && currentBudget && (
                       <div className="mt-2 text-sm">
-                        <span className="text-gray-600">Remaining Budget: </span>
+                        <span className="text-gray-600">
+                          Remaining Budget:{" "}
+                        </span>
                         <span
                           className={`font-semibold ${
                             exceedsBudget ? "text-red-600" : "text-green-600"
@@ -345,13 +365,14 @@ const PurchaseIntentModal = ({
                 </div>
               </div>
 
-              {/* Description Section */}
+              {/* Description */}
               <div className="space-y-4">
                 <div className="flex items-center gap-2 mb-4">
                   <div className="w-1 h-6 bg-green-500 rounded-full"></div>
-                  <h3 className="text-lg font-bold text-gray-900">Description</h3>
+                  <h3 className="text-lg font-bold text-gray-900">
+                    Description
+                  </h3>
                 </div>
-
                 <div className="space-y-2">
                   <textarea
                     value={formData.description}
@@ -362,23 +383,25 @@ const PurchaseIntentModal = ({
                       }))
                     }
                     rows={4}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Describe the purpose and requirements for this purchase..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder="Describe the purpose..."
                   />
                 </div>
               </div>
 
-              {/* Requested Items Section */}
+              {/* Items */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
                     <div className="w-1 h-6 bg-purple-500 rounded-full"></div>
-                    <h3 className="text-lg font-bold text-gray-900">Requested Items</h3>
+                    <h3 className="text-lg font-bold text-gray-900">
+                      Requested Items
+                    </h3>
                   </div>
                   <button
                     type="button"
                     onClick={addItem}
-                    className="px-3 py-1 text-blue-600 hover:text-blue-800 font-medium border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
+                    className="px-3 py-1 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50"
                   >
                     + Add Item
                   </button>
@@ -386,7 +409,10 @@ const PurchaseIntentModal = ({
 
                 <div className="space-y-3">
                   {formData.requestedItems.map((item, index) => (
-                    <div key={index} className="bg-white border border-gray-200 rounded-lg p-4">
+                    <div
+                      key={index}
+                      className="bg-white border border-gray-200 rounded-lg p-4"
+                    >
                       <div className="flex justify-between items-start mb-4">
                         <h4 className="font-semibold text-gray-900">
                           Item {item.sno}
@@ -395,7 +421,7 @@ const PurchaseIntentModal = ({
                           <button
                             type="button"
                             onClick={() => removeItem(index)}
-                            className="text-red-600 hover:text-red-800 text-sm font-medium"
+                            className="text-red-600 text-sm font-medium"
                           >
                             Remove
                           </button>
@@ -404,7 +430,9 @@ const PurchaseIntentModal = ({
 
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                         <div className="space-y-2">
-                          <label className="block text-sm font-medium text-gray-700">Category *</label>
+                          <label className="block text-sm font-medium text-gray-700">
+                            Category *
+                          </label>
                           <input
                             type="text"
                             value={
@@ -413,41 +441,50 @@ const PurchaseIntentModal = ({
                               "—"
                             }
                             readOnly
-                            className="w-full px-3 py-2 border border-gray-300 bg-gray-50 rounded-lg text-gray-700 cursor-not-allowed"
+                            className="w-full px-3 py-2 border border-gray-300 bg-gray-50 rounded-lg cursor-not-allowed"
                           />
                         </div>
-
                         <div className="space-y-2">
-                          <label className="block text-sm font-medium text-gray-700">Description *</label>
+                          <label className="block text-sm font-medium text-gray-700">
+                            Description *
+                          </label>
                           <input
                             type="text"
                             value={item.description}
                             onChange={(e) =>
-                              handleItemChange(index, "description", e.target.value)
+                              handleItemChange(
+                                index,
+                                "description",
+                                e.target.value,
+                              )
                             }
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            placeholder="e.g., Dell Latitude 5440 Laptop"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                             required
                           />
                         </div>
-
                         <div className="space-y-2">
-                          <label className="block text-sm font-medium text-gray-700">Quantity *</label>
+                          <label className="block text-sm font-medium text-gray-700">
+                            Quantity *
+                          </label>
                           <input
                             type="number"
                             value={item.quantity}
                             onChange={(e) =>
-                              handleItemChange(index, "quantity", e.target.value)
+                              handleItemChange(
+                                index,
+                                "quantity",
+                                e.target.value,
+                              )
                             }
                             min="1"
-                            step="1"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                             required
                           />
                         </div>
-
                         <div className="space-y-2">
-                          <label className="block text-sm font-medium text-gray-700">Estimated Price (₹) *</label>
+                          <label className="block text-sm font-medium text-gray-700">
+                            Est. Price (₹) *
+                          </label>
                           <input
                             type="number"
                             value={item.estPricePerUnit}
@@ -455,20 +492,20 @@ const PurchaseIntentModal = ({
                               handleItemChange(
                                 index,
                                 "estPricePerUnit",
-                                e.target.value
+                                e.target.value,
                               )
                             }
                             min="0"
                             step="0.01"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                             required
                           />
                         </div>
                       </div>
-
                       <div className="mt-3 pt-3 border-t border-gray-200">
                         <div className="text-sm font-medium text-gray-700">
-                          Item Total: ₹{(item.estTotal || 0).toLocaleString("en-IN")}
+                          Item Total (Excl. GST): ₹
+                          {(item.estTotal || 0).toLocaleString("en-IN")}
                         </div>
                       </div>
                     </div>
@@ -476,16 +513,20 @@ const PurchaseIntentModal = ({
                 </div>
               </div>
 
-              {/* Additional Details Section */}
+              {/* Additional Details & GST Checkbox */}
               <div className="space-y-4">
                 <div className="flex items-center gap-2 mb-4">
                   <div className="w-1 h-6 bg-indigo-500 rounded-full"></div>
-                  <h3 className="text-lg font-bold text-gray-900">Additional Details</h3>
+                  <h3 className="text-lg font-bold text-gray-900">
+                    Additional Details
+                  </h3>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <label className="block text-sm font-medium text-gray-700">Required By Date</label>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Required By Date
+                    </label>
                     <input
                       type="date"
                       value={formData.requiredBy}
@@ -495,25 +536,50 @@ const PurchaseIntentModal = ({
                           requiredBy: e.target.value,
                         }))
                       }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="dd-mm-yyyy"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <label className="block text-sm font-medium text-gray-700">Total Estimated Cost</label>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Total Estimated Cost
+                    </label>
                     <div
-                      className={`p-3 rounded-lg text-center font-bold text-lg ${
+                      className={`p-3 rounded-lg border flex flex-col justify-center items-center ${
                         exceedsBudget
-                          ? "bg-red-50 text-red-800 border border-red-200"
-                          : "bg-green-50 text-green-800 border border-green-200"
+                          ? "bg-red-50 text-red-800 border-red-200"
+                          : "bg-green-50 text-green-800 border-green-200"
                       }`}
                     >
-                      ₹{estimatedTotal.toLocaleString("en-IN")}
+                      <span className="font-bold text-lg">
+                        ₹{grandTotal.toLocaleString("en-IN")}
+                      </span>
                       {exceedsBudget && (
-                        <div className="text-sm mt-1 font-normal">Exceeds remaining budget</div>
+                        <div className="text-sm font-normal">
+                          Exceeds remaining budget
+                        </div>
                       )}
                     </div>
+
+                    {/* GST Checkbox */}
+                    <div className="mt-2 flex items-center gap-2">
+                      <input
+                        id="intent-gst"
+                        type="checkbox"
+                        checked={includeGST}
+                        onChange={(e) => setIncludeGST(e.target.checked)}
+                        className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      <label
+                        htmlFor="intent-gst"
+                        className="text-sm text-gray-700 font-medium"
+                      >
+                        Include GST Estimate (18%)
+                      </label>
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      Base Cost: ₹{baseTotal.toLocaleString("en-IN")}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -523,13 +589,13 @@ const PurchaseIntentModal = ({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 text-sm"
+                  className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold disabled:opacity-50 flex items-center text-sm"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"
                 >
                   Submit Purchase Intent
                 </button>

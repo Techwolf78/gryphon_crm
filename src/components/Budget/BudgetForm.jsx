@@ -87,11 +87,7 @@ const BudgetForm = ({
     departmentExpenses: {
       employeeSalary: "",
     },
-    csddExpenses: {
-      intercity_outstation_visits: "",
-      lunch_dinner_with_client: "",
-      mobile_sim: "",
-    },
+    csddExpenses: {},
     components: {},
     csddComponents: {},
     notes: "",
@@ -108,6 +104,9 @@ const BudgetForm = ({
   const [csddComponentName, setCsddComponentName] = useState("");
   const [csddComponentAllocation, setCsddComponentAllocation] = useState("");
   const [csddComponentNotes, setCsddComponentNotes] = useState("");
+  const [csddClientKey, setCsddClientKey] = useState("");
+  const [csddClientName, setCsddClientName] = useState("");
+  const [csddClientAllocation, setCsddClientAllocation] = useState("");
 
   // New global error state for form submission
   const [formError, setFormError] = useState("");
@@ -116,7 +115,7 @@ const BudgetForm = ({
   useEffect(() => {
     const budgetTitle = generateBudgetTitle(
       formData.department,
-      formData.fiscalYear
+      formData.fiscalYear,
     );
     setFormData((prev) => ({
       ...prev,
@@ -135,20 +134,28 @@ const BudgetForm = ({
     try {
       const fixedCostsTotal = Object.values(formData.fixedCosts || {}).reduce(
         (sum, cost) => sum + safeNumber(cost),
-        0
+        0,
       );
       const departmentExpensesTotal = Object.values(
-        formData.departmentExpenses || {}
+        formData.departmentExpenses || {},
       ).reduce((sum, cost) => sum + safeNumber(cost), 0);
+
       const csddExpensesTotal = Object.values(
-        formData.csddExpenses || {}
-      ).reduce((sum, cost) => sum + safeNumber(cost), 0);
+        formData.csddExpenses || {},
+      ).reduce((sum, item) => {
+        if (typeof item === "object" && item.type === "client") {
+          return sum + safeNumber(item.allocated);
+        }
+        return sum + safeNumber(item);
+      }, 0);
+
       const componentsTotal = Object.values(formData.components || {}).reduce(
         (sum, comp) => sum + safeNumber(comp?.allocated),
-        0
+        0,
       );
+
       const csddComponentsTotal = Object.values(
-        formData.csddComponents || {}
+        formData.csddComponents || {},
       ).reduce((sum, comp) => sum + safeNumber(comp?.allocated), 0);
 
       return (
@@ -198,6 +205,50 @@ const BudgetForm = ({
     setCsddComponentNotes("");
     setShowCsddComponentForm(false);
     setFormError(""); // Clear error on success
+  };
+
+  const addDmCsddClient = () => {
+    if (!csddClientKey.trim() || !csddClientName.trim()) {
+      setFormError("Client key and client name are required");
+      return;
+    }
+
+    if (formData.csddExpenses[csddClientKey]) {
+      setFormError("This client already exists in CSDD");
+      return;
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      csddExpenses: {
+        ...prev.csddExpenses,
+        [csddClientKey]: {
+          type: "client",
+          client_name: csddClientName,
+          allocated: csddClientAllocation,
+          spent: 0,
+          key: csddClientKey,
+        },
+      },
+    }));
+
+    // reset
+    setCsddClientKey("");
+    setCsddClientName("");
+    setCsddClientAllocation("");
+    setFormError("");
+  };
+
+  const removeDmCsddClient = (clientKey) => {
+    setFormData((prev) => {
+      const updatedCsddExpenses = { ...prev.csddExpenses };
+      delete updatedCsddExpenses[clientKey];
+
+      return {
+        ...prev,
+        csddExpenses: updatedCsddExpenses,
+      };
+    });
   };
 
   const handleCsddComponentChange = (componentId, field, value) => {
@@ -342,7 +393,7 @@ const BudgetForm = ({
       const budgetsQuery = query(
         collection(db, "department_budgets"),
         where("department", "==", department),
-        where("fiscalYear", "==", formData.fiscalYear)
+        where("fiscalYear", "==", formData.fiscalYear),
       );
       const snapshot = await getDocs(budgetsQuery);
 
@@ -382,7 +433,7 @@ const BudgetForm = ({
         if (fiscalYearExists) {
           newErrors.fiscalYear = `A budget for FY${formData.fiscalYear} already exists for this department`;
           setFormError(
-            `A budget for FY-${formData.fiscalYear} already exists for this department`
+            `A budget for FY-${formData.fiscalYear} already exists for this department`,
           );
         }
       } catch (error) {
@@ -424,8 +475,8 @@ const BudgetForm = ({
         // base fields (like employeeSalary)
         ...Object.fromEntries(
           Object.entries(formData.departmentExpenses || {}).map(
-            ([key, val]) => [key, { allocated: safeNumber(val), spent: 0 }]
-          )
+            ([key, val]) => [key, { allocated: safeNumber(val), spent: 0 }],
+          ),
         ),
         // additional dynamic components
         ...Object.fromEntries(
@@ -435,7 +486,7 @@ const BudgetForm = ({
               allocated: safeNumber(comp?.allocated),
               spent: 0,
             },
-          ])
+          ]),
         ),
       };
 
@@ -443,15 +494,28 @@ const BudgetForm = ({
       const mergedCsddExpenses = {
         // 🧹 Include only non-zero CSDD Expenses
         ...Object.fromEntries(
-          Object.entries(formData.csddExpenses || {})
-            .filter(([_, val]) => safeNumber(val) > 0) // ✅ filter out 0 or empty
-            .map(([key, val]) => [
+          Object.entries(formData.csddExpenses || {}).map(([key, val]) => {
+            if (typeof val === "object") {
+              // DM client entry
+              return [
+                key,
+                {
+                  type: val.type,
+                  client_name: val.client_name,
+                  allocated: safeNumber(val.allocated),
+                  spent: 0,
+                },
+              ];
+            }
+            // normal expense
+            return [
               key,
               {
                 allocated: safeNumber(val),
                 spent: 0,
               },
-            ])
+            ];
+          }),
         ),
 
         // 🧩 Include non-zero custom CSDD components
@@ -464,7 +528,7 @@ const BudgetForm = ({
                 allocated: safeNumber(comp?.allocated),
                 spent: 0,
               },
-            ])
+            ]),
         ),
       };
 
@@ -473,7 +537,7 @@ const BudgetForm = ({
         Object.entries(formData.fixedCosts || {}).map(([key, val]) => [
           key,
           { allocated: safeNumber(val), spent: 0 },
-        ])
+        ]),
       );
 
       const totalBudget = calculateTotalAllocated();
@@ -515,7 +579,7 @@ const BudgetForm = ({
 
   // Use it directly in your availableComponents calculation
   const availableComponents = Object.entries(
-    getDynamicBudgetComponents() || {}
+    getDynamicBudgetComponents() || {},
   ).filter(([key]) => !formData.components?.[key]);
 
   useEffect(() => {
@@ -580,17 +644,20 @@ const BudgetForm = ({
           className="overflow-y-auto max-h-[calc(90vh-85px)]"
         >
           <div className="p-6 space-y-6">
-
             {/* Basic Information Section */}
             <div className="space-y-4">
               <div className="flex items-center gap-2 mb-4">
                 <div className="w-1 h-6 bg-blue-500 rounded-full"></div>
-                <h3 className="text-lg font-bold text-gray-900">Basic Information</h3>
+                <h3 className="text-lg font-bold text-gray-900">
+                  Basic Information
+                </h3>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700">Budget Title *</label>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Budget Title *
+                  </label>
                   <div className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 min-h-[42px] flex items-center">
                     {formData.title}
                   </div>
@@ -600,7 +667,9 @@ const BudgetForm = ({
                 </div>
 
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700">Fiscal Year (FY) *</label>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Fiscal Year (FY) *
+                  </label>
                   <input
                     type="text"
                     name="fiscalYear"
@@ -613,12 +682,16 @@ const BudgetForm = ({
                     pattern="\d{2}-\d{2}"
                   />
                   {errors.fiscalYear && (
-                    <p className="mt-1 text-sm text-red-600">{errors.fiscalYear}</p>
+                    <p className="mt-1 text-sm text-red-600">
+                      {errors.fiscalYear}
+                    </p>
                   )}
                 </div>
 
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700">Department *</label>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Department *
+                  </label>
                   <select
                     name="department"
                     value={formData.department}
@@ -636,12 +709,16 @@ const BudgetForm = ({
                     <option value="management">Management</option>
                   </select>
                   {errors.department && (
-                    <p className="mt-1 text-sm text-red-600">{errors.department}</p>
+                    <p className="mt-1 text-sm text-red-600">
+                      {errors.department}
+                    </p>
                   )}
                 </div>
 
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700">Owner Name *</label>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Owner Name *
+                  </label>
                   <input
                     type="text"
                     name="ownerName"
@@ -653,7 +730,9 @@ const BudgetForm = ({
                     placeholder="Name of budget owner"
                   />
                   {errors.ownerName && (
-                    <p className="mt-1 text-sm text-red-600">{errors.ownerName}</p>
+                    <p className="mt-1 text-sm text-red-600">
+                      {errors.ownerName}
+                    </p>
                   )}
                 </div>
               </div>
@@ -664,7 +743,9 @@ const BudgetForm = ({
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="w-1 h-6 bg-green-500 rounded-full"></div>
-                  <h3 className="text-lg font-bold text-gray-900">Fixed Costs</h3>
+                  <h3 className="text-lg font-bold text-gray-900">
+                    Fixed Costs
+                  </h3>
                 </div>
                 <button
                   type="button"
@@ -689,7 +770,9 @@ const BudgetForm = ({
               <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-0">
                   <div className="p-4 border-r border-gray-200 last:border-r-0">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Rent (₹)</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Rent (₹)
+                    </label>
                     <input
                       type="number"
                       name="fixedCosts.rent"
@@ -700,7 +783,9 @@ const BudgetForm = ({
                     />
                   </div>
                   <div className="p-4 border-r border-gray-200 last:border-r-0">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Maintenance (₹)</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Maintenance (₹)
+                    </label>
                     <input
                       type="number"
                       name="fixedCosts.maintenance"
@@ -711,7 +796,9 @@ const BudgetForm = ({
                     />
                   </div>
                   <div className="p-4 border-r border-gray-200 last:border-r-0">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Electricity (₹)</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Electricity (₹)
+                    </label>
                     <input
                       type="number"
                       name="fixedCosts.electricity"
@@ -722,7 +809,9 @@ const BudgetForm = ({
                     />
                   </div>
                   <div className="p-4 border-r border-gray-200 last:border-r-0">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Internet (₹)</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Internet (₹)
+                    </label>
                     <input
                       type="number"
                       name="fixedCosts.internet"
@@ -733,7 +822,9 @@ const BudgetForm = ({
                     />
                   </div>
                   <div className="p-4 border-r border-gray-200 last:border-r-0">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Renovation (₹)</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Renovation (₹)
+                    </label>
                     <input
                       type="number"
                       name="fixedCosts.renovation"
@@ -751,13 +842,17 @@ const BudgetForm = ({
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <div className="w-1 h-6 bg-purple-500 rounded-full"></div>
-                <h3 className="text-lg font-bold text-gray-900">Department Expenses</h3>
+                <h3 className="text-lg font-bold text-gray-900">
+                  Department Expenses
+                </h3>
               </div>
 
               <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
                 <div className="p-4 border-b border-gray-200">
                   <div className="flex justify-between items-center">
-                    <label className="block text-sm font-medium text-gray-700">Employee Salaries (₹)</label>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Employee Salaries (₹)
+                    </label>
                     <input
                       type="number"
                       name="departmentExpenses.employeeSalary"
@@ -770,30 +865,41 @@ const BudgetForm = ({
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-0">
-                  {Object.entries(formData.components || {}).map(([componentId, component], index) => (
-                    <div key={componentId} className={`p-4 ${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'} border-r border-gray-200 last:border-r-0`}>
-                      <div className="flex justify-between items-start mb-2">
-                        <span className="text-sm font-medium text-gray-900 capitalize">
-                          {component.name} (₹)
-                        </span>
-                        <input
-                          type="number"
-                          value={component.allocated}
-                          onChange={(e) =>
-                            handleComponentChange(componentId, "allocated", e.target.value)
-                          }
-                          className="w-24 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                          placeholder="0"
-                        />
+                  {Object.entries(formData.components || {}).map(
+                    ([componentId, component], index) => (
+                      <div
+                        key={componentId}
+                        className={`p-4 ${index % 2 === 0 ? "bg-gray-50" : "bg-white"} border-r border-gray-200 last:border-r-0`}
+                      >
+                        <div className="flex justify-between items-start mb-2">
+                          <span className="text-sm font-medium text-gray-900 capitalize">
+                            {component.name} (₹)
+                          </span>
+                          <input
+                            type="number"
+                            value={component.allocated}
+                            onChange={(e) =>
+                              handleComponentChange(
+                                componentId,
+                                "allocated",
+                                e.target.value,
+                              )
+                            }
+                            className="w-24 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                            placeholder="0"
+                          />
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ),
+                  )}
                 </div>
 
                 {Object.keys(formData.components || {}).length === 0 && (
                   <div className="text-center py-8 text-gray-500">
                     <p className="text-sm">No components yet</p>
-                    <p className="text-xs text-gray-400">Add a component to see it here</p>
+                    <p className="text-xs text-gray-400">
+                      Add a component to see it here
+                    </p>
                   </div>
                 )}
 
@@ -815,7 +921,9 @@ const BudgetForm = ({
             {showComponentForm && (
               <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                 <div className="flex justify-between items-center mb-3">
-                  <h5 className="font-medium text-gray-900">Add New Component</h5>
+                  <h5 className="font-medium text-gray-900">
+                    Add New Component
+                  </h5>
                   <button
                     type="button"
                     onClick={() => setShowComponentForm(false)}
@@ -826,7 +934,9 @@ const BudgetForm = ({
                 </div>
                 <div className="flex gap-3 items-end">
                   <div className="flex-1">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Select Component</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Select Component
+                    </label>
                     <select
                       value={selectedComponent}
                       onChange={(e) => setSelectedComponent(e.target.value)}
@@ -834,12 +944,16 @@ const BudgetForm = ({
                     >
                       <option value="">Choose a component...</option>
                       {availableComponents.map(([key, name]) => (
-                        <option key={key} value={key}>{name}</option>
+                        <option key={key} value={key}>
+                          {name}
+                        </option>
                       ))}
                     </select>
                   </div>
                   <div className="flex-1">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Allocated Amount (₹)</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Allocated Amount (₹)
+                    </label>
                     <input
                       type="number"
                       value={componentAllocation}
@@ -864,13 +978,110 @@ const BudgetForm = ({
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <div className="w-1 h-6 bg-indigo-500 rounded-full"></div>
-                <h3 className="text-lg font-bold text-gray-900">CSDD Expenses (Corporate Social & Developmental Duties)</h3>
+                <h3 className="text-lg font-bold text-gray-900">
+                  CSDD Expenses (Corporate Social & Developmental Duties)
+                </h3>
               </div>
+
+              {formData.department === "dm" && (
+                <div className="bg-gray-50 p-4 border-b border-gray-200">
+                  <h4 className="text-sm font-semibold text-gray-700 mb-3">
+                    Add Client Budget (DM Only)
+                  </h4>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <input
+                      type="text"
+                      placeholder="Client Key (e.g. ICEM_admissions)"
+                      value={csddClientKey}
+                      onChange={(e) => setCsddClientKey(e.target.value)}
+                      className="px-3 py-2 border rounded-lg"
+                    />
+
+                    <input
+                      type="text"
+                      placeholder="Client Name (e.g. ICEM)"
+                      value={csddClientName}
+                      onChange={(e) => setCsddClientName(e.target.value)}
+                      className="px-3 py-2 border rounded-lg"
+                    />
+
+                    <input
+                      type="number"
+                      placeholder="Allocated Amount"
+                      value={csddClientAllocation}
+                      onChange={(e) => setCsddClientAllocation(e.target.value)}
+                      className="px-3 py-2 border rounded-lg"
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={addDmCsddClient}
+                    className="mt-3 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm"
+                  >
+                    Add Client Budget
+                  </button>
+                </div>
+              )}
+
+              {formData.department === "dm" && (
+                <div className="space-y-2">
+                  {Object.entries(formData.csddExpenses || {})
+                    .filter(
+                      ([_, val]) =>
+                        typeof val === "object" && val.type === "client",
+                    )
+                    .map(([key, client]) => (
+                      <div
+                        key={key}
+                        className="flex justify-between items-center p-3 bg-indigo-50 border border-indigo-200 rounded-lg"
+                      >
+                        <div>
+                          <p className="text-sm font-semibold text-indigo-900">
+                            {key}
+                          </p>
+                          <p className="text-xs text-indigo-600">
+                            {client.client_name} — Client Budget
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-indigo-900">
+                            {client.client_name}
+                          </p>
+                          <p className="text-xs text-indigo-600">Client Name</p>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <div className="text-right">
+                            <p className="text-sm font-medium text-gray-900">
+                              ₹
+                              {safeNumber(client.allocated).toLocaleString(
+                                "en-IN",
+                              )}
+                            </p>
+                            <p className="text-xs text-gray-500">Allocated</p>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => removeDmCsddClient(key)}
+                            className="p-1 text-red-600 hover:bg-red-100 rounded-md"
+                            title="Remove client budget"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
 
               <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-0">
                   <div className="p-4 border-r border-gray-200 last:border-r-0">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Intercity/Outstation Visits (₹)</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Intercity/Outstation Visits (₹)
+                    </label>
                     <input
                       type="number"
                       name="csddExpenses.intercity_outstation_visits"
@@ -881,7 +1092,9 @@ const BudgetForm = ({
                     />
                   </div>
                   <div className="p-4 border-r border-gray-200 last:border-r-0">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Lunch/Dinner with Client (₹)</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Lunch/Dinner with Client (₹)
+                    </label>
                     <input
                       type="number"
                       name="csddExpenses.lunch_dinner_with_client"
@@ -892,7 +1105,9 @@ const BudgetForm = ({
                     />
                   </div>
                   <div className="p-4 border-r border-gray-200 last:border-r-0">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Mobile/Sim (₹)</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Mobile/Sim (₹)
+                    </label>
                     <input
                       type="number"
                       name="csddExpenses.mobile_sim"
@@ -903,30 +1118,41 @@ const BudgetForm = ({
                     />
                   </div>
 
-                  {Object.entries(formData.csddComponents || {}).map(([componentId, component], index) => (
-                    <div key={componentId} className={`p-4 ${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'} border-r border-gray-200 last:border-r-0`}>
-                      <div className="flex justify-between items-start mb-2">
-                        <span className="text-sm font-medium text-gray-900 capitalize">
-                          {component.name} (₹)
-                        </span>
-                        <input
-                          type="number"
-                          value={component.allocated}
-                          onChange={(e) =>
-                            handleCsddComponentChange(componentId, "allocated", e.target.value)
-                          }
-                          className="w-24 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                          placeholder="0"
-                        />
+                  {Object.entries(formData.csddComponents || {}).map(
+                    ([componentId, component], index) => (
+                      <div
+                        key={componentId}
+                        className={`p-4 ${index % 2 === 0 ? "bg-gray-50" : "bg-white"} border-r border-gray-200 last:border-r-0`}
+                      >
+                        <div className="flex justify-between items-start mb-2">
+                          <span className="text-sm font-medium text-gray-900 capitalize">
+                            {component.name} (₹)
+                          </span>
+                          <input
+                            type="number"
+                            value={component.allocated}
+                            onChange={(e) =>
+                              handleCsddComponentChange(
+                                componentId,
+                                "allocated",
+                                e.target.value,
+                              )
+                            }
+                            className="w-24 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                            placeholder="0"
+                          />
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ),
+                  )}
                 </div>
 
                 {Object.keys(formData.csddComponents || {}).length === 0 && (
                   <div className="text-center py-8 text-gray-500">
                     <p className="text-sm">No CSDD components yet</p>
-                    <p className="text-xs text-gray-400">Add a CSDD component to see it here</p>
+                    <p className="text-xs text-gray-400">
+                      Add a CSDD component to see it here
+                    </p>
                   </div>
                 )}
 
@@ -946,7 +1172,9 @@ const BudgetForm = ({
             {showCsddComponentForm && (
               <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                 <div className="flex justify-between items-center mb-3">
-                  <h5 className="font-medium text-gray-900">Add New CSDD Component</h5>
+                  <h5 className="font-medium text-gray-900">
+                    Add New CSDD Component
+                  </h5>
                   <button
                     type="button"
                     onClick={() => setShowCsddComponentForm(false)}
@@ -957,7 +1185,9 @@ const BudgetForm = ({
                 </div>
                 <div className="flex gap-3 items-end">
                   <div className="flex-1">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Component Name</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Component Name
+                    </label>
                     <input
                       type="text"
                       value={csddComponentName}
@@ -967,11 +1197,15 @@ const BudgetForm = ({
                     />
                   </div>
                   <div className="flex-1">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Allocated Amount (₹)</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Allocated Amount (₹)
+                    </label>
                     <input
                       type="number"
                       value={csddComponentAllocation}
-                      onChange={(e) => setCsddComponentAllocation(e.target.value)}
+                      onChange={(e) =>
+                        setCsddComponentAllocation(e.target.value)
+                      }
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       placeholder="Enter amount"
                     />
@@ -992,7 +1226,9 @@ const BudgetForm = ({
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <div className="w-1 h-6 bg-emerald-500 rounded-full"></div>
-                <h3 className="text-lg font-bold text-gray-900">Budget Summary</h3>
+                <h3 className="text-lg font-bold text-gray-900">
+                  Budget Summary
+                </h3>
               </div>
 
               <div className="bg-linear-to-br from-emerald-50 to-green-50 border border-emerald-200 rounded-xl p-6">
@@ -1005,25 +1241,58 @@ const BudgetForm = ({
                   </div>
                   <div className="text-center">
                     <div className="text-lg font-semibold text-blue-600 mb-1">
-                      ₹{Object.values(formData.fixedCosts || {}).reduce((sum, cost) => sum + safeNumber(cost), 0).toLocaleString("en-IN")}
+                      ₹
+                      {Object.values(formData.fixedCosts || {})
+                        .reduce((sum, cost) => sum + safeNumber(cost), 0)
+                        .toLocaleString("en-IN")}
                     </div>
                     <div className="text-sm text-blue-700">Fixed Costs</div>
                   </div>
                   <div className="text-center">
                     <div className="text-lg font-semibold text-purple-600 mb-1">
-                      ₹{(Object.values(formData.departmentExpenses || {}).reduce((sum, cost) => sum + safeNumber(cost), 0) +
-                        Object.values(formData.components || {}).reduce((sum, comp) => sum + safeNumber(comp?.allocated), 0)).toLocaleString("en-IN")}
+                      ₹
+                      {(
+                        Object.values(formData.departmentExpenses || {}).reduce(
+                          (sum, cost) => sum + safeNumber(cost),
+                          0,
+                        ) +
+                        Object.values(formData.components || {}).reduce(
+                          (sum, comp) => sum + safeNumber(comp?.allocated),
+                          0,
+                        )
+                      ).toLocaleString("en-IN")}
                     </div>
                     <div className="text-sm text-purple-700">Department</div>
-                    <div className="text-xs text-purple-600 mt-1">Salaries + Components</div>
+                    <div className="text-xs text-purple-600 mt-1">
+                      Salaries + Components
+                    </div>
                   </div>
                   <div className="text-center">
                     <div className="text-lg font-semibold text-indigo-600 mb-1">
-                      ₹{(Object.values(formData.csddExpenses || {}).reduce((sum, cost) => sum + safeNumber(cost), 0) +
-                        Object.values(formData.csddComponents || {}).reduce((sum, comp) => sum + safeNumber(comp?.allocated), 0)).toLocaleString("en-IN")}
+                      ₹
+                      {(
+                        Object.values(formData.csddExpenses || {}).reduce(
+                          (sum, item) => {
+                            if (
+                              typeof item === "object" &&
+                              item.type === "client"
+                            ) {
+                              return sum + safeNumber(item.allocated);
+                            }
+                            return sum + safeNumber(item);
+                          },
+                          0,
+                        ) +
+                        Object.values(formData.csddComponents || {}).reduce(
+                          (sum, comp) => sum + safeNumber(comp?.allocated),
+                          0,
+                        )
+                      ).toLocaleString("en-IN")}
                     </div>
                     <div className="text-sm text-indigo-700">CSDD</div>
-                    <div className="text-xs text-indigo-600 mt-1">Expenses + Components</div>
+                    <div className="text-xs text-indigo-600 mt-1">
+                      Expenses + Components {department == "dm" && "+ Clients"}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1052,9 +1321,24 @@ const BudgetForm = ({
               >
                 {isSubmitting ? (
                   <>
-                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    <svg
+                      className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
                     </svg>
                     Creating...
                   </>
@@ -1071,5 +1355,3 @@ const BudgetForm = ({
 };
 
 export default BudgetForm;
-
-

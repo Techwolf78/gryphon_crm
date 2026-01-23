@@ -9,10 +9,9 @@ import {
 } from "lucide-react";
 import { useState, useEffect, useRef, useMemo } from "react";
 import * as JSC from "jscharting";
+import BudgetDetailTable from "./BudgetDetailTable";
 
-const BudgetOverview = ({
-  departmentBudget,
-}) => {
+const BudgetOverview = ({ departmentBudget }) => {
   const [viewMode, setViewMode] = useState("bar");
   const chartRef = useRef(null);
 
@@ -39,33 +38,39 @@ const BudgetOverview = ({
   const fixedCostItems = flattenExpenses(departmentBudget.fixedCosts, "fixed_");
   const deptExpenseItems = flattenExpenses(
     departmentBudget.departmentExpenses,
-    "dept_"
+    "dept_",
   );
   const csddExpenseItems = flattenExpenses(
     departmentBudget.csddExpenses,
-    "csdd_"
+    "csdd_",
   );
 
-  const allItems = useMemo(() => [
-    ...fixedCostItems,
-    ...deptExpenseItems,
-    ...csddExpenseItems,
-  ], [fixedCostItems, deptExpenseItems, csddExpenseItems]);
+  const allItems = useMemo(
+    () => [...fixedCostItems, ...deptExpenseItems, ...csddExpenseItems],
+    [fixedCostItems, deptExpenseItems, csddExpenseItems],
+  );
 
   const totalFixed = fixedCostItems.reduce((a, c) => a + c.allocated, 0);
   const totalDept = deptExpenseItems.reduce((a, c) => a + c.allocated, 0);
   const totalCsdd = csddExpenseItems.reduce((a, c) => a + c.allocated, 0);
 
-  const pieData = useMemo(() => [
-    { name: "Fixed Costs", y: totalFixed },
-    { name: "Department Expenses", y: totalDept },
-    { name: "CSDD", y: totalCsdd },
-  ], [totalFixed, totalDept, totalCsdd]);
+  const pieData = useMemo(
+    () => [
+      { name: "Fixed Costs", y: totalFixed },
+      { name: "Department Expenses", y: totalDept },
+      { name: "CSDD", y: totalCsdd },
+    ],
+    [totalFixed, totalDept, totalCsdd],
+  );
 
-  const barData = useMemo(() => allItems.map((item) => ({
-    x: item.label,
-    y: item.utilizationRate,
-  })), [allItems]);
+  const barData = useMemo(
+    () =>
+      allItems.map((item) => ({
+        x: item.label,
+        y: item.utilizationRate,
+      })),
+    [allItems],
+  );
 
   // 🎨 Initialize / update chart
   useEffect(() => {
@@ -175,42 +180,134 @@ const BudgetOverview = ({
             shadowColor: "shadow-purple-500/10",
             borderColor: "border-purple-200/50",
           },
-        ].map(({ title, value, icon: Icon, gradient, bgColor, textColor, shadowColor, borderColor }) => (
-          <div
-            key={title}
-            className={`${bgColor} backdrop-blur-sm ${borderColor} border rounded-2xl p-2 shadow-lg ${shadowColor} hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 cursor-pointer min-h-18 flex items-center`}
-          >
-            <div className={`p-2.5 rounded-xl bg-linear-to-br ${gradient} shadow-md mr-3`}>
-              <Icon className="w-5 h-5 text-white" />
+        ].map(
+          ({
+            title,
+            value,
+            icon: Icon,
+            gradient,
+            bgColor,
+            textColor,
+            shadowColor,
+            borderColor,
+          }) => (
+            <div
+              key={title}
+              className={`${bgColor} backdrop-blur-sm ${borderColor} border rounded-2xl p-2 shadow-lg ${shadowColor} hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 cursor-pointer min-h-18 flex items-center`}
+            >
+              <div
+                className={`p-2.5 rounded-xl bg-linear-to-br ${gradient} shadow-md mr-3`}
+              >
+                <Icon className="w-5 h-5 text-white" />
+              </div>
+              <div className="flex-1 text-right">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide leading-tight mb-2">
+                  {title}
+                </p>
+                <p className={`text-lg font-bold ${textColor} leading-none`}>
+                  {typeof value === "number"
+                    ? `₹${value.toLocaleString("en-IN")}`
+                    : value}
+                </p>
+              </div>
             </div>
-            <div className="flex-1 text-right">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide leading-tight mb-2">
-                {title}
-              </p>
-              <p className={`text-lg font-bold ${textColor} leading-none`}>
-                {typeof value === "number"
-                  ? `₹${value.toLocaleString("en-IN")}`
-                  : value}
-              </p>
-            </div>
-          </div>
-        ))}
+          ),
+        )}
       </div>
 
       {/* Distribution */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-        <SummaryCard
-          label="Fixed Costs"
-          amount={totalFixed}
-        />
-        <SummaryCard
-          label="Department Expenses"
-          amount={totalDept}
-        />
-        <SummaryCard
-          label="CSDD"
-          amount={totalCsdd}
-        />
+        <SummaryCard label="Fixed Costs" amount={totalFixed} />
+        <SummaryCard label="Department Expenses" amount={totalDept} />
+        <SummaryCard label="CSDD" amount={totalCsdd} />
+      </div>
+
+      <BudgetDetailTable budget={departmentBudget} />
+
+      {/* Detailed Utilization */}
+      <div className="bg-white/70 backdrop-blur-sm border border-gray-200/50 rounded-xl shadow-lg overflow-hidden">
+        {/* Header */}
+        <div className="bg-linear-to-r from-gray-50 to-slate-50 border-b border-gray-200/50 px-3 py-2">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-gray-100 rounded-lg">
+              <BarChart3 className="w-5 h-5 text-gray-600" />
+            </div>
+            <div>
+              <h4 className="text-lg font-bold text-gray-900">
+                Detailed Utilization
+              </h4>
+              <p className="text-sm text-gray-600">
+                Expense breakdown by category
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="p-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
+            {allItems
+              .sort((a, b) => b.utilizationRate - a.utilizationRate)
+              .map((item) => (
+                <div
+                  key={item.id}
+                  className="bg-white/80 backdrop-blur-sm border border-gray-200/50 rounded-xl p-2 shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 cursor-pointer"
+                >
+                  <div className="flex justify-between items-start mb-3">
+                    <span className="text-sm font-semibold text-gray-900 leading-tight flex-1 mr-2">
+                      {item.label}
+                    </span>
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs font-bold whitespace-nowrap ${
+                        item.utilizationRate < 30
+                          ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                          : item.utilizationRate < 70
+                            ? "bg-amber-100 text-amber-800 border border-amber-200"
+                            : "bg-red-100 text-red-800 border border-red-200"
+                      }`}
+                    >
+                      {item.utilizationRate.toFixed(1)}%
+                    </span>
+                  </div>
+
+                  <div className="space-y-2 mb-3">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-gray-500 font-medium">
+                        Allocated
+                      </span>
+                      <span className="font-bold text-gray-900">
+                        ₹{item.allocated.toLocaleString("en-IN")}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-gray-500 font-medium">Spent</span>
+                      <span className="font-bold text-gray-900">
+                        ₹{item.spent.toLocaleString("en-IN")}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="relative">
+                    <div className="w-full bg-gray-200/60 rounded-full h-3 shadow-inner">
+                      <div
+                        className={`h-3 rounded-full transition-all duration-700 shadow-sm ${
+                          item.utilizationRate < 30
+                            ? "bg-linear-to-r from-emerald-400 to-emerald-500"
+                            : item.utilizationRate < 70
+                              ? "bg-linear-to-r from-amber-400 to-amber-500"
+                              : "bg-linear-to-r from-red-400 to-red-500"
+                        }`}
+                        style={{
+                          width: `${Math.min(item.utilizationRate, 100)}%`,
+                        }}
+                      ></div>
+                    </div>
+                    <div className="absolute inset-0 rounded-full bg-white/20"></div>
+                  </div>
+                </div>
+              ))}
+          </div>
+        </div>
       </div>
 
       {/* Interactive Chart */}
@@ -283,79 +380,7 @@ const BudgetOverview = ({
         </div>
       </div>
 
-      {/* Detailed Utilization */}
-      <div className="bg-white/70 backdrop-blur-sm border border-gray-200/50 rounded-xl shadow-lg overflow-hidden">
-        {/* Header */}
-        <div className="bg-linear-to-r from-gray-50 to-slate-50 border-b border-gray-200/50 px-3 py-2">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-gray-100 rounded-lg">
-              <BarChart3 className="w-5 h-5 text-gray-600" />
-            </div>
-            <div>
-              <h4 className="text-lg font-bold text-gray-900">Detailed Utilization</h4>
-              <p className="text-sm text-gray-600">Expense breakdown by category</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className="p-3">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
-            {allItems
-              .sort((a, b) => b.utilizationRate - a.utilizationRate)
-              .map((item) => (
-                <div
-                  key={item.id}
-                  className="bg-white/80 backdrop-blur-sm border border-gray-200/50 rounded-xl p-2 shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 cursor-pointer"
-                >
-                  <div className="flex justify-between items-start mb-3">
-                    <span className="text-sm font-semibold text-gray-900 leading-tight flex-1 mr-2">
-                      {item.label}
-                    </span>
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs font-bold whitespace-nowrap ${
-                        item.utilizationRate < 30
-                          ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
-                          : item.utilizationRate < 70
-                          ? "bg-amber-100 text-amber-800 border border-amber-200"
-                          : "bg-red-100 text-red-800 border border-red-200"
-                      }`}
-                    >
-                      {item.utilizationRate.toFixed(1)}%
-                    </span>
-                  </div>
-
-                  <div className="space-y-2 mb-3">
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-gray-500 font-medium">Allocated</span>
-                      <span className="font-bold text-gray-900">₹{item.allocated.toLocaleString("en-IN")}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-gray-500 font-medium">Spent</span>
-                      <span className="font-bold text-gray-900">₹{item.spent.toLocaleString("en-IN")}</span>
-                    </div>
-                  </div>
-
-                  <div className="relative">
-                    <div className="w-full bg-gray-200/60 rounded-full h-3 shadow-inner">
-                      <div
-                        className={`h-3 rounded-full transition-all duration-700 shadow-sm ${
-                          item.utilizationRate < 30
-                            ? "bg-linear-to-r from-emerald-400 to-emerald-500"
-                            : item.utilizationRate < 70
-                            ? "bg-linear-to-r from-amber-400 to-amber-500"
-                            : "bg-linear-to-r from-red-400 to-red-500"
-                        }`}
-                        style={{ width: `${Math.min(item.utilizationRate, 100)}%` }}
-                      ></div>
-                    </div>
-                    <div className="absolute inset-0 rounded-full bg-white/20"></div>
-                  </div>
-                </div>
-              ))}
-          </div>
-        </div>
-      </div>
+      
     </div>
   );
 };
@@ -368,14 +393,16 @@ const SummaryCard = ({ label, amount }) => {
       borderColor: "border-gray-200/60",
       shadowColor: "shadow-gray-500/10",
       textColor: "text-gray-700",
-      accentColor: "from-gray-500 to-gray-600"
+      accentColor: "from-gray-500 to-gray-600",
     };
   };
 
   const style = getCardStyle();
 
   return (
-    <div className={`${style.bgColor} backdrop-blur-sm ${style.borderColor} border rounded-xl p-2 shadow-lg ${style.shadowColor} hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 cursor-pointer`}>
+    <div
+      className={`${style.bgColor} backdrop-blur-sm ${style.borderColor} border rounded-xl p-2 shadow-lg ${style.shadowColor} hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 cursor-pointer`}
+    >
       <div className="text-center mb-2">
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
           {label}
