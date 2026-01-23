@@ -178,7 +178,7 @@ const PurchaseIntentModal = ({
     if (estimatedTotal > remainingBudget) {
       if (
         !confirm(
-          `This purchase intent (₹${estimatedTotal.toLocaleString()}) exceeds the remaining budget (₹${remainingBudget.toLocaleString()}). Do you want to proceed?`
+          `This purchase intent (₹${estimatedTotal.toLocaleString()}) exceeds the remaining budget (₹${remainingBudget.toLocaleString()}). Do you want to proceed?`,
         )
       ) {
         return;
@@ -240,7 +240,7 @@ const PurchaseIntentModal = ({
   const exceedsBudget = grandTotal > remainingBudget;
 
   const availableCategories = Object.keys(
-    currentBudget?.departmentExpenses || {}
+    currentBudget?.departmentExpenses || {},
   )
     .filter((key) => key !== "employeeSalary")
     .map((key) => ({
@@ -248,10 +248,6 @@ const PurchaseIntentModal = ({
       label:
         budgetComponents?.[key] || key.charAt(0).toUpperCase() + key.slice(1),
     }));
-
-  console.log(budgetComponents);
-  console.log(availableCategories);
-  console.log(currentBudget?.departmentExpenses);
 
   const hasBudget =
     currentBudget &&
@@ -459,7 +455,7 @@ const PurchaseIntentModal = ({
                               handleItemChange(
                                 index,
                                 "description",
-                                e.target.value
+                                e.target.value,
                               )
                             }
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg"
@@ -477,7 +473,7 @@ const PurchaseIntentModal = ({
                               handleItemChange(
                                 index,
                                 "quantity",
-                                e.target.value
+                                e.target.value,
                               )
                             }
                             min="1"
@@ -496,7 +492,7 @@ const PurchaseIntentModal = ({
                               handleItemChange(
                                 index,
                                 "estPricePerUnit",
-                                e.target.value
+                                e.target.value,
                               )
                             }
                             min="0"

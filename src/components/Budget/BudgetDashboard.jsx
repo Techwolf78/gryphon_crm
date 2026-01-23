@@ -25,7 +25,6 @@ import { exportBudget } from "./utils/ExportBudget";
 import { exportPurchaseOrders } from "./utils/ExportPO";
 import { exportPurchaseIntents } from "./utils/ExportIntent";
 import { Plus, PlusIcon } from "lucide-react";
-import ManageCSDD from "./ManageCSDD";
 import { toast } from "react-toastify";
 import { budgetComponents, componentColors } from "./config/department";
 
@@ -39,6 +38,7 @@ const PurchaseIntentsList = lazy(() => import("./PurchaseIntentsList"));
 const PurchaseOrdersList = lazy(() => import("./PurchaseOrdersList"));
 const VendorManagement = lazy(() => import("./VendorManagement"));
 const ViewBudgetModal = lazy(() => import("./ViewBudgetModal"));
+const ManageCSDD = lazy(()=> import("./ManageCSDD"))
 
 // Loading component
 const ComponentLoader = () => (
