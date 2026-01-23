@@ -12,9 +12,10 @@ const DashboardLayout = () => {
     } catch {
       // ignore
     }
-    // fallback to responsive default
-    return typeof window !== 'undefined' && window.innerWidth < 1024;
+    // Default to collapsed
+    return true;
   });
+  const [sidebarHovered, setSidebarHovered] = useState(false);
 
   // Auto-collapse sidebar on mobile only when user has not set a preference
   useEffect(() => {
@@ -37,13 +38,14 @@ const DashboardLayout = () => {
       <Sidebar
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+        onHoverChange={setSidebarHovered}
         user={user}
       />
       <main
         className={`grow transition-all duration-300 ease-in-out min-h-screen
-          ${sidebarCollapsed 
-            ? 'ml-0 lg:ml-16' // Change this line - was missing ml-0
-            : 'ml-0 lg:ml-36' // Change this line - was missing ml-0
+          ${sidebarCollapsed && !sidebarHovered
+            ? 'ml-0 lg:ml-16'
+            : 'ml-0 lg:ml-36'
           }
         `}
       >
