@@ -1,10 +1,26 @@
 // Utility for generating trainer invoice PDF
 import { saveAs } from 'file-saver';
+import { logInvoiceAction, AUDIT_ACTIONS } from '../../utils/trainerInvoiceAuditLogger';
+
+// Helper function to format payment cycle for display
+const formatPaymentCycle = (cycleStr) => {
+  if (!cycleStr || cycleStr === 'unknown') return 'Unknown';
+
+  // Parse format like "2025-12-1-15" or "2025-12-16-31"
+  const parts = cycleStr.split('-');
+  if (parts.length !== 4) return cycleStr;
+
+  const [year, month, startDay, endDay] = parts;
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const monthName = monthNames[parseInt(month) - 1] || month;
+
+  return `${monthName} ${year} (Days ${startDay}-${endDay})`;
+};
 
 export const generateInvoicePDF = async (invoiceData) => {
   try {
-    console.log('🎯 Starting PDF generation for invoice:', invoiceData?.billNumber);
-    console.log('📊 Invoice data received:', invoiceData);
+    // console.log('🎯 Starting PDF generation for invoice:', invoiceData?.billNumber);
+    // console.log('📊 Invoice data received:', invoiceData);
 
     // Validate required fields
     const requiredFields = [
@@ -14,7 +30,7 @@ export const generateInvoicePDF = async (invoiceData) => {
 
     const missingFields = requiredFields.filter(field => !invoiceData || !invoiceData[field]);
     if (missingFields.length > 0) {
-      console.error('❌ Missing required fields:', missingFields);
+      // console.error('❌ Missing required fields:', missingFields);
       throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
     }
 
@@ -48,7 +64,7 @@ export const generateInvoicePDF = async (invoiceData) => {
       gst: invoiceData.gst || 'NA',
     };
 
-    console.log('🔧 Using safe invoice data:', safeInvoiceData);
+    // console.log('🔧 Using safe invoice data:', safeInvoiceData);
 
     const logo = await import('../../assets/gryphon_logo.png');
 
@@ -61,9 +77,9 @@ export const generateInvoicePDF = async (invoiceData) => {
     // add logo
     try {
       doc.addImage(logo.default || logo, 'PNG', 15, 9, 30, 15);
-      console.log('✅ Logo added successfully');
+      // console.log('✅ Logo added successfully');
     } catch (logoError) {
-      console.warn('⚠️ Logo loading failed:', logoError);
+      // console.warn('⚠️ Logo loading failed:', logoError);
     }
 
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -121,7 +137,7 @@ export const generateInvoicePDF = async (invoiceData) => {
         [`Topic: ${safeInvoiceData.topics}`, `IFSC Code: ${safeInvoiceData.ifscCode}`],
         [`From: ${formatDate(safeInvoiceData.startDate)}`, `PAN Card: ${safeInvoiceData.panNumber}`],
         [`To: ${formatDate(safeInvoiceData.endDate)}`, `Billing Date: ${formatDate(safeInvoiceData.billingDate)}`],
-        ...(safeInvoiceData.paymentCycle ? [[`Payment Cycle: ${safeInvoiceData.paymentCycle} (Days ${safeInvoiceData.paymentCycle})`, '']] : []),
+        ...(safeInvoiceData.paymentCycle ? [[`Payment Cycle: ${formatPaymentCycle(safeInvoiceData.paymentCycle)}`, '']] : []),
       ],
       theme: 'grid',
       styles: { textColor: [0, 0, 0], fontSize: 9, cellPadding: 1.2, valign: 'middle', lineColor: [0, 0, 0], lineWidth: 0.2 },
@@ -248,23 +264,30 @@ export const generateInvoicePDF = async (invoiceData) => {
     doc.setGState(new doc.GState({ opacity: 1 }));
 
     const fileName = `Invoice_${safeInvoiceData.billNumber || 'NA'}.pdf`;
-    console.log('💾 Attempting to save PDF with filename:', fileName);
+    // console.log('💾 Attempting to save PDF with filename:', fileName);
 
     // Generate PDF as blob for both download and preview
     const pdfBlob = doc.output('blob');
     
+    // Log the PDF download action
+    await logInvoiceAction(AUDIT_ACTIONS.DOWNLOAD, safeInvoiceData, {
+      downloadFormat: 'pdf',
+      downloadSource: 'web',
+      fileName: fileName
+    });
+    
     // Download the file and open in new tab
     saveAs(pdfBlob, fileName);
-    console.log('✅ PDF download initiated successfully');
+    // console.log('✅ PDF download initiated successfully');
     
     // Also open in new tab for preview
     const blobUrl = URL.createObjectURL(pdfBlob);
     window.open(blobUrl, '_blank');
-    console.log('✅ PDF opened in new tab for preview');
+    // console.log('✅ PDF opened in new tab for preview');
 
     return true;
   } catch (error) {
-    console.error('❌ PDF generation failed:', error);
+    // console.error('❌ PDF generation failed:', error);
     alert('Failed to generate PDF. Please try again.');
     return false;
   }

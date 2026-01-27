@@ -636,13 +636,13 @@ const TableView = ({ tasks, getRoleDisplay, getRoleColor, handleDelete, moveTask
   const getStatusBadge = (status) => {
     switch (status) {
       case 'not_started':
-        return <span className="px-3 py-1.5 text-xs bg-gray-100 text-gray-700 rounded-full font-semibold shadow-sm whitespace-nowrap">Not Started</span>;
+        return <span className="px-3 py-1.5 text-xs bg-gray-100 text-gray-700 rounded-full font-semibold shadow-sm whitespace-nowrap">Backlog</span>;
       case 'in_progress':
         return <span className="px-3 py-1.5 text-xs bg-blue-100 text-blue-700 rounded-full font-semibold shadow-sm whitespace-nowrap">In Progress</span>;
       case 'completed':
-        return <span className="px-3 py-1.5 text-xs bg-green-100 text-green-700 rounded-full font-semibold shadow-sm whitespace-nowrap">Completed</span>;
+        return <span className="px-3 py-1.5 text-xs bg-green-100 text-green-700 rounded-full font-semibold shadow-sm whitespace-nowrap">Done</span>;
       case 'cancelled':
-        return <span className="px-3 py-1.5 text-xs bg-red-100 text-red-700 rounded-full font-semibold shadow-sm whitespace-nowrap">Cancelled</span>;
+        return <span className="px-3 py-1.5 text-xs bg-red-100 text-red-700 rounded-full font-semibold shadow-sm whitespace-nowrap">On hold</span>;
       default:
         return <span className="px-3 py-1.5 text-xs bg-gray-100 text-gray-700 rounded-full font-semibold shadow-sm whitespace-nowrap">{status}</span>;
     }
@@ -1765,7 +1765,7 @@ const TaskManager = ({ onBack }) => {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     <Column
                       id="not_started"
-                      title="Not Started"
+                      title="Backlog"
                       color="bg-gray-400"
                       bgColor="bg-gray-50"
                       tasks={getTasksByStatus('not_started')}
@@ -1807,7 +1807,7 @@ const TaskManager = ({ onBack }) => {
 
                     <Column
                       id="completed"
-                      title="Completed"
+                      title="Done"
                       color="bg-green-500"
                       bgColor="bg-green-50"
                       tasks={getTasksByStatus('completed')}
@@ -1828,7 +1828,7 @@ const TaskManager = ({ onBack }) => {
 
                     <Column
                       id="cancelled"
-                      title="Cancelled"
+                      title="On hold"
                       color="bg-red-500"
                       bgColor="bg-red-50"
                       tasks={getTasksByStatus('cancelled')}

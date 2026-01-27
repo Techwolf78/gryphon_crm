@@ -3,12 +3,28 @@ import { db } from "../../firebase";
 import { doc, getDoc, collection, addDoc } from "firebase/firestore";
 import { query, where, getDocs } from "firebase/firestore";
 import {  FiX, FiEye, FiFileText, FiSave, FiArrowLeft, FiCheckCircle, FiXCircle, FiAlertCircle } from "react-icons/fi";
+import { logInvoiceAction, AUDIT_ACTIONS } from "../../utils/trainerInvoiceAuditLogger";
 
 // Import the standardized PDF generation function
 
 // Helper function to round numbers to nearest whole number
 const roundToNearestWhole = (num) => {
   return Math.round(num);
+};
+
+// Helper function to format payment cycle for UI display
+const formatPaymentCycleForUI = (cycleStr) => {
+  if (!cycleStr || cycleStr === 'unknown') return 'Unknown';
+
+  // Parse format like "2025-12-1-15" or "2025-12-16-31"
+  const parts = cycleStr.split('-');
+  if (parts.length !== 4) return cycleStr;
+
+  const [year, month, startDay, endDay] = parts;
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const monthName = monthNames[parseInt(month) - 1] || month;
+
+  return `${monthName} ${year} (Days ${startDay}-${endDay})`;
 };
 
 function InvoiceModal({ trainer, onClose, onInvoiceGenerated, onToast }) {
@@ -20,7 +36,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated, onToast }) {
         ? `Dates: ${trainer.activeDates.length} days (${trainer.earliestStartDate || 'N/A'} to ${trainer.latestEndDate || 'N/A'})`
         : `Date range: ${trainer.earliestStartDate || 'N/A'} to ${trainer.latestEndDate || 'N/A'}`;
       
-      console.log('📋 INVOICE MODAL opened for trainer:', trainer.trainerName, 'ID:', trainer.trainerId, 'Cycle:', trainer.paymentCycle, 'Mode: generate |', datesInfo);
+      // console.log('📋 INVOICE MODAL opened for trainer:', trainer.trainerName, 'ID:', trainer.trainerId, 'Cycle:', trainer.paymentCycle, 'Mode: generate |', datesInfo);
       hasLoggedRef.current = true;
     }
   }, [trainer]);
@@ -90,14 +106,14 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated, onToast }) {
           }));
         } else {
           // Trainer document doesn't exist - this is expected for new trainers
-          console.warn(`Trainer document not found for trainerId: ${queryDeps.trainerId}`);
+          // console.warn(`Trainer document not found for trainerId: ${queryDeps.trainerId}`);
           setInvoiceData((prev) => ({
             ...prev,
             gst: prev.gst || "NA", // Default to NA if trainer not found
           }));
         }
       } catch (error) {
-        console.error('Error fetching trainer bank details:', error);
+        // console.error('Error fetching trainer bank details:', error);
         // Continue with empty bank details - user can still fill them manually
       }
     };
@@ -105,7 +121,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated, onToast }) {
     const checkExistingInvoice = async () => {
       if (!queryDeps.trainerId || !queryDeps.collegeName) return;
 
-      console.log('🔍 CHECKING EXISTING INVOICE for trainer:', queryDeps.trainerId, 'college:', queryDeps.collegeName, 'phase:', queryDeps.phase, 'paymentCycle:', trainer?.paymentCycle, 'projectCode:', queryDeps.projectCode);
+      // console.log('🔍 CHECKING EXISTING INVOICE for trainer:', queryDeps.trainerId, 'college:', queryDeps.collegeName, 'phase:', queryDeps.phase, 'paymentCycle:', trainer?.paymentCycle, 'projectCode:', queryDeps.projectCode);
 
       try {
         const q = queryDeps.isMerged
@@ -126,7 +142,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated, onToast }) {
             );
 
         const querySnapshot = await getDocs(q);
-        console.log('📋 Existing invoice query results:', querySnapshot.size, 'documents found for payment cycle:', trainer?.paymentCycle);
+        // console.log('📋 Existing invoice query results:', querySnapshot.size, 'documents found for payment cycle:', trainer?.paymentCycle);
         
         if (!querySnapshot.empty) {
           // Get the most recent invoice
@@ -135,7 +151,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated, onToast }) {
             id: latestInvoiceDoc.id,
             ...latestInvoiceDoc.data(),
           };
-          console.log('📄 FOUND EXISTING INVOICE:', latestInvoice.billNumber, 'for cycle:', latestInvoice.paymentCycle, 'dates:', latestInvoice.startDate, 'to', latestInvoice.endDate);
+          // console.log('📄 FOUND EXISTING INVOICE:', latestInvoice.billNumber, 'for cycle:', latestInvoice.paymentCycle, 'dates:', latestInvoice.startDate, 'to', latestInvoice.endDate);
           setExistingInvoice(latestInvoice);
           setViewMode(true); // Automatically set to view mode if invoice exists
 
@@ -147,12 +163,12 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated, onToast }) {
             gst: latestInvoice.gst !== undefined ? String(latestInvoice.gst) : (queryDeps.gst ? "0" : "NA"),
           }));
         } else {
-          console.log('✅ NO EXISTING INVOICE found for this payment cycle - ready to create new invoice');
+          // console.log('✅ NO EXISTING INVOICE found for this payment cycle - ready to create new invoice');
           setExistingInvoice(null);
           setViewMode(false);
         }
       } catch (error) {
-        console.error('Error checking for existing invoice:', error);
+        // console.error('Error checking for existing invoice:', error);
         // Continue without existing invoice - user can create a new one
       }
     };
@@ -205,22 +221,33 @@ const handleSubmit = async (e) => {
     };
 
     invoiceToSave.createdAt = new Date();
-    console.log('💾 SAVING INVOICE to Firebase:', {
-      trainer: invoiceToSave.trainerName,
-      id: invoiceToSave.trainerId,
-      cycle: invoiceToSave.paymentCycle,
-      billNumber: invoiceToSave.billNumber,
-      totalAmount: invoiceToSave.totalAmount,
-      netPayment: invoiceToSave.netPayment
+    // console.log('💾 SAVING INVOICE to Firebase:', {
+    //   trainer: invoiceToSave.trainerName,
+    //   id: invoiceToSave.trainerId,
+    //   cycle: invoiceToSave.paymentCycle,
+    //   billNumber: invoiceToSave.billNumber,
+    //   totalAmount: invoiceToSave.totalAmount,
+    //   netPayment: invoiceToSave.netPayment
+    // });
+    const docRef = await addDoc(collection(db, "invoices"), invoiceToSave);
+
+    // Log the invoice generation action
+    await logInvoiceAction(AUDIT_ACTIONS.GENERATE, {
+      ...trainer,
+      ...invoiceToSave,
+      invoiceId: docRef.id
+    }, {
+      generatedFrom: 'modal',
+      invoiceData: invoiceToSave
     });
-    await addDoc(collection(db, "invoices"), invoiceToSave);
+
     onToast({ type: 'success', message: "Invoice generated successfully!" });
 
     await onInvoiceGenerated(invoiceToSave); // Pass the invoice data for undo functionality
     onClose();
 
   } catch (error) {
-    console.error('Error generating invoice:', error);
+    // console.error('Error generating invoice:', error);
     onToast({ type: 'error', message: "Invoice not generated. Please try again." });
   } finally {
     setIsGenerating(false);
@@ -302,9 +329,9 @@ const handleSubmit = async (e) => {
               <div><span className="font-medium">Phase:</span> {trainer?.phase}</div>
               {trainer?.paymentCycle && (
                 <div className="col-span-2">
-                  <span className="font-medium">Payment Cycle:</span> 
+                  <span className="font-medium">Payment Cycle:</span>
                   <span className="ml-1 bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs font-medium">
-                    {trainer.paymentCycle} (Days {trainer.paymentCycle})
+                    {formatPaymentCycleForUI(trainer.paymentCycle)}
                   </span>
                 </div>
               )}

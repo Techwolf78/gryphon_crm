@@ -5,7 +5,7 @@ import { doc, setDoc, collection, getDocs, query, orderBy } from "firebase/fires
 // Smart batching utility to find the next available batch number and check existing batches
 const getNextBatchInfo = async (chunkSize = 1000) => {
   try {
-    console.log("Checking existing batches in Firestore...");
+    // console.log("Checking existing batches in Firestore...");
 
     // Query all batch documents ordered by batch number (assuming batch_1, batch_2, etc.)
     const batchesQuery = query(collection(db, "companyleads"), orderBy("__name__"));
@@ -29,7 +29,7 @@ const getNextBatchInfo = async (chunkSize = 1000) => {
       }
     });
 
-    console.log(`Found ${highestBatchNumber} existing batches. Last batch: ${lastBatchId}`);
+    // console.log(`Found ${highestBatchNumber} existing batches. Last batch: ${lastBatchId}`);
 
     // Check if the last batch has space (<chunkSize records)
     let shouldCreateNewBatch = true;
@@ -37,21 +37,21 @@ const getNextBatchInfo = async (chunkSize = 1000) => {
 
     if (lastBatchData && lastBatchData.companies) {
       const lastBatchSize = lastBatchData.companies.length;
-      console.log(`Last batch (${lastBatchId}) has ${lastBatchSize} records`);
+      // console.log(`Last batch (${lastBatchId}) has ${lastBatchSize} records`);
 
       if (lastBatchSize < chunkSize) {
         // Last batch has space, we can append to it
         shouldCreateNewBatch = false;
         nextBatchNumber = highestBatchNumber;
-        console.log(`Will append to existing batch_${nextBatchNumber} (${lastBatchSize}/${chunkSize} records)`);
+        // console.log(`Will append to existing batch_${nextBatchNumber} (${lastBatchSize}/${chunkSize} records)`);
       } else {
         // Last batch is full, create new batch
-        console.log(`Last batch is full (${lastBatchSize}/${chunkSize}), will create batch_${nextBatchNumber}`);
+        // console.log(`Last batch is full (${lastBatchSize}/${chunkSize}), will create batch_${nextBatchNumber}`);
       }
     } else if (highestBatchNumber === 0) {
       // No existing batches, start from 1
       nextBatchNumber = 1;
-      console.log("No existing batches found, starting from batch_1");
+      // console.log("No existing batches found, starting from batch_1");
     }
 
     return {
@@ -61,9 +61,9 @@ const getNextBatchInfo = async (chunkSize = 1000) => {
       lastBatchId: shouldCreateNewBatch ? null : lastBatchId
     };
   } catch (error) {
-    console.error("Error checking existing batches:", error);
+    // console.error("Error checking existing batches:", error);
     // If we can't check existing batches, start from batch_1
-    console.log("Could not check existing batches, starting from batch_1");
+    // console.log("Could not check existing batches, starting from batch_1");
     return {
       nextBatchNumber: 1,
       shouldCreateNewBatch: true,
@@ -75,11 +75,11 @@ const getNextBatchInfo = async (chunkSize = 1000) => {
 
 // Utility function to handle Firestore index errors
 const handleFirestoreIndexError = (error, operation = "operation") => {
-  console.error(`Firestore Index Error in ${operation}:`, error);
+  // console.error(`Firestore Index Error in ${operation}:`, error);
 
   if (error.message && error.message.includes('index')) {
-    console.error("Firestore Index Error Detected!");
-    console.error("To fix this, create the required index:");
+    // console.error("Firestore Index Error Detected!");
+    // console.error("To fix this, create the required index:");
 
     // Try to extract index URL from error message
     const indexUrlMatch = error.message.match(/https:\/\/console\.firebase\.google\.com[^\s]*/);

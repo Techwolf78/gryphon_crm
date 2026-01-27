@@ -15,12 +15,12 @@ const CONNECTION_CHECK_INTERVAL = 30000; // 30 seconds
 // Update online status
 window.addEventListener('online', () => {
   isOnline = true;
-  console.log('Connection restored');
+  // console.log('Connection restored');
 });
 
 window.addEventListener('offline', () => {
   isOnline = false;
-  console.log('Connection lost');
+  // console.log('Connection lost');
 });
 
 // Check connection by attempting a lightweight Firebase operation
@@ -40,7 +40,7 @@ const checkConnection = async () => {
     isOnline = true;
     return true;
   } catch (error) {
-    console.warn('Connection check failed:', error);
+    // console.warn('Connection check failed:', error);
     isOnline = false;
     return false;
   }
@@ -112,7 +112,7 @@ export const safeFirebaseQuery = async (
 
     } catch (error) {
       lastError = error;
-      console.error(`Firebase query attempt ${attempt + 1} failed:`, error);
+      // console.error(`Firebase query attempt ${attempt + 1} failed:`, error);
 
       // Don't retry on the last attempt
       if (attempt === maxRetries) break;
@@ -132,7 +132,7 @@ export const safeFirebaseQuery = async (
 
       // Exponential backoff with jitter
       const delay = baseDelay * Math.pow(2, attempt) + Math.random() * 1000;
-      console.log(`Retrying Firebase query in ${Math.round(delay)}ms...`);
+      // console.log(`Retrying Firebase query in ${Math.round(delay)}ms...`);
 
       await new Promise(resolve => setTimeout(resolve, delay));
     }

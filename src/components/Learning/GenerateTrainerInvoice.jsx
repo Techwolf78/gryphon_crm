@@ -10,6 +10,7 @@ import FiltersSection from "./Invoice/FiltersSection";
 import EmptyState from "./Invoice/EmptyState";
 import TrainerInvoiceSkeleton from "./Invoice/TrainerInvoiceSkeleton";
 import TrainerTable from "./Invoice/TrainerTable";
+import { logInvoiceAction, AUDIT_ACTIONS } from "../../utils/trainerInvoiceAuditLogger";
 
 function GenerateTrainerInvoice() {
   // Cache duration: 5 minutes (but adaptive based on usage)
@@ -89,7 +90,7 @@ function GenerateTrainerInvoice() {
       localStorage.setItem('trainer_invoice_last_fetch', timestamp.toString());
       localStorage.setItem('trainer_invoice_cache_version', CACHE_VERSION); // 🆕 Save version
     } catch (error) {
-      console.warn('⚠️ Failed to save cache to localStorage:', error);
+      // console.warn('⚠️ Failed to save cache to localStorage:', error);
     }
   };
   
@@ -99,7 +100,7 @@ function GenerateTrainerInvoice() {
       localStorage.removeItem('trainer_invoice_last_fetch');
       localStorage.removeItem('trainer_invoice_cache_version'); // 🆕 Clear version too
     } catch (error) {
-      console.warn('⚠️ Failed to clear cache from localStorage:', error);
+      // console.warn('⚠️ Failed to clear cache from localStorage:', error);
     }
   };
 
@@ -189,7 +190,7 @@ function GenerateTrainerInvoice() {
                         }
                       }
                     } catch (error) {
-                      console.warn('Failed to generate activeDates for trainer:', trainer.trainerName, error);
+                      // console.warn('Failed to generate activeDates for trainer:', trainer.trainerName, error);
                     }
                   }
 
@@ -276,7 +277,7 @@ function GenerateTrainerInvoice() {
               missingTrainers.add(trainerId);
             }
           } catch (error) {
-            console.warn(`Failed to fetch trainer ${trainerId}:`, error);
+            // console.warn(`Failed to fetch trainer ${trainerId}:`, error);
             missingTrainers.add(trainerId);
           }
         });
@@ -315,8 +316,11 @@ function GenerateTrainerInvoice() {
       const getPaymentCycle = (dateStr) => {
         if (!dateStr) return 'unknown';
         const date = new Date(dateStr);
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0'); // 01-12
         const day = date.getDate();
-        return day <= 15 ? '1-15' : '16-31';
+        const cycle = day <= 15 ? '1-15' : '16-31';
+        return `${year}-${month}-${cycle}`;
       };
 
       // Helper function to get unique payment cycles for trainer assignments
@@ -383,8 +387,11 @@ function GenerateTrainerInvoice() {
             // Fallback: check if the date range intersects with this cycle
             const startDate = new Date(trainer.startDate);
             const endDate = new Date(trainer.endDate);
-            const cycleStart = cycle === '1-15' ? 1 : 16;
-            const cycleEnd = cycle === '1-15' ? 15 : 31;
+
+            // Parse cycle format: "2025-12-1-15" -> startDay=1, endDay=15
+            const cycleParts = cycle.split('-');
+            const cycleStart = parseInt(cycleParts[2]); // 1 or 16
+            const cycleEnd = parseInt(cycleParts[3]); // 15 or 31
 
             // Check if the training period overlaps with this payment cycle
             const trainingStartDay = startDate.getDate();
@@ -432,8 +439,22 @@ function GenerateTrainerInvoice() {
           let cycleEndDate = null;
 
           if (trainer.activeDates && trainer.activeDates.length > 0) {
-            // Use activeDates for precise calculation
-            cycleHours = cycleAssignments.length * (trainer.dailyHours?.[0] || trainer.assignedHours / trainer.activeDates.length || 0);
+            // FIXED: Count working days (excluding weekends) for proper hour allocation
+            const workingDaysInCycle = cycleAssignments.filter(dateStr => {
+              const date = new Date(dateStr);
+              const dayOfWeek = date.getDay();
+              return dayOfWeek !== 0 && dayOfWeek !== 6; // Exclude Sunday (0) and Saturday (6)
+            }).length;
+            
+            const totalWorkingDays = trainer.activeDates.filter(dateStr => {
+              const date = new Date(dateStr);
+              const dayOfWeek = date.getDay();
+              return dayOfWeek !== 0 && dayOfWeek !== 6; // Exclude Sunday (0) and Saturday (6)
+            }).length;
+            
+            // Allocate hours proportionally based on working days in each cycle
+            cycleHours = totalWorkingDays > 0 ? (workingDaysInCycle / totalWorkingDays) * trainer.assignedHours : 0;
+            
             if (cycleAssignments.length > 0) {
               cycleStartDate = cycleAssignments[0];
               cycleEndDate = cycleAssignments[cycleAssignments.length - 1];
@@ -616,7 +637,7 @@ function GenerateTrainerInvoice() {
 
           return trainerWithInvoiceStatus;
         } catch (trainerError) {
-          console.error(`🚨 Error processing trainer ${trainer.trainerName}:`, trainerError);
+          // console.error(`🚨 Error processing trainer ${trainer.trainerName}:`, trainerError);
           return {
             ...trainer,
             hasExistingInvoice: false,
@@ -669,7 +690,7 @@ function GenerateTrainerInvoice() {
       saveCacheToStorage(cacheData, now);
       
     } catch (error) {
-      console.error('❌ Error fetching trainers:', error);
+      // console.error('❌ Error fetching trainers:', error);
       // If fetch fails but we have cached data, use it
       if (!forceRefresh && cachedData) {
         setTrainerData(cachedData.trainerData);
@@ -748,18 +769,25 @@ function GenerateTrainerInvoice() {
       ? `Dates: ${trainer.activeDates.length} days (${trainer.earliestStartDate || 'N/A'} to ${trainer.latestEndDate || 'N/A'})`
       : `Date range: ${trainer?.earliestStartDate || 'N/A'} to ${trainer?.latestEndDate || 'N/A'}`;
     
-    console.log('🚀 HANDLE GENERATE INVOICE called for trainer:', trainer?.trainerName, 'ID:', trainer?.trainerId, 'Cycle:', trainer?.paymentCycle, '|', datesInfo);
+    // console.log('🚀 HANDLE GENERATE INVOICE called for trainer:', trainer?.trainerName, 'ID:', trainer?.trainerId, 'Cycle:', trainer?.paymentCycle, '|', datesInfo);
     setSelectedTrainer(trainer);
     setModalMode('edit');
     setShowInvoiceModal(true);
   }, []);
 
-  const handleViewInvoice = useCallback((trainer) => {
+  const handleViewInvoice = useCallback(async (trainer) => {
     const datesInfo = trainer?.activeDates 
       ? `Dates: ${trainer.activeDates.length} days (${trainer.earliestStartDate || 'N/A'} to ${trainer.latestEndDate || 'N/A'})`
       : `Date range: ${trainer?.earliestStartDate || 'N/A'} to ${trainer?.latestEndDate || 'N/A'}`;
     
-    console.log('👁️ HANDLE VIEW INVOICE called for trainer:', trainer?.trainerName, 'ID:', trainer?.trainerId, 'Cycle:', trainer?.paymentCycle, '|', datesInfo);
+    // console.log('👁️ HANDLE VIEW INVOICE called for trainer:', trainer?.trainerName, 'ID:', trainer?.trainerId, 'Cycle:', trainer?.paymentCycle, '|', datesInfo);
+
+    // Log the view action
+    await logInvoiceAction(AUDIT_ACTIONS.VIEW, trainer, {
+      viewSource: 'dashboard',
+      datesInfo
+    });
+
     setSelectedTrainer(trainer);
     setModalMode('view');
     setShowInvoiceModal(true);
@@ -1127,7 +1155,7 @@ function GenerateTrainerInvoice() {
         }));
       }
     } catch (error) {
-      console.error('❌ Download invoice error:', error);
+      // console.error('❌ Download invoice error:', error);
       setToast({ type: 'error', message: "Failed to download invoice. Please try again." });
       setPdfStatus((prev) => ({
         ...prev,
@@ -1158,6 +1186,7 @@ function GenerateTrainerInvoice() {
       if (!querySnapshot.empty) {
         const invoiceDoc = querySnapshot.docs[0];
         const invoiceRef = doc(db, "invoices", invoiceDoc.id);
+        const invoiceData = invoiceDoc.data();
         
         // Update invoice to pending status and make it available for HR review
         await updateDoc(invoiceRef, {
@@ -1166,6 +1195,17 @@ function GenerateTrainerInvoice() {
           approvedDate: new Date().toISOString().split("T")[0],
           approvedBy: "Learning Department",
           updatedAt: new Date()
+        });
+
+        // Log the approval action
+        await logInvoiceAction(AUDIT_ACTIONS.APPROVE, {
+          ...trainer,
+          ...invoiceData,
+          invoiceId: invoiceDoc.id
+        }, {
+          approvalReason: "Approved by Learning Department for HR review",
+          previousStatus: invoiceData.status,
+          newStatus: "pending"
         });
 
         // Clear cache and refresh data
@@ -1179,14 +1219,14 @@ function GenerateTrainerInvoice() {
         setToast({ type: 'error', message: "Invoice not found" });
       }
     } catch (error) {
-      console.error('Error approving invoice:', error);
+      // console.error('Error approving invoice:', error);
       setToast({ type: 'error', message: "Failed to approve invoice" });
     }
   }, [fetchTrainers]);
 
   // Handle invoice deletion (for old combined invoices that need to be split)
   const handleDeleteInvoice = useCallback(async (trainer) => {
-    console.log('🗑️ HANDLE DELETE INVOICE called for trainer:', trainer?.trainerName, 'ID:', trainer?.trainerId, 'Cycle:', trainer?.paymentCycle);
+    // console.log('🗑️ HANDLE DELETE INVOICE called for trainer:', trainer?.trainerName, 'ID:', trainer?.trainerId, 'Cycle:', trainer?.paymentCycle);
     
     const confirmDelete = window.confirm(
       `Are you sure you want to delete the invoice for ${trainer.trainerName} (${trainer.paymentCycle} cycle)?\n\nThis action cannot be undone.`
@@ -1196,7 +1236,7 @@ function GenerateTrainerInvoice() {
 
     try {
       // Find and delete the invoice document
-      console.log('🔍 QUERYING for invoice deletion - trainerId:', trainer.trainerId, 'collegeName:', trainer.collegeName, 'phase:', trainer.phase, 'paymentCycle:', trainer.paymentCycle);
+      // console.log('🔍 QUERYING for invoice deletion - trainerId:', trainer.trainerId, 'collegeName:', trainer.collegeName, 'phase:', trainer.phase, 'paymentCycle:', trainer.paymentCycle);
       
       const q = query(
         collection(db, "invoices"),
@@ -1207,12 +1247,23 @@ function GenerateTrainerInvoice() {
       );
 
       const querySnapshot = await getDocs(q);
-      console.log('📋 Query results:', querySnapshot.size, 'documents found');
+      // console.log('📋 Query results:', querySnapshot.size, 'documents found');
 
       if (!querySnapshot.empty) {
         const invoiceDoc = querySnapshot.docs[0];
         const invoiceRef = doc(db, "invoices", invoiceDoc.id);
-        console.log('🗑️ DELETING invoice document ID:', invoiceDoc.id);
+        const invoiceData = invoiceDoc.data();
+        // console.log('🗑️ DELETING invoice document ID:', invoiceDoc.id);
+
+        // Log the deletion action before deleting
+        await logInvoiceAction(AUDIT_ACTIONS.DELETE, {
+          ...trainer,
+          ...invoiceData,
+          invoiceId: invoiceDoc.id
+        }, {
+          deleteReason: "Deleted to allow separate invoices per payment cycle",
+          deletedData: invoiceData
+        });
 
         await deleteDoc(invoiceRef);
 
@@ -1227,7 +1278,7 @@ function GenerateTrainerInvoice() {
         setToast({ type: 'error', message: "Invoice not found" });
       }
     } catch (error) {
-      console.error('Error deleting invoice:', error);
+      // console.error('Error deleting invoice:', error);
       setToast({ type: 'error', message: "Failed to delete invoice" });
     }
   }, [fetchTrainers]);

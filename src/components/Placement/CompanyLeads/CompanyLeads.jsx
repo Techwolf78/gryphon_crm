@@ -256,7 +256,10 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         const usersSnapshot = await getDocs(usersQuery);
         const usersData = {};
         usersSnapshot.forEach((doc) => {
-          usersData[doc.id] = { id: doc.id, ...doc.data() };
+          const userData = doc.data();
+          const userUid = userData.uid || doc.id;
+          usersData[userUid] = { ...userData, id: userUid, uid: userUid };
+          usersData[userUid].name = userData.displayName || userData.name || userData.email || "Unknown User";
         });
         setAllUsers(usersData);
       } catch (error) {
@@ -1759,14 +1762,13 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
     }
   };
 
-  const handleAssignLead = async (leadId, userId) => {
+  const handleAssignLead = async (leadId, user) => {
     try {
       const lead = leads.find((l) => l.id === leadId);
       if (!lead || !lead.batchId) return;
 
-      // Get assignee name
-      const assignee = Object.values(allUsers).find(u => (u.uid || u.id) === userId);
-      const assigneeName = assignee?.displayName || assignee?.name || "Unknown User";
+      const userId = user.uid || user.id;
+      const assigneeName = user.displayName || user.name || "Unknown User";
 
       // Log the assignment activity
       logPlacementActivity({

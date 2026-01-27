@@ -1,9 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import GenerateTrainerInvoice from '../components/Learning/GenerateTrainerInvoice';
 import ContractInvoiceTable from '../components/Learning/ContractInvoices/ContractInvoiceTable';
-import { FileText, File } from 'lucide-react';
+import { FileText, File, Shield } from 'lucide-react';
 
 const Accountant = () => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(() => {
     try {
       return localStorage.getItem('accounts_activeTab') || 'trainer-invoice';
@@ -14,6 +16,7 @@ const Accountant = () => {
   const tabs = [
     { id: 'trainer-invoice', label: 'Trainer Invoice', icon: <FileText size={16} /> },
     { id: 'contract-invoices', label: 'Contract Invoices', icon: <File size={16} /> },
+    { id: 'admin', label: 'Audit Logs', icon: <Shield size={16} />, isRoute: true },
   ];
   const containerRef = useRef(null);
   const tabRefs = useRef([]);
@@ -42,7 +45,7 @@ const Accountant = () => {
   }, [activeTab]);
 
   return (
-    <div className=" bg-white rounded-md shadow-sm">
+    <div className="bg-white rounded-md shadow-sm">
       <div className="bg-white border border-gray-100 rounded-md shadow-sm">
         <div className="flex items-center justify-between gap-2 px-2 pt-2 pb-1">
           <div>
@@ -56,7 +59,13 @@ const Accountant = () => {
                 key={t.id}
                 role="tab"
                 aria-selected={activeTab === t.id}
-                onClick={() => setActiveTab(t.id)}
+                onClick={() => {
+                  if (t.isRoute) {
+                    navigate('/dashboard/accounts/admin');
+                  } else {
+                    setActiveTab(t.id);
+                  }
+                }}
                 className={`flex-none px-4 py-2 flex items-center gap-2 justify-center text-sm font-medium rounded-md transition-all duration-150 ${
                   activeTab === t.id
                     ? 'text-blue-600 bg-blue-50'

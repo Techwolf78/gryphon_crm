@@ -20,13 +20,16 @@ describe('GenerateTrainerInvoice - Core Logic Tests', () => {
       const getPaymentCycle = (dateStr) => {
         if (!dateStr) return 'unknown';
         const date = new Date(dateStr);
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0'); // 01-12
         const day = date.getDate();
-        return day <= 15 ? '1-15' : '16-31';
+        const cycle = day <= 15 ? '1-15' : '16-31';
+        return `${year}-${month}-${cycle}`;
       };
 
-      expect(getPaymentCycle('2025-12-01')).toBe('1-15');
-      expect(getPaymentCycle('2025-12-16')).toBe('16-31');
-      expect(getPaymentCycle('2025-12-31')).toBe('16-31');
+      expect(getPaymentCycle('2025-12-01')).toBe('2025-12-1-15');
+      expect(getPaymentCycle('2025-12-16')).toBe('2025-12-16-31');
+      expect(getPaymentCycle('2025-12-31')).toBe('2025-12-16-31');
       expect(getPaymentCycle('')).toBe('unknown');
     });
 
@@ -34,14 +37,17 @@ describe('GenerateTrainerInvoice - Core Logic Tests', () => {
       const getPaymentCycle = (dateStr) => {
         if (!dateStr) return 'unknown';
         const date = new Date(dateStr);
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0'); // 01-12
         const day = date.getDate();
-        return day <= 15 ? '1-15' : '16-31';
+        const cycle = day <= 15 ? '1-15' : '16-31';
+        return `${year}-${month}-${cycle}`;
       };
 
-      expect(getPaymentCycle('2025-12-15')).toBe('1-15');
-      expect(getPaymentCycle('2025-12-16')).toBe('16-31');
-      expect(getPaymentCycle('2025-02-28')).toBe('16-31'); // 28 > 15
-      expect(getPaymentCycle('2025-02-14')).toBe('1-15'); // 14 <= 15
+      expect(getPaymentCycle('2025-12-15')).toBe('2025-12-1-15');
+      expect(getPaymentCycle('2025-12-16')).toBe('2025-12-16-31');
+      expect(getPaymentCycle('2025-02-28')).toBe('2025-02-16-31'); // 28 > 15
+      expect(getPaymentCycle('2025-02-14')).toBe('2025-02-1-15'); // 14 <= 15
     });
   });
 

@@ -1141,7 +1141,7 @@ function Purchase() {
         </div>
 
         {/* Main Content */}
-        <div className="bg-gray-100 rounded-xl  border border-gray-200 ">
+        <div className="bg-white rounded-xl border border-gray-200 p-2">
           <Suspense fallback={<ComponentLoader />}>
             {activeTab === "budgets" && (
               <>
@@ -1427,9 +1427,9 @@ function Purchase() {
             {activeTab === "history" && (
               <div className="space-y-6">
                 {/* Header Section */}
-                <div className="bg-linear-to-r from-indigo-500/10 to-purple-500/10 backdrop-blur-sm rounded-2xl p-4 border border-white/20 shadow-lg">
+                <div className="bg-white rounded-2xl p-4 border border-gray-200 shadow-lg">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-linear-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+                    <div className="w-8 h-8 bg-linear-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center shadow-lg">
                       <BarChart4 className="w-4 h-4 text-white" />
                     </div>
                     <div>

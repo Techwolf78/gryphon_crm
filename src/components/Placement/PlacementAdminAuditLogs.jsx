@@ -282,13 +282,15 @@ const PlacementAdminAuditLogs = () => {
             <p className="text-gray-600 text-sm">Track all activities performed on placement leads • {filteredLogs.length} logs loaded • Page {currentPage} of {totalPages}</p>
           </div>
         </div>
-        <button
-          onClick={exportToCSV}
-          className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-1.5 text-sm"
-        >
-          <FaDownload />
-          Export CSV
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={exportToCSV}
+            className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-1.5 text-sm"
+          >
+            <FaDownload />
+            Export CSV
+          </button>
+        </div>
       </div>
 
       {/* Search and Filter Bar */}

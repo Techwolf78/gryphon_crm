@@ -84,6 +84,9 @@ function LearningDevelopment() {
     useState(null);
   const [existingJDConfig, setExistingJDConfig] = useState(null);
 
+  // College search state
+  const [collegeSearchTerm, setCollegeSearchTerm] = useState("");
+
   // Function to categorize trainings into active and old contracts
   const categorizeTrainings = (trainings) => {
     const today = new Date();
@@ -215,6 +218,113 @@ function LearningDevelopment() {
 
       return false; // If no date available, don't include
     });
+  };
+
+  // Function to filter trainings by college search term (Elasticsearch-style)
+  const filterTrainingsByCollege = (trainings, searchTerm) => {
+    if (!searchTerm || searchTerm.trim() === "") return trainings;
+
+    const query = searchTerm.toLowerCase().trim();
+    const queryWords = query.split(/\s+/).filter(word => word.length > 0);
+
+    return trainings
+      .map((training) => {
+        // Combine searchable fields
+        const searchableText = [
+          training.collegeName || '',
+          training.businessName || '',
+          training.trainingName || '',
+          training.collegeName?.replace(/[^a-zA-Z0-9]/g, ' ') || '', // Remove special chars for better matching
+          training.businessName?.replace(/[^a-zA-Z0-9]/g, ' ') || '',
+          training.trainingName?.replace(/[^a-zA-Z0-9]/g, ' ') || ''
+        ].join(' ').toLowerCase();
+
+        let score = 0;
+        let matches = 0;
+
+        // Check each query word
+        for (const word of queryWords) {
+          if (word.length < 2) continue; // Skip very short words
+
+          // Exact word match (highest score)
+          if (searchableText.includes(` ${word} `) || searchableText.startsWith(word + ' ') || searchableText.endsWith(' ' + word)) {
+            score += 100;
+            matches++;
+            continue;
+          }
+
+          // Partial word match (good score)
+          const partialMatches = searchableText.split(/\s+/).filter(textWord =>
+            textWord.includes(word) || word.includes(textWord)
+          );
+          if (partialMatches.length > 0) {
+            score += 50 * partialMatches.length;
+            matches++;
+            continue;
+          }
+
+          // Fuzzy matching (Levenshtein distance <= 2)
+          const fuzzyMatches = searchableText.split(/\s+/).filter(textWord => {
+            if (Math.abs(textWord.length - word.length) > 2) return false;
+            return levenshteinDistance(textWord, word) <= 2;
+          });
+          if (fuzzyMatches.length > 0) {
+            score += 25 * fuzzyMatches.length;
+            matches++;
+            continue;
+          }
+
+          // Substring match anywhere (lower score)
+          if (searchableText.includes(word)) {
+            score += 10;
+            matches++;
+          }
+        }
+
+        // Boost score for matches in preferred fields
+        if (training.collegeName?.toLowerCase().includes(query)) score += 20;
+        if (training.businessName?.toLowerCase().includes(query)) score += 15;
+
+        // Boost for exact phrase match
+        if (searchableText.includes(query)) score += 30;
+
+        return { training, score, matches };
+      })
+      .filter(item => item.matches > 0) // Only include items with at least one match
+      .sort((a, b) => {
+        // Sort by score (descending), then by matches (descending), then by name (ascending)
+        if (b.score !== a.score) return b.score - a.score;
+        if (b.matches !== a.matches) return b.matches - a.matches;
+        const nameA = (a.training.collegeName || a.training.businessName || '').toLowerCase();
+        const nameB = (b.training.collegeName || b.training.businessName || '').toLowerCase();
+        return nameA.localeCompare(nameB);
+      })
+      .map(item => item.training);
+  };
+
+  // Levenshtein distance function for fuzzy matching
+  const levenshteinDistance = (str1, str2) => {
+    const matrix = [];
+    for (let i = 0; i <= str2.length; i++) {
+      matrix[i] = [i];
+    }
+    for (let j = 0; j <= str1.length; j++) {
+      matrix[0][j] = j;
+    }
+    for (let i = 1; i <= str2.length; i++) {
+      for (let j = 1; j <= str1.length; j++) {
+        if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+          matrix[i][j] = matrix[i - 1][j - 1];
+        } else {
+          matrix[i][j] = Math.min(
+            matrix[i - 1][j - 1] + 1, // substitution
+            matrix[i][j - 1] + 1,     // insertion
+            matrix[i - 1][j] + 1      // deletion
+          );
+        }
+      }
+    }
+    return matrix[str2.length][str1.length];
   };
 
   // Set the refresh callback when InitiationDashboard mounts
@@ -512,8 +622,10 @@ function LearningDevelopment() {
             >
               All Contracts (
               {
-                filterTrainingsByFinancialYear(trainings, selectedFinancialYear)
-                  .length
+                filterTrainingsByCollege(
+                  filterTrainingsByFinancialYear(trainings, selectedFinancialYear),
+                  collegeSearchTerm
+                ).length
               }
               )
             </button>
@@ -719,8 +831,8 @@ function LearningDevelopment() {
             </div>
           ) : (
             <>
-              {/* Financial Year Filter and Enhanced Toggle Buttons */}
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-1">
+              {/* Financial Year Filter, Search Bar, and Enhanced Toggle Buttons */}
+              <div className="flex flex-col lg:flex-row items-center justify-between gap-4 mb-1">
                 {/* Financial Year Filter */}
                 <div className="flex items-center gap-2">
                   <Calendar size={16} className="text-gray-500" />
@@ -738,6 +850,39 @@ function LearningDevelopment() {
                       </option>
                     ))}
                   </select>
+                </div>
+
+                {/* College Search Bar */}
+                <div className="flex items-center gap-2 flex-1 max-w-md">
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      placeholder="Search colleges names..."
+                      value={collegeSearchTerm}
+                      onChange={(e) => setCollegeSearchTerm(e.target.value)}
+                      className="w-full px-3 py-1.5 pl-8 pr-8 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                    />
+                    <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
+                      <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    </div>
+                    {collegeSearchTerm && (
+                      <button
+                        onClick={() => setCollegeSearchTerm("")}
+                        className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-gray-400 hover:text-gray-600"
+                      >
+                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex items-center text-gray-400" title="Elasticsearch-style fuzzy search: handles typos, partial matches, and ranks results by relevance">
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
                 </div>
 
                 {/* Enhanced Toggle Buttons */}
@@ -776,9 +921,12 @@ function LearningDevelopment() {
                       >
                         {
                           categorizeTrainings(
-                            filterTrainingsByFinancialYear(
-                              trainings,
-                              selectedFinancialYear
+                            filterTrainingsByCollege(
+                              filterTrainingsByFinancialYear(
+                                trainings,
+                                selectedFinancialYear
+                              ),
+                              collegeSearchTerm
                             )
                           ).active.length
                         }
@@ -809,9 +957,12 @@ function LearningDevelopment() {
                       >
                         {
                           categorizeTrainings(
-                            filterTrainingsByFinancialYear(
-                              trainings,
-                              selectedFinancialYear
+                            filterTrainingsByCollege(
+                              filterTrainingsByFinancialYear(
+                                trainings,
+                                selectedFinancialYear
+                              ),
+                              collegeSearchTerm
                             )
                           ).old.length
                         }
@@ -827,12 +978,15 @@ function LearningDevelopment() {
                   <>
                     <TrainingTable
                       trainingData={
-                        categorizeTrainings(
-                          filterTrainingsByFinancialYear(
-                            trainings,
-                            selectedFinancialYear
-                          )
-                        ).active
+                        filterTrainingsByCollege(
+                          categorizeTrainings(
+                            filterTrainingsByFinancialYear(
+                              trainings,
+                              selectedFinancialYear
+                            )
+                          ).active,
+                          collegeSearchTerm
+                        )
                       }
                       onRowClick={setSelectedTraining}
                       onViewStudentData={handleViewStudentData}
@@ -845,12 +999,15 @@ function LearningDevelopment() {
                   <>
                     <TrainingTable
                       trainingData={
-                        categorizeTrainings(
-                          filterTrainingsByFinancialYear(
-                            trainings,
-                            selectedFinancialYear
-                          )
-                        ).old
+                        filterTrainingsByCollege(
+                          categorizeTrainings(
+                            filterTrainingsByFinancialYear(
+                              trainings,
+                              selectedFinancialYear
+                            )
+                          ).old,
+                          collegeSearchTerm
+                        )
                       }
                       onRowClick={setSelectedTraining}
                       onViewStudentData={handleViewStudentData}
