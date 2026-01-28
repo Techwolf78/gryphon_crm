@@ -32,11 +32,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated, onToast }) {
 
   useEffect(() => {
     if (!hasLoggedRef.current && trainer) {
-      const datesInfo = trainer.activeDates 
-        ? `Dates: ${trainer.activeDates.length} days (${trainer.earliestStartDate || 'N/A'} to ${trainer.latestEndDate || 'N/A'})`
-        : `Date range: ${trainer.earliestStartDate || 'N/A'} to ${trainer.latestEndDate || 'N/A'}`;
-      
-      // console.log('📋 INVOICE MODAL opened for trainer:', trainer.trainerName, 'ID:', trainer.trainerId, 'Cycle:', trainer.paymentCycle, 'Mode: generate |', datesInfo);
+      // console.log('📋 INVOICE MODAL opened for trainer:', trainer.trainerName, 'ID:', trainer.trainerId, 'Cycle:', trainer.paymentCycle, 'Mode: generate');
       hasLoggedRef.current = true;
     }
   }, [trainer]);
@@ -112,8 +108,8 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated, onToast }) {
             gst: prev.gst || "NA", // Default to NA if trainer not found
           }));
         }
-      } catch (error) {
-        // console.error('Error fetching trainer bank details:', error);
+      } catch {
+        // console.error('Error fetching trainer bank details');
         // Continue with empty bank details - user can still fill them manually
       }
     };
@@ -167,15 +163,15 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated, onToast }) {
           setExistingInvoice(null);
           setViewMode(false);
         }
-      } catch (error) {
-        // console.error('Error checking for existing invoice:', error);
+      } catch {
+        // console.error('Error checking for existing invoice');
         // Continue without existing invoice - user can create a new one
       }
     };
 
     checkExistingInvoice();
     fetchTrainerBankDetails();
-  }, [queryDeps]);
+  }, [queryDeps, trainer?.paymentCycle]);
 
 const handleSubmit = async (e) => {
   e.preventDefault();
@@ -246,8 +242,8 @@ const handleSubmit = async (e) => {
     await onInvoiceGenerated(invoiceToSave); // Pass the invoice data for undo functionality
     onClose();
 
-  } catch (error) {
-    // console.error('Error generating invoice:', error);
+  } catch {
+    // console.error('Error generating invoice');
     onToast({ type: 'error', message: "Invoice not generated. Please try again." });
   } finally {
     setIsGenerating(false);
@@ -690,8 +686,8 @@ const handleSubmit = async (e) => {
                   })()}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="font-medium">TDS ({invoiceData.tds}% on Training Fees + GST only):</span>
-                  <span>₹{(() => {
+                  <span className="font-medium text-red-600">TDS ({invoiceData.tds}% on Training Fees + GST only):</span>
+                  <span className="text-red-600">-₹{(() => {
                     const trainingFees = roundToNearestWhole((invoiceData.trainingRate || 0) * (invoiceData.totalHours || 0));
                     const gstAmount = invoiceData.gst === "18" ? roundToNearestWhole(trainingFees * 0.18) : 0;
                     const taxableAmount = trainingFees + gstAmount;

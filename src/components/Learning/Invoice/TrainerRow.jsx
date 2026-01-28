@@ -226,7 +226,16 @@ function TrainerRow({
         <div className="space-y-1">
           {invoiceData?.netPayment ? (
             <div className="text-sm font-semibold text-green-600">
-              ₹{invoiceData.netPayment.toLocaleString('en-IN')}
+              {(() => {
+                // Recalculate net payment using stored invoice data to ensure accuracy
+                const trainingFees = Math.round((invoiceData.trainingRate || 0) * (invoiceData.totalHours || 0));
+                const gstAmount = invoiceData.gst === "18" ? Math.round(trainingFees * 0.18) : 0;
+                const taxableAmount = trainingFees + gstAmount;
+                const tdsAmount = Math.round((taxableAmount * (parseFloat(invoiceData.tds) || 0)) / 100);
+                const otherExpenses = (parseFloat(invoiceData.conveyance) || 0) + (parseFloat(invoiceData.food) || 0) + (parseFloat(invoiceData.lodging) || 0);
+                const netPayment = Math.round(taxableAmount - tdsAmount + otherExpenses + (parseFloat(invoiceData.adhocAdjustment) || 0));
+                return `₹${netPayment.toLocaleString('en-IN')}`;
+              })()}
             </div>
           ) : (
             <div className="text-sm font-semibold text-green-600">

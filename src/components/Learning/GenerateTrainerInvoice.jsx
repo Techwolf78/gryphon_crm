@@ -89,8 +89,8 @@ function GenerateTrainerInvoice() {
       localStorage.setItem('trainer_invoice_cache', JSON.stringify(data));
       localStorage.setItem('trainer_invoice_last_fetch', timestamp.toString());
       localStorage.setItem('trainer_invoice_cache_version', CACHE_VERSION); // 🆕 Save version
-    } catch (error) {
-      // console.warn('⚠️ Failed to save cache to localStorage:', error);
+    } catch {
+      // console.warn('⚠️ Failed to save cache to localStorage');
     }
   };
   
@@ -99,8 +99,8 @@ function GenerateTrainerInvoice() {
       localStorage.removeItem('trainer_invoice_cache');
       localStorage.removeItem('trainer_invoice_last_fetch');
       localStorage.removeItem('trainer_invoice_cache_version'); // 🆕 Clear version too
-    } catch (error) {
-      // console.warn('⚠️ Failed to clear cache from localStorage:', error);
+    } catch {
+      // console.warn('⚠️ Failed to clear cache from localStorage');
     }
   };
 
@@ -183,14 +183,20 @@ function GenerateTrainerInvoice() {
                     try {
                       const start = new Date(startDate);
                       const end = new Date(endDate);
+                      const excludeDays = _phaseData.excludeDays || "None";
                       if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
                         activeDates = [];
                         for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-                          activeDates.push(d.toISOString().split('T')[0]);
+                          const dayOfWeek = d.getDay();
+                          let shouldInclude = true;
+                          if (excludeDays === "Saturday" && dayOfWeek === 6) shouldInclude = false;
+                          else if (excludeDays === "Sunday" && dayOfWeek === 0) shouldInclude = false;
+                          else if (excludeDays === "Both" && (dayOfWeek === 0 || dayOfWeek === 6)) shouldInclude = false;
+                          if (shouldInclude) activeDates.push(d.toISOString().split('T')[0]);
                         }
                       }
-                    } catch (error) {
-                      // console.warn('Failed to generate activeDates for trainer:', trainer.trainerName, error);
+                    } catch {
+                      // console.warn('Failed to generate activeDates for trainer:', trainer.trainerName);
                     }
                   }
 
@@ -241,6 +247,7 @@ function GenerateTrainerInvoice() {
                     conveyance: parseFloat(trainer.conveyance) || 0,
                     food: parseFloat(trainer.food) || 0,
                     lodging: parseFloat(trainer.lodging) || 0,
+                    excludeDays: _phaseData.excludeDays || "None",
                     // Add phase-level merged training data
                     isMergedTraining: _phaseData.isMergedTraining || false,
                     mergedColleges: _phaseData.mergedColleges || [],
@@ -276,8 +283,8 @@ function GenerateTrainerInvoice() {
             } else {
               missingTrainers.add(trainerId);
             }
-          } catch (error) {
-            // console.warn(`Failed to fetch trainer ${trainerId}:`, error);
+          } catch {
+            // console.warn(`Failed to fetch trainer ${trainerId}`);
             missingTrainers.add(trainerId);
           }
         });
@@ -565,15 +572,15 @@ function GenerateTrainerInvoice() {
           // Calculate total allowances from all batches (per-day rate × number of training days)
           // For JD domain, take allowances only once (not summed across batches)
           totalFood: (trainer.domain === "JD") 
-            ? ((trainer.allBatches[0]?.food || 0) * (trainer.allBatches[0]?.activeDates?.length || getTrainingDays(trainer.allBatches[0]?.startDate, trainer.allBatches[0]?.endDate)))
+            ? ((trainer.allBatches[0]?.food || 0) * (trainer.allBatches[0]?.activeDates?.length || getTrainingDays(trainer.allBatches[0]?.startDate, trainer.allBatches[0]?.endDate, trainer.excludeDays)))
             : trainer.allBatches.reduce((sum, batch) => {
-                const days = batch.activeDates?.length || getTrainingDays(batch.startDate, batch.endDate);
+                const days = batch.activeDates?.length || getTrainingDays(batch.startDate, batch.endDate, trainer.excludeDays);
                 return sum + ((batch.food || 0) * days);
               }, 0),
           totalLodging: (trainer.domain === "JD") 
-            ? ((trainer.allBatches[0]?.lodging || 0) * (trainer.allBatches[0]?.activeDates?.length || getTrainingDays(trainer.allBatches[0]?.startDate, trainer.allBatches[0]?.endDate)))
+            ? ((trainer.allBatches[0]?.lodging || 0) * (trainer.allBatches[0]?.activeDates?.length || getTrainingDays(trainer.allBatches[0]?.startDate, trainer.allBatches[0]?.endDate, trainer.excludeDays)))
             : trainer.allBatches.reduce((sum, batch) => {
-                const days = batch.activeDates?.length || getTrainingDays(batch.startDate, batch.endDate);
+                const days = batch.activeDates?.length || getTrainingDays(batch.startDate, batch.endDate, trainer.excludeDays);
                 return sum + ((batch.lodging || 0) * days);
               }, 0),
           totalConveyance: (trainer.domain === "JD") 
@@ -636,8 +643,8 @@ function GenerateTrainerInvoice() {
           };
 
           return trainerWithInvoiceStatus;
-        } catch (trainerError) {
-          // console.error(`🚨 Error processing trainer ${trainer.trainerName}:`, trainerError);
+        } catch {
+          // console.error(`🚨 Error processing trainer ${trainer.trainerName}`);
           return {
             ...trainer,
             hasExistingInvoice: false,
@@ -689,8 +696,8 @@ function GenerateTrainerInvoice() {
       setLastFetchTime(now);
       saveCacheToStorage(cacheData, now);
       
-    } catch (error) {
-      // console.error('❌ Error fetching trainers:', error);
+    } catch {
+      // console.error('❌ Error fetching trainers');
       // If fetch fails but we have cached data, use it
       if (!forceRefresh && cachedData) {
         setTrainerData(cachedData.trainerData);
@@ -765,11 +772,7 @@ function GenerateTrainerInvoice() {
   };
 
   const handleGenerateInvoice = useCallback((trainer) => {
-    const datesInfo = trainer?.activeDates 
-      ? `Dates: ${trainer.activeDates.length} days (${trainer.earliestStartDate || 'N/A'} to ${trainer.latestEndDate || 'N/A'})`
-      : `Date range: ${trainer?.earliestStartDate || 'N/A'} to ${trainer?.latestEndDate || 'N/A'}`;
-    
-    // console.log('🚀 HANDLE GENERATE INVOICE called for trainer:', trainer?.trainerName, 'ID:', trainer?.trainerId, 'Cycle:', trainer?.paymentCycle, '|', datesInfo);
+    // console.log('🚀 HANDLE GENERATE INVOICE called for trainer:', trainer?.trainerName, 'ID:', trainer?.trainerId, 'Cycle:', trainer?.paymentCycle);
     setSelectedTrainer(trainer);
     setModalMode('edit');
     setShowInvoiceModal(true);
@@ -1154,8 +1157,8 @@ function GenerateTrainerInvoice() {
           [statusKey]: "not_found",
         }));
       }
-    } catch (error) {
-      // console.error('❌ Download invoice error:', error);
+    } catch {
+      // console.error('❌ Download invoice error');
       setToast({ type: 'error', message: "Failed to download invoice. Please try again." });
       setPdfStatus((prev) => ({
         ...prev,
@@ -1218,8 +1221,8 @@ function GenerateTrainerInvoice() {
       } else {
         setToast({ type: 'error', message: "Invoice not found" });
       }
-    } catch (error) {
-      // console.error('Error approving invoice:', error);
+    } catch {
+      // console.error('Error approving invoice');
       setToast({ type: 'error', message: "Failed to approve invoice" });
     }
   }, [fetchTrainers]);
@@ -1277,8 +1280,8 @@ function GenerateTrainerInvoice() {
       } else {
         setToast({ type: 'error', message: "Invoice not found" });
       }
-    } catch (error) {
-      // console.error('Error deleting invoice:', error);
+    } catch {
+      // console.error('Error deleting invoice');
       setToast({ type: 'error', message: "Failed to delete invoice" });
     }
   }, [fetchTrainers]);
