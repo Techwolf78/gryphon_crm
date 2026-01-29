@@ -13,24 +13,34 @@ const EditTaskModal = ({ task, isOpen, onClose, onSave, assignees }) => {
   const [uploadingImage, setUploadingImage] = useState(false);
   const fileInputRef = useRef(null);
 
-  const formatDateForInput = (dateValue) => {
-    if (!dateValue) return '';
-    let date;
-    if (dateValue.toDate) { // Firestore Timestamp
-      date = dateValue.toDate();
-    } else if (typeof dateValue === 'string') {
-      date = new Date(dateValue);
-    } else if (dateValue instanceof Date) {
-      date = dateValue;
-    } else {
-      return '';
+  const parseDate = (dateStr) => {
+    if (!dateStr) return null;
+    if (dateStr instanceof Date) return dateStr;
+    if (dateStr.toDate) return dateStr.toDate();
+    if (typeof dateStr === 'string') {
+      const parts = dateStr.split('-');
+      if (parts.length === 3) {
+        const [p1, p2, p3] = parts.map(Number);
+        if (p1 > 31) { // YYYY-MM-DD
+          return new Date(p1, p2 - 1, p3);
+        } else if (p3 > 31) { // DD-MM-YYYY
+          return new Date(p3, p2 - 1, p1);
+        }
+      }
+      return new Date(dateStr);
     }
+    return null;
+  };
+
+  const formatDateForInput = (dateValue) => {
+    const date = parseDate(dateValue);
+    if (!date || isNaN(date.getTime())) return '';
     return date.toISOString().split('T')[0];
   };
 
   useEffect(() => {
     if (task) {
-      setTitle(task.title || task.description || '');
+      setTitle(task.description || task.title || '');
       setStartDate(formatDateForInput(task.startDate));
       setDueDate(formatDateForInput(task.dueDate));
       setAssignedTo(task.assignedTo || '');
@@ -157,9 +167,9 @@ const EditTaskModal = ({ task, isOpen, onClose, onSave, assignees }) => {
   const handleSave = async () => {
     if (task) {
       const taskData = {
-        title: title || null,
-        startDate: startDate ? new Date(startDate) : null,
-        dueDate: dueDate ? new Date(dueDate) : null,
+        description: title || null,
+        startDate: startDate ? parseDate(startDate) : null,
+        dueDate: dueDate ? parseDate(dueDate) : null,
         assignedTo: assignedTo || null,
         role: role || null,
         images: images,

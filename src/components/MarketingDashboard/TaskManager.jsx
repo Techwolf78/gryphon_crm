@@ -464,6 +464,25 @@ const Column = ({ id, title, color, bgColor, tasks, children }) => {
   );
 };
 
+const parseDate = (dateStr) => {
+  if (!dateStr) return null;
+  if (dateStr instanceof Date) return dateStr;
+  if (dateStr.toDate) return dateStr.toDate();
+  if (typeof dateStr === 'string') {
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      const [p1, p2, p3] = parts.map(Number);
+      if (p1 > 31) { // YYYY-MM-DD
+        return new Date(p1, p2 - 1, p3);
+      } else if (p3 > 31) { // DD-MM-YYYY
+        return new Date(p3, p2 - 1, p1);
+      }
+    }
+    return new Date(dateStr);
+  }
+  return null;
+};
+
 const CalendarView = ({ tasks, getRoleDisplay, getRoleColor, handleDelete, moveTask, onImageDelete, onEditTask, currentDate, onDateChange }) => {
   const [selectedDate, setSelectedDate] = useState(null);
 
@@ -471,15 +490,15 @@ const CalendarView = ({ tasks, getRoleDisplay, getRoleColor, handleDelete, moveT
     return tasks.filter(task => {
       // If task has start and due dates, check if the date falls within the range
       if (task.startDate && task.dueDate) {
-        const startDate = new Date(task.startDate);
-        const dueDate = new Date(task.dueDate);
+        const startDate = parseDate(task.startDate);
+        const dueDate = parseDate(task.dueDate);
         const checkDate = new Date(date);
-        return checkDate >= startDate && checkDate <= dueDate;
+        return startDate && dueDate && checkDate >= startDate && checkDate <= dueDate;
       }
       // Otherwise, use due date if available, otherwise use creation date
       let taskDate = null;
       if (task.dueDate) {
-        taskDate = new Date(task.dueDate);
+        taskDate = parseDate(task.dueDate);
       } else if (task.createdAt) {
         taskDate = task.createdAt?.toDate ? task.createdAt.toDate() : new Date(task.createdAt);
       }
@@ -648,9 +667,29 @@ const TableView = ({ tasks, getRoleDisplay, getRoleColor, handleDelete, moveTask
     }
   };
 
+  const parseDate = (dateStr) => {
+    if (!dateStr) return null;
+    if (dateStr instanceof Date) return dateStr;
+    if (dateStr.toDate) return dateStr.toDate();
+    if (typeof dateStr === 'string') {
+      const parts = dateStr.split('-');
+      if (parts.length === 3) {
+        const [p1, p2, p3] = parts.map(Number);
+        if (p1 > 31) { // YYYY-MM-DD
+          return new Date(p1, p2 - 1, p3);
+        } else if (p3 > 31) { // DD-MM-YYYY
+          return new Date(p3, p2 - 1, p1);
+        }
+      }
+      return new Date(dateStr);
+    }
+    return null;
+  };
+
   const formatDate = (dateString) => {
-    if (!dateString) return '—';
-    return new Date(dateString).toLocaleDateString('en-US', {
+    const date = parseDate(dateString);
+    if (!date || isNaN(date.getTime())) return '—';
+    return date.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric'
     });
@@ -885,7 +924,8 @@ const TaskManager = ({ onBack }) => {
 
     // Set up limited real-time listener for tasks
     const calendarLimit = currentView === "calendar" ? 500 : currentLimit;
-    const tasksQuery = query(collection(db, "marketing_tasks"), orderBy("createdAt", "desc"), limit(calendarLimit));
+    const queryLimit = loadingMore && currentView !== "calendar" ? currentLimit + 1 : calendarLimit;
+    const tasksQuery = query(collection(db, "marketing_tasks"), orderBy("createdAt", "desc"), limit(queryLimit));
     const unsubscribeTasks = onSnapshot(tasksQuery, (snapshot) => {
       const tasksData = snapshot.docs.map(docSnap => {
         const data = docSnap.data();
@@ -896,7 +936,6 @@ const TaskManager = ({ onBack }) => {
           images: data.images || (data.imageUrl ? [data.imageUrl] : []),
         };
       });
-      const previousLength = tasks.length;
       const previousFilteredLength = filteredTasks.length;
       setTasks(tasksData);
       if (initialLoadRef.current) {
@@ -904,65 +943,55 @@ const TaskManager = ({ onBack }) => {
         initialLoadRef.current = false;
       }
       if (loadingMore) {
-        const newTasksCount = tasksData.length - previousLength;
+        // Clear the timeout since we loaded
+        if (loadMoreTimeoutRef.current) {
+          clearTimeout(loadMoreTimeoutRef.current);
+          loadMoreTimeoutRef.current = null;
+        }
+        setLoadingMore(false);
         
-        // Only process when we actually have new tasks loaded
-        if (newTasksCount > 0) {
-          // Clear the timeout since tasks were loaded
-          if (loadMoreTimeoutRef.current) {
-            clearTimeout(loadMoreTimeoutRef.current);
-            loadMoreTimeoutRef.current = null;
+        // Calculate how many new tasks are visible after filtering
+        const newFilteredTasks = tasksData.filter(task => {
+          if (filters.user && task.assignedTo !== filters.user) return false;
+          if (filters.role && task.role !== filters.role) return false;
+          if (filters.startDate && task.startDate) {
+            const taskStart = parseDate(task.startDate);
+            const filterStart = new Date(filters.startDate);
+            if (taskStart && taskStart < filterStart) return false;
           }
-          setLoadingMore(false);
-          
-          // Calculate how many new tasks are visible after filtering
-          const newFilteredTasks = tasksData.filter(task => {
-            if (filters.user && task.assignedTo !== filters.user) return false;
-            if (filters.role && task.role !== filters.role) return false;
-            if (filters.startDate && task.startDate) {
-              const taskStart = new Date(task.startDate);
-              const filterStart = new Date(filters.startDate);
-              if (taskStart < filterStart) return false;
-            }
-            if (filters.endDate && task.dueDate) {
-              const taskEnd = new Date(task.dueDate);
-              const filterEnd = new Date(filters.endDate);
-              if (taskEnd > filterEnd) return false;
-            }
-            // Week filter
-            const weekStart = new Date(currentWeek);
-            const weekEnd = new Date(weekStart);
-            weekEnd.setDate(weekStart.getDate() + 6);
-            weekEnd.setHours(23, 59, 59, 999);
-            let taskDate = null;
-            if (task.dueDate) {
-              taskDate = new Date(task.dueDate);
-            } else if (task.createdAt) {
-              taskDate = task.createdAt?.toDate ? task.createdAt.toDate() : new Date(task.createdAt);
-            }
-            if (taskDate && (taskDate < weekStart || taskDate > weekEnd)) return false;
-            return true;
-          });
-          
-          const newVisibleTasksCount = newFilteredTasks.length - previousFilteredLength;
-          
-          const message = newVisibleTasksCount > 0 
-            ? `${newVisibleTasksCount} tasks fetched.` 
-            : `${newTasksCount} tasks loaded (${newTasksCount - newVisibleTasksCount} filtered out).`;
-          
-          setToastMessage(message);
-          setShowToast(true);
-          setTimeout(() => setShowToast(false), 3000);
+          if (filters.endDate && task.dueDate) {
+            const taskEnd = parseDate(task.dueDate);
+            const filterEnd = new Date(filters.endDate);
+            if (taskEnd && taskEnd > filterEnd) return false;
+          }
+          // Week filter
+          const weekStart = new Date(currentWeek);
+          const weekEnd = new Date(weekStart);
+          weekEnd.setDate(weekStart.getDate() + 6);
+          weekEnd.setHours(23, 59, 59, 999);
+          let taskDate = null;
+          if (task.dueDate) {
+            taskDate = parseDate(task.dueDate);
+          } else if (task.createdAt) {
+            taskDate = task.createdAt?.toDate ? task.createdAt.toDate() : new Date(task.createdAt);
+          }
+          if (taskDate && (taskDate < weekStart || taskDate > weekEnd)) return false;
+          return true;
+        });
+        
+        const newVisibleTasksCount = newFilteredTasks.length - previousFilteredLength;
+        
+        const message = newVisibleTasksCount > 0 
+          ? `${newVisibleTasksCount} tasks fetched.` 
+          : `Tasks loaded.`;
+        
+        setToastMessage(message);
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
+        
+        if (tasksData.length > currentLimit) {
           setNoMoreTasks(false);
-          setNoMoreCount(0);
-        } else if (tasksData.length >= currentLimit) {
-          // If we reached the limit but no new tasks, it means no more tasks available
-          // Clear the timeout since we determined no more tasks
-          if (loadMoreTimeoutRef.current) {
-            clearTimeout(loadMoreTimeoutRef.current);
-            loadMoreTimeoutRef.current = null;
-          }
-          setLoadingMore(false);
+        } else {
           setNoMoreTasks(true);
           const newCount = noMoreCount + 1;
           setNoMoreCount(newCount);
@@ -971,8 +1000,6 @@ const TaskManager = ({ onBack }) => {
             setCountdown(10);
           }
         }
-        // If newTasksCount === 0 and tasksData.length < currentLimit, 
-        // it means the data is still loading, so we don't do anything yet
       }
     }, (error) => {
       console.error("Error loading tasks from Firestore:", error);
@@ -1358,6 +1385,8 @@ const TaskManager = ({ onBack }) => {
         const taskRef = doc(db, "marketing_tasks", taskId);
         batch.set(taskRef, {
           ...task,
+          startDate: task.startDate ? parseDate(task.startDate) : null,
+          dueDate: task.dueDate ? parseDate(task.dueDate) : null,
           id: taskId,
           createdAt: task.createdAt || serverTimestamp(),
           updatedAt: serverTimestamp(),
@@ -1910,7 +1939,7 @@ const TaskManager = ({ onBack }) => {
         <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl border border-gray-100 max-w-xs w-full mx-auto">
             <div className="p-6 text-center">
-              <div className="w-12 h-12 bg-gradient-to-br from-orange-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-3 shadow-md">
+              <div className="w-12 h-12 bg-linear-to-br from-orange-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-3 shadow-md">
                 <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
                 </svg>
