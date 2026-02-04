@@ -3,6 +3,7 @@ import { db } from "../../../firebase";
 import { collection, query, where, getDocs, updateDoc, doc } from "firebase/firestore";
 import { FiX, FiSave, FiEdit2, FiCalendar, FiUser, FiMapPin, FiDollarSign } from "react-icons/fi";
 import { FaRupeeSign } from "react-icons/fa";
+import { logInvoiceAction, AUDIT_ACTIONS } from "../../../utils/trainerInvoiceAuditLogger";
 
 // Reusable form field component
 const FormField = ({ label, name, type = "text", required, step, min, max, span = 1, value, onChange }) => (
@@ -60,29 +61,53 @@ function EditInvoiceModal({ trainer, onClose, onInvoiceUpdated, onToast }) {
               collection(db, "invoices"),
               where("trainerId", "==", trainer.trainerId),
               where("collegeName", "==", trainer.collegeName),
-              where("phase", "==", trainer.phase)
+              where("phase", "==", trainer.phase),
+              where("paymentCycle", "==", trainer.paymentCycle)
             )
           : query(
               collection(db, "invoices"),
               where("trainerId", "==", trainer.trainerId),
               where("collegeName", "==", trainer.collegeName),
               where("phase", "==", trainer.phase),
-              where("projectCode", "==", trainer.projectCode)
+              where("projectCode", "==", trainer.projectCode),
+              where("paymentCycle", "==", trainer.paymentCycle)
             );
+
+        // console.log('🔍 EditInvoiceModal fetching invoice for:', {
+        //   trainerId: trainer.trainerId,
+        //   collegeName: trainer.collegeName,
+        //   phase: trainer.phase,
+        //   paymentCycle: trainer.paymentCycle,
+        //   projectCode: trainer.projectCode,
+        //   isMerged: trainer.isMerged
+        // });
 
         const querySnapshot = await getDocs(q);
 
         if (!querySnapshot.empty) {
           const invoiceDoc = querySnapshot.docs[0];
           const data = invoiceDoc.data();
+          // console.log('✅ EditInvoiceModal found invoice:', {
+          //   trainer: trainer.trainerName,
+          //   cycle: trainer.paymentCycle,
+          //   billNumber: data.billNumber,
+          //   netPayment: data.netPayment,
+          //   totalAmount: data.totalAmount,
+          //   totalHours: data.totalHours
+          // });
           setInvoiceData({
             ...data,
             billingDate: data.billingDate || new Date().toISOString().split("T")[0],
             gst: String(data.gst || 'NA'),
           });
+        } else {
+          // console.log('❌ EditInvoiceModal no invoice found for:', {
+          //   trainer: trainer.trainerName,
+          //   cycle: trainer.paymentCycle
+          // });
         }
       } catch (error) {
-        console.error('Error fetching invoice:', error);
+        // console.error('Error fetching invoice:', error);
         onToast({ type: 'error', message: 'Failed to load invoice data' });
       } finally {
         setLoading(false);
@@ -134,14 +159,16 @@ function EditInvoiceModal({ trainer, onClose, onInvoiceUpdated, onToast }) {
               collection(db, "invoices"),
               where("trainerId", "==", trainer.trainerId),
               where("collegeName", "==", trainer.collegeName),
-              where("phase", "==", trainer.phase)
+              where("phase", "==", trainer.phase),
+              where("paymentCycle", "==", trainer.paymentCycle)
             )
           : query(
               collection(db, "invoices"),
               where("trainerId", "==", trainer.trainerId),
               where("collegeName", "==", trainer.collegeName),
               where("phase", "==", trainer.phase),
-              where("projectCode", "==", trainer.projectCode)
+              where("projectCode", "==", trainer.projectCode),
+              where("paymentCycle", "==", trainer.paymentCycle)
             );
         
         const currentInvoiceSnapshot = await getDocs(currentInvoiceQuery);
@@ -164,20 +191,23 @@ function EditInvoiceModal({ trainer, onClose, onInvoiceUpdated, onToast }) {
             collection(db, "invoices"),
             where("trainerId", "==", trainer.trainerId),
             where("collegeName", "==", trainer.collegeName),
-            where("phase", "==", trainer.phase)
+            where("phase", "==", trainer.phase),
+            where("paymentCycle", "==", trainer.paymentCycle)
           )
         : query(
             collection(db, "invoices"),
             where("trainerId", "==", trainer.trainerId),
             where("collegeName", "==", trainer.collegeName),
             where("phase", "==", trainer.phase),
-            where("projectCode", "==", trainer.projectCode)
+            where("projectCode", "==", trainer.projectCode),
+            where("paymentCycle", "==", trainer.paymentCycle)
           );
 
       const querySnapshot = await getDocs(q);
 
       if (!querySnapshot.empty) {
         const invoiceRef = doc(db, "invoices", querySnapshot.docs[0].id);
+        const originalInvoiceData = querySnapshot.docs[0].data();
 
         const updatedInvoice = {
           ...invoiceData,
@@ -195,12 +225,26 @@ function EditInvoiceModal({ trainer, onClose, onInvoiceUpdated, onToast }) {
 
         await updateDoc(invoiceRef, updatedInvoice);
 
+        // Log the invoice edit action
+        await logInvoiceAction(AUDIT_ACTIONS.EDIT, {
+          ...trainer,
+          ...updatedInvoice,
+          invoiceId: querySnapshot.docs[0].id
+        }, {
+          previousValues: originalInvoiceData,
+          newValues: updatedInvoice,
+          changedFields: Object.keys(updatedInvoice).filter(key => 
+            JSON.stringify(originalInvoiceData[key]) !== JSON.stringify(updatedInvoice[key])
+          ),
+          editReason: invoiceData.status === "rejected" ? "Resubmitting rejected invoice" : "Manual edit"
+        });
+
         onToast({ type: 'success', message: 'Invoice updated successfully!' });
         onInvoiceUpdated();
         onClose();
       }
     } catch (error) {
-      console.error('Error updating invoice:', error);
+      // console.error('Error updating invoice:', error);
       onToast({ type: 'error', message: 'Failed to update invoice' });
     } finally {
       setSaving(false);

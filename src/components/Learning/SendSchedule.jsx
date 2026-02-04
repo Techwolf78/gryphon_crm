@@ -53,7 +53,6 @@ function SendSchedule({
 
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Helper function to calculate expenses for selected assignments
   const calculateExpensesForSelected = (selectedAssignmentsData) => {
     const uniqueDetails = new Set();
     let conveyance = 0;
@@ -62,13 +61,14 @@ function SendSchedule({
 
     selectedAssignmentsData.forEach(assignment => {
       const detail = trainersData.find(d => 
+        d.trainerId === assignment.trainerId &&
         d.domain === assignment.domain && 
         d.batchCode === assignment.batchCode && 
         new Date(d.startDate) <= new Date(assignment.date) && 
         new Date(assignment.date) <= new Date(d.endDate)
       );
       if (detail) {
-        const detailKey = `${detail.domain}_${detail.batchCode}_${detail.startDate}_${detail.endDate}`;
+        const detailKey = `${detail.trainerId}_${detail.domain}_${detail.batchCode}_${detail.startDate}_${detail.endDate}`;
         if (!uniqueDetails.has(detailKey)) {
           uniqueDetails.add(detailKey);
           conveyance += Number(detail.conveyance) || 0;

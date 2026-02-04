@@ -55,7 +55,7 @@ export const exportPurchaseOrderToPDF = async (order, vendorData) => {
     "9th Floor, Olympia Business House, Baner, Pune - 411045",
     120,
     29,
-    { align: "center" }
+    { align: "center" },
   );
   docPDF.setFont("helvetica", "bold");
   docPDF.setFontSize(12);
@@ -72,17 +72,14 @@ export const exportPurchaseOrderToPDF = async (order, vendorData) => {
   docPDF.text(
     `PO No. : ${order.poNumber || `PO-${order.id?.slice(-6)}`}`,
     15,
-    58
+    58,
   );
 
   // 🧾 Vendor Table
   autoTable(docPDF, {
     startY: 70,
     body: [
-      [
-        "Vendor Name:",
-        vendorData.contact || "_______________________",
-      ],
+      ["Vendor Name:", vendorData.contact || "_______________________"],
       ["Business Name:", vendorData.name || "_______________________"],
       ["Address:", vendorData.address || "_______________________"],
       ["Phone:", vendorData.phone || "_______________________"],
@@ -134,14 +131,38 @@ export const exportPurchaseOrderToPDF = async (order, vendorData) => {
     itemRows.push(["", "", "", "", "", ""]);
   }
 
-  // 💰 GST Rows
+  // 🟢 ENHANCED GST LOGIC (Read-Time Calculation)
   if (order.gstDetails) {
     const gst = order.gstDetails;
-    const halfGst = (gst.gstAmount || 0) / 2;
-    itemRows.push(
-      ["", "", "SGST ", "9%", formatNum(halfGst), formatNum(halfGst)],
-      ["", "", "CGST ", "9%", formatNum(halfGst), formatNum(halfGst)]
-    );
+
+    // 1. Get the address string safely
+    const addressStr =
+      typeof order.vendorDetails.address === "string"
+        ? order.vendorDetails.address
+        : "";
+
+    // 2. Check if address contains "Maharashtra" (Case Insensitive)
+    const isIntrastate = addressStr.toLowerCase().includes("maharashtra");
+
+    if (isIntrastate) {
+      // 📍 Local Vendor: Show CGST + SGST (Split the total GST amount by 2)
+      const halfGst = (gst.gstAmount || 0) / 2;
+      itemRows.push(
+        ["", "", "SGST ", "9%", formatNum(halfGst), formatNum(halfGst)],
+        ["", "", "CGST ", "9%", formatNum(halfGst), formatNum(halfGst)],
+      );
+    } else {
+      // 🚛 Out-of-State Vendor: Show IGST (Full Amount)
+      itemRows.push([
+        "",
+        "",
+        "IGST ",
+        "18%",
+        formatNum(gst.gstAmount),
+        formatNum(gst.gstAmount),
+      ]);
+    }
+
     if (gst.totalWithGST) {
       itemRows.push([
         "",
@@ -168,8 +189,15 @@ export const exportPurchaseOrderToPDF = async (order, vendorData) => {
     },
     didParseCell: (data) => {
       const desc = data.row.raw?.[2] || "";
-      if (desc.includes("SGST") || desc.includes("CGST"))
+
+      // 🟢 Update Highlighting to include IGST
+      if (
+        desc.includes("SGST") ||
+        desc.includes("CGST") ||
+        desc.includes("IGST")
+      )
         data.cell.styles.fillColor = [245, 245, 245];
+
       if (desc.includes("Total (with GST)"))
         data.cell.styles.fillColor = [230, 230, 230];
     },
@@ -196,7 +224,6 @@ export const exportPurchaseOrderToPDF = async (order, vendorData) => {
       textColor: [40, 40, 40],
       lineColor: [0, 0, 0],
     },
-    // 🔹 Make all 5 boxes equal width
     columnStyles: {
       0: { cellWidth: 36 },
       1: { cellWidth: 36 },
@@ -227,12 +254,11 @@ export const exportPurchaseOrderToPDF = async (order, vendorData) => {
     `${order.department?.toUpperCase() || "DEPARTMENT"} BUDGET SUMMARY`,
     105,
     20,
-    { align: "center" }
+    { align: "center" },
   );
 
   const rows = [];
 
-  // ✅ Reusable section helper
   const addSection = (title, data) => {
     if (!data || Object.keys(data).length === 0) return;
     let first = true;
@@ -256,12 +282,10 @@ export const exportPurchaseOrderToPDF = async (order, vendorData) => {
     });
   };
 
-  // ✅ Add each section based on new schema
   addSection("Fixed Costs", budgetData.fixedCosts);
   addSection("Department Expenses", budgetData.departmentExpenses);
   addSection("CSDD Expenses", budgetData.csddExpenses);
 
-  // ✅ Safe numeric parsing
   const parseValue = (val) => {
     if (val == null || val === "-" || val === "") return 0;
     const strVal = val.toString().replace(/,/g, "");
@@ -269,7 +293,6 @@ export const exportPurchaseOrderToPDF = async (order, vendorData) => {
     return isNaN(num) ? 0 : num;
   };
 
-  // ✅ Total calculations
   const totalApproved = rows.reduce((sum, r) => sum + parseValue(r[2]), 0);
   const totalSpent = rows.reduce((sum, r) => sum + parseValue(r[4]), 0);
   const totalRemaining = totalApproved - totalSpent;
@@ -278,7 +301,6 @@ export const exportPurchaseOrderToPDF = async (order, vendorData) => {
       ? ((totalSpent / totalApproved) * 100).toFixed(1) + "%"
       : "-";
 
-  // ✅ Push total row
   rows.push([
     "TOTAL",
     "",
@@ -288,7 +310,6 @@ export const exportPurchaseOrderToPDF = async (order, vendorData) => {
     formatNum(totalRemaining),
   ]);
 
-  // ✅ AutoTable render
   autoTable(docPDF, {
     startY: 30,
     head: [
@@ -312,7 +333,7 @@ export const exportPurchaseOrderToPDF = async (order, vendorData) => {
     },
     didParseCell: (data) => {
       const spent = parseFloat(
-        (data.row.raw?.[4] || "0").toString().replace(/,/g, "")
+        (data.row.raw?.[4] || "0").toString().replace(/,/g, ""),
       );
       const description = data.row.raw?.[1] || "";
       const isTotalRow = data.row.raw?.[0] === "TOTAL";
@@ -320,7 +341,6 @@ export const exportPurchaseOrderToPDF = async (order, vendorData) => {
       const currentComponent =
         order.budgetComponent?.replace(/_/g, " ").toUpperCase() || "";
 
-      // Highlight only current purchase component row
       if (
         description === currentComponent &&
         data.row.raw[0] !== "TOTAL" &&
@@ -330,12 +350,10 @@ export const exportPurchaseOrderToPDF = async (order, vendorData) => {
         data.cell.styles.fontStyle = "bold";
       }
 
-      // Emphasize 'Amount Spent' column
       if (data.column.index === 4) {
         data.cell.styles.textColor = [40, 40, 40];
       }
 
-      // Total row styling
       if (isTotalRow) {
         data.cell.styles.fontStyle = "bold";
         data.cell.styles.textColor = [40, 40, 40];
@@ -344,12 +362,29 @@ export const exportPurchaseOrderToPDF = async (order, vendorData) => {
     },
   });
 
-  // ✅ Footer
-  docPDF.setFontSize(8);
-  docPDF.text("Generated via Gryphon Budget System", 105, 285, {
-    align: "center",
+  // ✍️ Signatures
+  autoTable(docPDF, {
+    startY: docPDF.lastAutoTable.finalY + 10,
+    body: [
+      ["", ""],
+      ["Signature\n\n(Founder & Director)", "Signature\n\n(Co-Founder)"],
+    ],
+    theme: "grid",
+    styles: {
+      fontSize: 9,
+      halign: "center",
+      minCellHeight: 20,
+      textColor: [40, 40, 40],
+      lineColor: [0, 0, 0],
+    },
+    columnStyles: {
+      0: { cellWidth: 36 },
+      1: { cellWidth: 36 },
+      2: { cellWidth: 36 },
+      3: { cellWidth: 36 },
+      4: { cellWidth: 36 },
+    },
   });
 
-  // ✅ Save File
   docPDF.save(`Purchase_Order_${order.poNumber || order.id}.pdf`);
 };

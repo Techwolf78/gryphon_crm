@@ -3,6 +3,86 @@ import { XIcon } from "@heroicons/react/outline";
 import StudentDataView from './StudentDataView';
 import { formatSalary, formatStipend } from "../../../utils/salaryUtils";
 
+// Function to format specializations for display
+const formatSpecializations = (specialization, course) => {
+  if (!specialization) return "—";
+
+  let specsArray = [];
+  if (Array.isArray(specialization)) {
+    specsArray = specialization;
+  } else if (typeof specialization === 'string') {
+    // Handle comma-separated string
+    if (specialization.includes(',')) {
+      specsArray = specialization.split(',').map(spec => spec.trim());
+    } else {
+      // Try to parse concatenated specializations
+      const parsed = parseConcatenatedSpecializations(specialization, course);
+      specsArray = parsed.length > 0 ? parsed : [specialization];
+    }
+  } else {
+    specsArray = [specialization];
+  }
+
+  // Import specializationOptions to check against standard options
+  const specializationOptions = {
+    Engineering: ["CS", "IT", "ENTC", "CS-Cyber Security", "Mechanical", "Civil", "Electrical", "Chemical", "CS-AI-ML", "CS-AI-DS", "Other"],
+    MBA: ["Marketing", "Finance", "HR", "Operations", "Supply Chain", "Business Analyst", "Other"],
+    BBA: ["Marketing", "Finance", "HR", "Operations", "Supply Chain", "Business Analyst", "Other"],
+    BCA: ["Computer Applications", "Other"],
+    MCA: ["Computer Science", "Other"],
+    Diploma: ["Mechanical", "Civil", "Electrical", "Computer", "Other"],
+    BSC: ["Physics", "Chemistry", "Mathematics", "CS", "Other"],
+    MSC: ["Physics", "Chemistry", "Mathematics", "CS", "Other"],
+    Other: ["Other"],
+  };
+
+  // Separate standard specs and custom specs
+  const standardSpecs = specsArray.filter(spec => specializationOptions[course]?.includes(spec) && spec !== 'Other');
+  const customSpecs = specsArray.filter(spec => !specializationOptions[course]?.includes(spec));
+
+  // Combine all specs for display
+  const allSpecs = [...standardSpecs, ...customSpecs];
+
+  return allSpecs.length > 0 ? allSpecs.join(", ") : "—";
+};
+
+// Helper function to parse concatenated specializations
+const parseConcatenatedSpecializations = (str, course) => {
+  const specializationOptions = {
+    Engineering: ["CS", "IT", "ENTC", "CS-Cyber Security", "Mechanical", "Civil", "Electrical", "Chemical", "CS-AI-ML", "CS-AI-DS", "Other"],
+    MBA: ["Marketing", "Finance", "HR", "Operations", "Supply Chain", "Business Analyst", "Other"],
+    BBA: ["Marketing", "Finance", "HR", "Operations", "Supply Chain", "Business Analyst", "Other"],
+    BCA: ["Computer Applications", "Other"],
+    MCA: ["Computer Science", "Other"],
+    Diploma: ["Mechanical", "Civil", "Electrical", "Computer", "Other"],
+    BSC: ["Physics", "Chemistry", "Mathematics", "CS", "Other"],
+    MSC: ["Physics", "Chemistry", "Mathematics", "CS", "Other"],
+    Other: ["Other"],
+  };
+
+  const options = specializationOptions[course] || [];
+  const found = [];
+  let remaining = str;
+
+  // Sort options by length (longest first) to match longer names first
+  const sortedOptions = [...options].sort((a, b) => b.length - a.length);
+
+  for (const option of sortedOptions) {
+    if (remaining.includes(option)) {
+      found.push(option);
+      remaining = remaining.replace(option, '');
+    }
+  }
+
+  // If we found some options and there's remaining text, add it as a custom spec
+  if (found.length > 0 && remaining.trim()) {
+    found.push(remaining.trim());
+  }
+
+  // If no options found, return the original string as one spec
+  return found.length > 0 ? found : [str];
+};
+
 function CompanyDetails({ company, onClose }) {
   const [showStudentData, setShowStudentData] = useState(false);
   const students = [];
@@ -74,7 +154,7 @@ function CompanyDetails({ company, onClose }) {
               </div>
               <div className="bg-white p-2 border border-gray-100">
                 <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Specialization</label>
-                <p className="text-gray-900 font-medium text-sm">{company.specialization || "—"}</p>
+                <p className="text-gray-900 font-medium text-sm">{formatSpecializations(company.specialization, company.course)}</p>
               </div>
               <div className="bg-white p-2 border border-gray-100">
                 <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Marks Criteria</label>

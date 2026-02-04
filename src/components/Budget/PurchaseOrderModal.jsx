@@ -7,11 +7,10 @@ const PurchaseOrderModal = ({
   intent,
   vendors,
   budgetComponents,
-  // currentUser,
 }) => {
   const [formData, setFormData] = useState({
     vendorId: "",
-    finalPrice: 0,
+    finalPrice: 0, // This is the BASE PRICE (before tax)
     terms: "",
     deliveryDate: "",
     paymentTerms: "net30",
@@ -20,35 +19,48 @@ const PurchaseOrderModal = ({
   const [selectedVendor, setSelectedVendor] = useState(null);
   const [includeGST, setIncludeGST] = useState(false);
 
-  // Calculate total from requestedItems
-  const calculateIntentTotal = () => {
+  // 🔹 Logic to get BASE Total (Excl. GST) from Intent
+  const calculateBaseIntentTotal = () => {
     if (!intent) return 0;
 
-    // Use estimatedTotal if available, otherwise calculate from requestedItems
-    if (intent.estimatedTotal) return intent.estimatedTotal;
+    // Use specific baseTotal field if available (from new intents created with the updated modal)
+    if (intent.baseTotal) return intent.baseTotal;
 
+    // Fallback 1: Sum up the items (Qty * Unit Price usually equals base)
     if (intent.requestedItems && intent.requestedItems.length > 0) {
       return intent.requestedItems.reduce((total, item) => {
         return total + (item.estTotal || 0);
       }, 0);
     }
 
-    return intent.totalEstimate || 0;
+    // Fallback 2: If we only have estimatedTotal and includeGST is true, reverse calc to get base
+    if (intent.includeGST && intent.estimatedTotal) {
+      return intent.estimatedTotal / 1.18;
+    }
+
+    return intent.estimatedTotal || 0;
   };
 
-  const intentTotal = calculateIntentTotal();
-  const gstRate = 0.18; // total 18%
+  const intentBaseTotal = calculateBaseIntentTotal();
+  const intentGrandTotal = intent?.estimatedTotal || intentBaseTotal;
+
+  // Order Calculations
+  const gstRate = 0.18; // 18%
   const gstAmount = includeGST ? formData.finalPrice * gstRate : 0;
   const finalTotalWithGST = formData.finalPrice + gstAmount;
 
   useEffect(() => {
     if (intent) {
+      // 🔹 Initialize price with BASE amount to avoid double taxation
       setFormData((prev) => ({
         ...prev,
-        finalPrice: intentTotal,
+        finalPrice: intentBaseTotal,
       }));
+
+      // 🔹 Sync GST checkbox state from Intent
+      setIncludeGST(!!intent.includeGST);
     }
-  }, [intent, intentTotal]);
+  }, [intent, intentBaseTotal]);
 
   useEffect(() => {
     if (formData.vendorId) {
@@ -73,11 +85,10 @@ const PurchaseOrderModal = ({
       items: intent.requestedItems || [],
       budgetComponent: intent.selectedBudgetComponent || intent.budgetComponent,
       department: intent.deptId || intent.department,
-      estimatedTotal: intentTotal,
+      estimatedTotal: intentGrandTotal,
       ownerName: intent.ownerName,
       title: intent.title,
       description: intent.description,
-      // approvalBy: currentUser || "N/A",
       vendorDetails: {
         vendorId: selectedVendor.id,
         name: selectedVendor.name || selectedVendor.businessName || "-",
@@ -112,12 +123,10 @@ const PurchaseOrderModal = ({
         document.activeElement.type === "number" &&
         document.activeElement.contains(e.target)
       ) {
-        e.preventDefault(); // stop value change
+        e.preventDefault();
       }
     };
-
     window.addEventListener("wheel", preventScrollChange, { passive: false });
-
     return () => window.removeEventListener("wheel", preventScrollChange);
   }, []);
 
@@ -168,7 +177,7 @@ const PurchaseOrderModal = ({
 
               <div className="flex justify-between items-center">
                 <p className="font-medium text-gray-800">Description:</p>
-                <p className="text-gray-600 font-semibold  mt-0.5">
+                <p className="text-gray-600 font-semibold mt-0.5">
                   {intent.description || "No description provided"}
                 </p>
               </div>
@@ -185,7 +194,12 @@ const PurchaseOrderModal = ({
               <div className="flex justify-between items-center border-t border-gray-200 pt-2 mt-2">
                 <p className="font-medium text-gray-800">Original Estimate:</p>
                 <p className="text-green-700 font-semibold">
-                  ₹{intentTotal.toLocaleString("en-In")}
+                  ₹{intentGrandTotal.toLocaleString("en-In")}
+                  {intent.includeGST && (
+                    <span className="text-xs text-gray-500 font-normal ml-1">
+                      (Incl. GST)
+                    </span>
+                  )}
                 </p>
               </div>
             </div>
@@ -220,13 +234,6 @@ const PurchaseOrderModal = ({
                   </div>
                 </div>
               ))}
-
-              {(!intent.requestedItems ||
-                intent.requestedItems.length === 0) && (
-                <div className="text-center py-4 text-gray-500">
-                  No items found in this purchase intent
-                </div>
-              )}
             </div>
           </div>
 
@@ -240,7 +247,7 @@ const PurchaseOrderModal = ({
               onChange={(e) =>
                 setFormData((prev) => ({ ...prev, vendorId: e.target.value }))
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               required
             >
               <option value="">Choose a vendor</option>
@@ -252,6 +259,7 @@ const PurchaseOrderModal = ({
               ))}
             </select>
 
+            {/* 🛑 THIS IS THE UI BLOCK THAT WAS TRUNCATED BEFORE */}
             {selectedVendor && (
               <div className="mt-3 p-4 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200/60 shadow-sm hover:shadow-md transition-all duration-300 transform hover:-translate-y-0.5">
                 <div className="flex items-start justify-between mb-3">
@@ -412,7 +420,7 @@ const PurchaseOrderModal = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Final Negotiated Price (₹) *
+                Final Negotiated Base Price (Excl. GST) *
               </label>
               <input
                 type="number"
@@ -425,44 +433,40 @@ const PurchaseOrderModal = ({
                 }
                 min="0"
                 step="0.01"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 required
               />
               <div className="mt-1 text-sm text-gray-600">
-                {formData.finalPrice !== intentTotal && (
+                {/* Compare Base to Base for accurate savings calculation */}
+                {formData.finalPrice !== intentBaseTotal && (
                   <span
                     className={
-                      formData.finalPrice < intentTotal
+                      formData.finalPrice < intentBaseTotal
                         ? "text-green-600"
                         : "text-red-600"
                     }
                   >
-                    {formData.finalPrice < intentTotal
+                    {formData.finalPrice < intentBaseTotal
                       ? "Savings: "
                       : "Overage: "}
                     ₹
-                    {Math.abs(formData.finalPrice - intentTotal).toLocaleString(
-                      "en-In"
-                    )}
-                    {` (${(
-                      (Math.abs(formData.finalPrice - intentTotal) /
-                        intentTotal) *
-                      100
-                    ).toFixed(1)}%)`}
+                    {Math.abs(
+                      formData.finalPrice - intentBaseTotal
+                    ).toLocaleString("en-In")}
                   </span>
                 )}
               </div>
             </div>
             <div className="mt-3 flex items-center gap-2">
               <input
-                id="gst"
+                id="po-gst"
                 type="checkbox"
                 checked={includeGST}
                 onChange={(e) => setIncludeGST(e.target.checked)}
                 className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
               />
               <label
-                htmlFor="gst"
+                htmlFor="po-gst"
                 className="text-sm text-gray-700 font-medium"
               >
                 Include GST (9% CGST + 9% SGST)
@@ -481,7 +485,7 @@ const PurchaseOrderModal = ({
                     paymentTerms: e.target.value,
                   }))
                 }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
               >
                 <option value="net15">Net 15</option>
                 <option value="net30">Net 30</option>
@@ -506,7 +510,7 @@ const PurchaseOrderModal = ({
                     deliveryDate: e.target.value,
                   }))
                 }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
               />
             </div>
 
@@ -520,49 +524,52 @@ const PurchaseOrderModal = ({
                 onChange={(e) =>
                   setFormData((prev) => ({ ...prev, terms: e.target.value }))
                 }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                 placeholder="e.g., 1-year warranty, installation included"
               />
             </div>
           </div>
 
-          {includeGST && (
-            <div className="mt-2 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg p-3">
-              <div className="flex justify-between">
-                <span>Base Amount:</span>
-                <span>₹{formData.finalPrice.toLocaleString("en-IN")}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>CGST (9%):</span>
-                <span>
-                  ₹{(formData.finalPrice * 0.09).toLocaleString("en-IN")}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span>SGST (9%):</span>
-                <span>
-                  ₹{(formData.finalPrice * 0.09).toLocaleString("en-IN")}
-                </span>
-              </div>
-              <div className="flex justify-between border-t border-gray-300 pt-2 mt-2 font-semibold text-gray-900">
-                <span>Total (Incl. GST):</span>
-                <span>₹{finalTotalWithGST.toLocaleString("en-IN")}</span>
-              </div>
+          {/* Totals Section */}
+          <div className="mt-2 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg p-3">
+            <div className="flex justify-between">
+              <span>Base Amount:</span>
+              <span>₹{formData.finalPrice.toLocaleString("en-IN")}</span>
             </div>
-          )}
+            {includeGST && (
+              <>
+                <div className="flex justify-between text-gray-500">
+                  <span>CGST (9%):</span>
+                  <span>
+                    ₹{(formData.finalPrice * 0.09).toLocaleString("en-IN")}
+                  </span>
+                </div>
+                <div className="flex justify-between text-gray-500">
+                  <span>SGST (9%):</span>
+                  <span>
+                    ₹{(formData.finalPrice * 0.09).toLocaleString("en-IN")}
+                  </span>
+                </div>
+              </>
+            )}
+            <div className="flex justify-between border-t border-gray-300 pt-2 mt-2 font-semibold text-gray-900">
+              <span>Total (Incl. GST):</span>
+              <span>₹{finalTotalWithGST.toLocaleString("en-IN")}</span>
+            </div>
+          </div>
 
           {/* Action Buttons */}
           <div className="flex justify-end gap-3 pt-6 border-t border-gray-200">
             <button
               type="button"
               onClick={onClose}
-              className="px-6 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              className="px-6 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold"
+              className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold"
             >
               Create Purchase Order
             </button>

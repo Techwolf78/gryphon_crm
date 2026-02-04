@@ -50,6 +50,7 @@ import {
   orderBy,
   limit,
 } from "firebase/firestore";
+import { INDUSTRY_OPTIONS } from "../../utils/constants";
 
 const formatCurrency = (amount) => {
   const numAmount = Number(amount);
@@ -454,16 +455,26 @@ const LeadStatusDistribution = ({ leadData, isLoading }) => {
     );
   }
 
+  // Sort data by value descending and take top 10, group rest as "Others"
+  const sortedData = [...leadData].sort((a, b) => b.value - a.value);
+  const topData = sortedData.slice(0, 10);
+  const othersValue = sortedData.slice(10).reduce((sum, item) => sum + item.value, 0);
+  
+  let displayData = topData;
+  if (othersValue > 0) {
+    displayData = [...topData, { name: 'Others', value: othersValue }];
+  }
+
   return (
     <>
       <div className="mb-2 flex flex-wrap justify-center gap-2">
-        {leadData.map((status, index) => (
+        {displayData.map((status, index) => (
           <div key={index} className="flex items-center">
             <div
               className="w-3 h-3 rounded-full mr-2"
               style={{ backgroundColor: COLORS[index % COLORS.length] }}
             />
-            <span className="text-xs text-gray-600">
+            <span className="text-xs text-gray-600 truncate max-w-32" title={`${status.name}: ${status.value}`}>
               {status.name}: {status.value}
             </span>
           </div>
@@ -473,7 +484,7 @@ const LeadStatusDistribution = ({ leadData, isLoading }) => {
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
-              data={leadData}
+              data={displayData}
               cx="50%"
               cy="50%"
               labelLine={false}
@@ -482,7 +493,7 @@ const LeadStatusDistribution = ({ leadData, isLoading }) => {
               fill="#8884d8"
               dataKey="value"
             >
-              {leadData.map((entry, index) => (
+              {displayData.map((entry, index) => (
                 <Cell
                   key={`cell-${index}`}
                   fill={COLORS[index % COLORS.length]}
@@ -971,18 +982,18 @@ const PlacementDashboard = ({ filters }) => {
       // Lead industry distribution
       const leadIndustries = {};
       leads.forEach(lead => {
-        const industry = lead.industry || 'unknown';
+        let industry = lead.industry || 'Other';
+        // Check if the industry matches one of the predefined options
+        if (!INDUSTRY_OPTIONS.includes(industry)) {
+          industry = 'Other';
+        }
         leadIndustries[industry] = (leadIndustries[industry] || 0) + 1;
       });
       const leadIndustryDistribution = Object.entries(leadIndustries).map(([name, value]) => ({ name, value }));
 
       // User-wise lead distribution
       const userLeadDistribution = {};
-      const assignedToValues = new Set(); // For debugging
       leads.forEach(lead => {
-        if (lead.assignedTo) {
-          assignedToValues.add(typeof lead.assignedTo === 'string' ? lead.assignedTo : JSON.stringify(lead.assignedTo));
-        }
         let assignedUser = 'Unassigned';
         if (lead.assignedTo) {
           // assignedTo might be a string (user ID) or an object
@@ -996,8 +1007,8 @@ const PlacementDashboard = ({ filters }) => {
             if (user) {
               assignedUser = user.displayName || user.name || user.email || lead.assignedTo;
             } else {
-              // If no user found, keep the ID but mark it as unknown user
-              assignedUser = `Unknown User (${lead.assignedTo})`;
+              // Group all unknown users together
+              assignedUser = 'Unknown Users';
             }
           } else if (typeof lead.assignedTo === 'object') {
             // Handle object structure
@@ -1006,8 +1017,6 @@ const PlacementDashboard = ({ filters }) => {
         }
         userLeadDistribution[assignedUser] = (userLeadDistribution[assignedUser] || 0) + 1;
       });
-      console.log("AssignedTo values found:", Array.from(assignedToValues));
-      console.log("Users found:", users.length, users.map(u => ({ id: u.id, uid: u.uid, name: u.displayName || u.name })));
       const userLeadDistributionData = Object.entries(userLeadDistribution)
         .map(([name, value]) => ({ name, value }))
         .sort((a, b) => b.value - a.value);
@@ -1521,7 +1530,7 @@ const PlacementDashboard = ({ filters }) => {
             ) : (
               <>
                 <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
-                  Placement Analytics
+                  Placement Dashboard
                 </h1>
                 <p className="text-gray-600 mt-1">
                   Key metrics and performance indicators for placement activities

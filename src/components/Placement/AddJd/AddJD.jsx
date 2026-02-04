@@ -1,27 +1,30 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { XIcon } from "@heroicons/react/outline";
 import { toast } from "react-toastify";
-import { db } from "../../../firebase";
+import { db, storage } from "../../../firebase";
 import {
   collection,
   addDoc,
   updateDoc,
+  setDoc,
   doc,
   serverTimestamp,
   query,
   where,
   getDocs,
 } from "firebase/firestore";
+import { ref, getDownloadURL, deleteObject, uploadBytesResumable } from "firebase/storage";
 import emailjs from "@emailjs/browser";
 import AddJDForm from "./AddJDForm";
 import CollegeSelection from "./CollegeSelection";
 import TemplateDownloadModal from "./TemplateDownloadModal";
 import ExcelUploadModal from "./ExcelUploadModal";
+import specializationOptions from './specializationOptions';
 
 const EMAILJS_CONFIG = {
-  SERVICE_ID: "service_pskknsn",
-  TEMPLATE_ID: "template_p2as3pp",
-  PUBLIC_KEY: "zEVWxxT-QvGIrhvTV",
+  SERVICE_ID: "service_sl0i7kr",
+  TEMPLATE_ID: "template_q0oarab",
+  PUBLIC_KEY: "V5rET66jxvg4gqulO",
 };
 
 // Academic year calculation helper
@@ -62,6 +65,7 @@ function AddJD({ show, onClose, company, fetchCompanies }) {
     companyWebsite: "",
     course: "",
     specialization: [],
+    otherSpecializations: "",
     passingYear: "",
     gender: "",
     marksCriteria: "",
@@ -113,6 +117,94 @@ function AddJD({ show, onClose, company, fetchCompanies }) {
   };
 
   const [jobFiles, setJobFiles] = useState([]);
+  const [uploadedFileUrls, setUploadedFileUrls] = useState([]);
+  const [fileUploadProgress, setFileUploadProgress] = useState({});
+
+  const handleFileChange = async (event) => {
+    const newFiles = Array.from(event.target.files);
+
+    // Separate stored files from current jobFiles
+    const storedFiles = jobFiles ? jobFiles.filter(file => file.isStored) : [];
+    const currentNewFiles = jobFiles ? jobFiles.filter(file => !file.isStored) : [];
+
+    // Combine stored files with newly selected files
+    const allFiles = [...storedFiles, ...currentNewFiles, ...newFiles.map(file => ({ name: file.name, file: file, isNew: true }))];
+    setJobFiles(allFiles);
+
+    // Only upload the newly selected files
+    const filesToUpload = newFiles;
+    if (filesToUpload.length === 0) return;
+
+    const uploadPromises = filesToUpload.map(async (file, index) => {
+      const storageRef = ref(storage, `jobFiles/${Date.now()}_${file.name}`);
+      const uploadTask = uploadBytesResumable(storageRef, file);
+
+      return new Promise((resolve, reject) => {
+        uploadTask.on(
+          'state_changed',
+          (snapshot) => {
+            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+            setFileUploadProgress(prev => ({
+              ...prev,
+              [storedFiles.length + currentNewFiles.length + index]: progress
+            }));
+          },
+          (error) => {
+            console.error('Upload error:', error);
+            reject(error);
+          },
+          async () => {
+            try {
+              const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+              resolve({ name: file.name, url: downloadURL });
+            } catch (error) {
+              reject(error);
+            }
+          }
+        );
+      });
+    });
+
+    try {
+      const newlyUploadedFiles = await Promise.all(uploadPromises);
+      // Combine existing uploaded URLs with new ones
+      setUploadedFileUrls(prev => [...prev, ...newlyUploadedFiles]);
+      setFileUploadProgress({});
+    } catch (error) {
+      console.error('Error uploading files:', error);
+      alert('Error uploading files. Please try again.');
+    }
+  };
+
+  const removeFile = async (index) => {
+    const fileToRemove = jobFiles[index];
+    const updatedFiles = jobFiles.filter((_, i) => i !== index);
+    setJobFiles(updatedFiles);
+
+    // If it's a stored file, delete from storage
+    if (fileToRemove.isStored && fileToRemove.url) {
+      try {
+        // Extract the file path from the URL
+        const url = new URL(fileToRemove.url);
+        const path = decodeURIComponent(url.pathname.split('/o/')[1].split('?')[0]);
+        const fileRef = ref(storage, path);
+        await deleteObject(fileRef);
+      } catch (error) {
+        console.error('Error deleting file from storage:', error);
+      }
+    }
+
+    // Remove from uploaded URLs if it exists there
+    if (fileToRemove.url) {
+      setUploadedFileUrls(prev => prev.filter(f => f.url !== fileToRemove.url));
+    }
+  };
+
+  // Check if any files are still uploading
+  const isUploading = () => {
+    return Object.values(fileUploadProgress).some(progress => progress < 100);
+  };
+
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedColleges, setSelectedColleges] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -174,10 +266,6 @@ function AddJD({ show, onClose, company, fetchCompanies }) {
     return Object.keys(errors).length === 0;
   };
 
-  const handleFileChange = (e) => {
-    setJobFiles([...e.target.files]);
-  };
-
   const handleSubmit = () => {
     if (!validateStep1()) return;
     setCurrentStep(2);
@@ -192,7 +280,11 @@ function AddJD({ show, onClose, company, fetchCompanies }) {
       const totalSalary =
         (parseFloat(formData.fixedSalary) || 0) +
         (parseFloat(formData.variableSalary) || 0);
-      const updatedFormData = { ...formData, salary: totalSalary.toString() };
+      const updatedFormData = { 
+        ...formData, 
+        salary: totalSalary.toString(),
+        jobFiles: uploadedFileUrls // Always store the current uploaded file URLs
+      };
 
       if (company && company.id) {
         // Update existing company
@@ -471,22 +563,21 @@ function AddJD({ show, onClose, company, fetchCompanies }) {
       // --- END ---
 
       // Send individual emails to each college
-      const fileNames =
-        jobFiles && jobFiles.length
-          ? jobFiles.map((file) => file.name || file)
-          : [];
+      const fileNames = uploadedFileUrls.length
+        ? uploadedFileUrls.map((file) => file.name)
+        : jobFiles && jobFiles.length
+        ? jobFiles.map((file) => file.name || file)
+        : [];
 
-      const jobFilesHTML = fileNames.length
-        ? `<p><strong>Job Files:</strong><ul>${fileNames
-            .map((fn) => `<li>${fn}</li>`)
-            .join("")}</ul></p>`
+      const jobFilesHTML = uploadedFileUrls.length
+        ? `<p><strong>Job Files:</strong></p><p>${uploadedFileUrls.map(file => `<a href="${file.url}" target="_blank" rel="noopener noreferrer">${file.name}</a>`).join('<br>')}</p>`
         : "<p><strong>Job Files:</strong> Not provided</p>";
 
       const emailPromises = collegesWithTPO
         .filter(({ tpoEmail }) => tpoEmail && tpoEmail.trim() !== "")
         .map(async ({ college, tpoEmail }) => {
           const templateParams = {
-            to_email: "placements@gryphonacademy.co.in",
+            to_email: tpoEmail,
             company_name: formData.companyName,
             company_website: formData.companyWebsite || "Not provided",
             job_designation: formData.jobDesignation,
@@ -531,7 +622,7 @@ function AddJD({ show, onClose, company, fetchCompanies }) {
             // ✅ FIXED: Complete URL with ALL job details parameters
             upload_link: `${
               window.location.origin
-            }/upload-student-data?college=${encodeURIComponent(
+            }/sync/upload-student-data?college=${encodeURIComponent(
               college
             )}&company=${encodeURIComponent(
               formData.companyName
@@ -569,17 +660,18 @@ function AddJD({ show, onClose, company, fetchCompanies }) {
 
             company_files_link: `${
               window.location.origin
-            }/company-files?company=${encodeURIComponent(
+            }/sync/company-files?company=${encodeURIComponent(
               formData.companyName
             )}&college=${encodeURIComponent(college)}`,
             coordinator_name: formData.coordinator,
             coordinator_phone: "+91-9876543210",
-            bcc: tpoEmail,
             job_description: formData.jobDescription || "Not specified",
             job_description_html: formData.jobDescription
               ? `<p><strong>Job Description:</strong><br>${formData.jobDescription}</p>`
               : "<p><strong>Job Description:</strong> Not specified</p>",
-            job_files: fileNames.join(", "),
+            job_files: uploadedFileUrls.length
+              ? uploadedFileUrls.map(file => `${file.name}: ${file.url}`).join("\n")
+              : fileNames.join(", "),
             job_files_html: jobFilesHTML,
           };
 
@@ -652,17 +744,17 @@ function AddJD({ show, onClose, company, fetchCompanies }) {
           college,
           tpoEmail: getCollegeEmail(college),
           templateFields: selectedTemplateFields, // ✅ Save selected columns
-          jobFiles: jobFiles.map((file) => file.name || file),
+          jobFiles: uploadedFileUrls, // Store the actual file URLs
           updatedAt: serverTimestamp(),
         };
 
         // If editing an existing company, update it instead of creating new
         if (company && company.id) {
           // Find the existing company document for this college and update it
-          return updateDoc(doc(db, "companies", company.id), {
+          return setDoc(doc(db, "companies", company.id), {
             ...companyData,
             updatedAt: serverTimestamp(),
-          });
+          }, { merge: true });
         } else {
           // Create new company document
           return addDoc(collection(db, "companies"), companyData);
@@ -688,16 +780,27 @@ function AddJD({ show, onClose, company, fetchCompanies }) {
   useEffect(() => {
     if (show && company) {
       // Pre-fill form with company data for editing
+      const specializationArray = Array.isArray(company.specialization)
+        ? company.specialization
+        : company.specialization
+        ? [company.specialization]
+        : [];
+      
+      // Separate standard and custom specializations
+      const standardSpecs = specializationArray.filter(spec => 
+        specializationOptions[company.course]?.includes(spec) || spec === 'Other'
+      );
+      const customSpecs = specializationArray.filter(spec => 
+        !specializationOptions[company.course]?.includes(spec) && spec !== 'Other'
+      );
+      
       setFormData((prev) => ({
         ...prev,
         companyName: company.companyName || company.name || "",
         companyWebsite: company.companyUrl || company.companyWebsite || "",
         course: company.course || "",
-        specialization: Array.isArray(company.specialization)
-          ? company.specialization
-          : company.specialization
-          ? [company.specialization]
-          : [],
+        specialization: standardSpecs.concat(customSpecs),
+        otherSpecializations: customSpecs.join(', '),
         passingYear: company.passingYear || "",
         gender: company.gender || "",
         marksCriteria: company.marksCriteria || "",
@@ -726,9 +829,21 @@ function AddJD({ show, onClose, company, fetchCompanies }) {
         status: company.status || "ongoing",
         createdAt: company.createdAt || serverTimestamp(),
       }));
-      // If company has jobFiles (from DB as array of strings), set state for display
+      // If company has jobFiles (from DB as array of file objects), set state for display
       if (company.jobFiles && company.jobFiles.length) {
-        setJobFiles(company.jobFiles);
+        // Convert stored file objects to a format that can be displayed
+        const storedFiles = company.jobFiles.map((file, index) => ({
+          name: typeof file === 'string' ? file : (file.name || `File ${index + 1}`),
+          url: file.url || null,
+          isStored: true // Mark as stored file
+        }));
+        setJobFiles(storedFiles);
+        // Also normalize uploadedFileUrls to ensure consistent object format
+        const normalizedUrls = company.jobFiles.map((file, index) => ({
+          name: typeof file === 'string' ? file : (file.name || `File ${index + 1}`),
+          url: typeof file === 'string' ? null : (file.url || null)
+        }));
+        setUploadedFileUrls(normalizedUrls);
       }
     } else if (!show) {
       // Reset form when modal closes
@@ -737,6 +852,7 @@ function AddJD({ show, onClose, company, fetchCompanies }) {
         companyWebsite: "",
         course: "",
         specialization: [],
+        otherSpecializations: "",
         passingYear: "",
         gender: "",
         marksCriteria: "",
@@ -761,6 +877,7 @@ function AddJD({ show, onClose, company, fetchCompanies }) {
         createdAt: serverTimestamp(),
       });
       setJobFiles([]);
+      setUploadedFileUrls([]);
       setCurrentStep(1);
       setSelectedColleges([]);
       setFormErrors({});
@@ -815,11 +932,12 @@ function AddJD({ show, onClose, company, fetchCompanies }) {
                 setFormData={setFormData}
                 formErrors={formErrors}
                 handleFileChange={handleFileChange}
+                removeFile={removeFile}
                 jobFiles={jobFiles}
-                setJobFiles={setJobFiles}
                 onClose={onClose}
                 placementUsers={placementUsers}
                 isLoadingUsers={isLoadingUsers}
+                fileUploadProgress={fileUploadProgress}
               />
             </div>
 
@@ -834,21 +952,28 @@ function AddJD({ show, onClose, company, fetchCompanies }) {
                 {company && (
                   <button
                     onClick={handleSave}
-                    disabled={saveStatus === "saving" || saveStatus === "saved"}
+                    disabled={saveStatus === "saving" || saveStatus === "saved" || isUploading()}
                     className="px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {saveStatus === "saving"
                       ? "Saving..."
                       : saveStatus === "saved"
                       ? "Saved!"
+                      : isUploading()
+                      ? "Uploading..."
                       : "Update"}
                   </button>
                 )}
                 <button
                   onClick={handleSubmit}
-                  className="px-6 py-2.5 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition"
+                  disabled={isUploading()}
+                  className={`px-6 py-2.5 rounded-lg text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition ${
+                    isUploading()
+                      ? "bg-gray-400 cursor-not-allowed"
+                      : "bg-blue-600 hover:bg-blue-700"
+                  }`}
                 >
-                  {company ? "Update & Next" : "Save & Next"}
+                  {isUploading() ? "Uploading files..." : (company ? "Update & Next" : "Save & Next")}
                 </button>
               </div>
             </div>

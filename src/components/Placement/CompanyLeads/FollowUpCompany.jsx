@@ -39,7 +39,9 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
   const [remarks, setRemarks] = useState("");
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState("");
-  const [selectedIndustry, setSelectedIndustry] = useState(company?.industry || "");
+  const [selectedIndustry, setSelectedIndustry] = useState(
+    company?.industry && INDUSTRY_OPTIONS.includes(company.industry) && company.industry !== 'Other' ? company.industry : ""
+  );
   const [loading, setLoading] = useState(false);
   const [pastFollowups, setPastFollowups] = useState([]);
   const [calendarError, setCalendarError] = useState(null);
@@ -52,8 +54,10 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
   const [snackbar, setSnackbar] = useState("");
   const [snackbarType, setSnackbarType] = useState("success");
   const [maliciousWarning, setMaliciousWarning] = useState("");
-  const timePickerRef = useRef(null);
   const [connecting, setConnecting] = useState(false);
+  const [expandedFollowups, setExpandedFollowups] = useState(new Set());
+
+  const timePickerRef = useRef(null);
 
   const { instance, accounts } = useMsal();
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -70,6 +74,19 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
   const markCalendarWarningShown = () => {
     const today = dayjs().format('YYYY-MM-DD');
     localStorage.setItem('calendarWarningLastShown', today);
+  };
+
+  // Toggle expanded state for follow-up remarks
+  const toggleFollowupExpansion = (followupKey) => {
+    setExpandedFollowups(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(followupKey)) {
+        newSet.delete(followupKey);
+      } else {
+        newSet.add(followupKey);
+      }
+      return newSet;
+    });
   };
 
   // Close time picker when clicking outside
@@ -945,7 +962,9 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
                     <div className="bg-green-50 border border-green-200 rounded-lg p-3">
                       <div className="flex items-center space-x-2">
                         <FaCheckCircle className="text-green-600 text-sm" />
-                        <span className="text-xs text-green-800 font-medium">Industry: {selectedIndustry}</span>
+                        <span className="text-xs text-green-800 font-medium">
+                          Industry: {selectedIndustry}
+                        </span>
                         <button
                           type="button"
                           onClick={() => setSelectedIndustry("")}
@@ -968,7 +987,7 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
                         required
                       >
                         <option value="">Select industry to schedule</option>
-                        {INDUSTRY_OPTIONS.map((industry) => (
+                        {INDUSTRY_OPTIONS.filter(industry => industry !== 'Other').map((industry) => (
                           <option key={industry} value={industry}>
                             {industry}
                           </option>
@@ -1131,9 +1150,23 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
                         </div>
 
                         {followup.remarks && (
-                          <p className="text-sm text-slate-600 mb-2 line-clamp-2">
-                            {followup.remarks}
-                          </p>
+                          <div className="mb-2">
+                            <p className={`text-sm text-slate-600 ${
+                              !expandedFollowups.has(followup.key || index) && followup.remarks.length > 150
+                                ? 'line-clamp-3'
+                                : ''
+                            }`}>
+                              {followup.remarks}
+                            </p>
+                            {followup.remarks.length > 150 && (
+                              <button
+                                onClick={() => toggleFollowupExpansion(followup.key || index)}
+                                className="text-xs text-blue-600 hover:text-blue-800 font-medium mt-1 hover:underline focus:outline-none"
+                              >
+                                {expandedFollowups.has(followup.key || index) ? 'Show Less' : 'Show More'}
+                              </button>
+                            )}
+                          </div>
                         )}
 
                         <div className="flex items-center justify-between">

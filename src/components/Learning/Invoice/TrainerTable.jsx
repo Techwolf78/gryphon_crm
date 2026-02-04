@@ -13,12 +13,10 @@ function TrainerTable({
   handleGenerateInvoice,
   handleApproveInvoice,
   handleViewInvoice,
+  handleDeleteInvoice,
   downloadingInvoice,
   getDownloadStatus,
-  formatDate,
-  recentlyGeneratedInvoices,
-  handleUndoInvoice,
-  countdownTimers
+  formatDate
 }) {
   // 🔄 NEW: Structure is now College → Phase → Trainers
   
@@ -142,12 +140,10 @@ function TrainerTable({
                               handleGenerateInvoice={handleGenerateInvoice}
                               handleApproveInvoice={handleApproveInvoice}
                               handleViewInvoice={handleViewInvoice}
+                              handleDeleteInvoice={handleDeleteInvoice}
                               downloadingInvoice={downloadingInvoice}
                               getDownloadStatus={getDownloadStatus}
                               formatDate={formatDate}
-                              recentlyGeneratedInvoices={recentlyGeneratedInvoices}
-                              handleUndoInvoice={handleUndoInvoice}
-                              countdownTimers={countdownTimers}
                             />
                           ))}
                         </tbody>

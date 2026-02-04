@@ -18,7 +18,7 @@ export const logLearningActivity = async (action, entityData = {}, options = {})
     const currentUser = auth.currentUser;
 
     if (!currentUser) {
-      console.warn("No authenticated user for audit logging");
+      // console.warn("No authenticated user for audit logging");
       return;
     }
 
@@ -67,7 +67,7 @@ export const logLearningActivity = async (action, entityData = {}, options = {})
     return `batch-${Date.now()}`; // Return batch ID instead of document ID
 
   } catch (error) {
-    console.error("Failed to queue audit log:", error);
+    // console.error("Failed to queue audit log:", error);
     // Don't throw error to avoid breaking main functionality
   }
 };
@@ -88,9 +88,9 @@ const processAuditBatch = async () => {
     await Promise.all(
       batch.map(log => addDoc(collection(db, "learning_audit_logs"), log))
     );
-    console.log(`Audit batch processed: ${batch.length} logs`);
+    // console.log(`Audit batch processed: ${batch.length} logs`);
   } catch (error) {
-    console.error("Failed to process audit batch:", error);
+    // console.error("Failed to process audit batch:", error);
     // Re-queue failed logs
     auditBatchQueue.unshift(...batch);
   }

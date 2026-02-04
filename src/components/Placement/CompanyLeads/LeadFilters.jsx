@@ -11,6 +11,7 @@ import {
   FiCheck,
   FiCalendar
 } from "react-icons/fi";
+import { INDUSTRY_OPTIONS } from "../../../utils/constants";
 
 function LeadFilters({
   filters,
@@ -82,13 +83,21 @@ function LeadFilters({
             .filter(Boolean)
         ),
       ].sort(),
-      industries: [
-        ...new Set(
-          baseFilteredLeads
-            .map((lead) => lead.industry)
-            .filter(Boolean)
-        ),
-      ].sort(),
+      industries: INDUSTRY_OPTIONS.map(industry => {
+        let count;
+        if (industry.toLowerCase() === 'other') {
+          // For "Other", count leads whose industry is not in predefined options
+          const predefinedIndustries = INDUSTRY_OPTIONS.filter(opt => opt.toLowerCase() !== 'other').map(opt => opt.toLowerCase());
+          count = baseFilteredLeads.filter(lead => {
+            const ind = (lead.industry || '').toLowerCase().trim();
+            return ind && !predefinedIndustries.includes(ind);
+          }).length;
+        } else {
+          count = baseFilteredLeads.filter(lead => (lead.industry || '').toLowerCase().trim() === industry.toLowerCase()).length;
+        }
+        return { name: industry, count };
+      }),
+      totalLeads: baseFilteredLeads.length,
     };
   }, [leads, viewMyLeadsOnly, currentUser, allUsers, getTeamMemberIds, activeTab]);
 
@@ -329,7 +338,7 @@ function LeadFilters({
                         <div className="w-5 h-5 bg-purple-500 rounded-md flex items-center justify-center shadow-sm">
                           <FiBriefcase className="w-3 h-3 text-white" />
                         </div>
-                        <span className="font-medium text-gray-900 text-sm">Industry ({filterOptions.industries.length})</span>
+                        <span className="font-medium text-gray-900 text-sm">Industry ({filterOptions.totalLeads})</span>
                       </div>
                       <div className={`w-4 h-4 rounded-full bg-gray-100 flex items-center justify-center transition-transform duration-200 ${activeSection === 'industry' ? 'rotate-180' : ''}`}>
                         <FiChevronDown className="w-2.5 h-2.5 text-gray-500" />
@@ -345,10 +354,10 @@ function LeadFilters({
                           }}
                           className="w-full px-2 py-1.5 text-xs bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 shadow-sm"
                         >
-                          <option value="">All Industries</option>
+                          <option value="">All Industries ({filterOptions.totalLeads})</option>
                           {filterOptions.industries.map((industry) => (
-                            <option key={industry} value={industry}>
-                              {industry}
+                            <option key={industry.name} value={industry.name}>
+                              {industry.name} ({industry.count})
                             </option>
                           ))}
                         </select>

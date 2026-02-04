@@ -1,5 +1,7 @@
 // FILE: /components/budget/ManageCSDD.jsx
 import React, { useState, Suspense, lazy } from "react";
+import ManageCSDD_DM from "./ManageCSDD_DM";
+
 const CreateVoucher = lazy(() => import("./CreateVoucher"));
 const RequestReimbursement = lazy(() => import("./RequestReimbursement"));
 const ViewRequests = lazy(() => import("./ViewRequests"));
@@ -10,6 +12,8 @@ export default function ManageCSDD({
   fiscalYear,
   currentUser,
 }) {
+  const dept = department?.toLowerCase() ?? "";
+
   const [showVoucher, setShowVoucher] = useState(false);
   const [showReimbursement, setShowReimbursement] = useState(false);
 
@@ -31,15 +35,32 @@ export default function ManageCSDD({
             The CSDD budget for FY {fiscalYear} has not been created yet.
           </p>
           <p className="text-gray-500 text-sm">
-            Please contact the {department.toUpperCase()} Head to set up the
-            budget.
+            Please contact the {dept.toUpperCase()} Head to set up the budget.
           </p>
         </div>
       </div>
     );
   }
 
-  // ====== NORMAL UI RENDERS BELOW ======
+  // =========================================================
+  // DM has a completely different CSDD lifecycle:
+  // - client budgets
+  // - internal sheets
+  // - client-wise POs & purchases
+  // DM exits here. Nothing below should know DM exists.
+  // =========================================================
+  if (dept === "dm") {
+    return (
+      <ManageCSDD_DM
+        department={dept}
+        currentBudget={currentBudget}
+        fiscalYear={fiscalYear}
+        currentUser={currentUser}
+      />
+    );
+  }
+
+  // ====== GENERIC CSDD UI (ALL NON-DM DEPARTMENTS) ======
 
   return (
     <div className="p-6 bg-white rounded-xl shadow-sm border border-gray-200">
@@ -59,9 +80,9 @@ export default function ManageCSDD({
           <button
             onClick={() => setShowVoucher(true)}
             className="bg-amber-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium 
-               shadow-lg hover:shadow-md transition-all duration-200
-               border-b-2 border-amber-700 hover:border-amber-800
-                active:translate-y-0 active:shadow-sm"
+              shadow-lg hover:shadow-md transition-all duration-200
+              border-b-2 border-amber-700 hover:border-amber-800
+              active:translate-y-0 active:shadow-sm"
           >
             Create Voucher
           </button>
@@ -69,16 +90,16 @@ export default function ManageCSDD({
           <button
             onClick={() => setShowReimbursement(true)}
             className="bg-blue-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium 
-               shadow-lg hover:shadow-md transition-all duration-200
-               border-b-2 border-blue-700 hover:border-blue-800
-               active:translate-y-0 active:shadow-sm"
+              shadow-lg hover:shadow-md transition-all duration-200
+              border-b-2 border-blue-700 hover:border-blue-800
+              active:translate-y-0 active:shadow-sm"
           >
             Request Reimbursement
           </button>
         </div>
       </div>
 
-      {/* Always show ViewRequests */}
+      {/* Requests + Modals */}
       <Suspense
         fallback={
           <div className="flex justify-center items-center py-12 max-w-7xl">
@@ -87,15 +108,14 @@ export default function ManageCSDD({
         }
       >
         <ViewRequests
-          department={department}
+          department={dept}
           fiscalYear={fiscalYear}
           currentUser={currentUser}
           currentBudget={currentBudget}
         />
 
-        {/* Modal components - Add isOpen prop */}
         <CreateVoucher
-          department={department}
+          department={dept}
           fiscalYear={fiscalYear}
           currentUser={currentUser}
           currentBudget={currentBudget}
@@ -104,7 +124,7 @@ export default function ManageCSDD({
         />
 
         <RequestReimbursement
-          department={department}
+          department={dept}
           fiscalYear={fiscalYear}
           currentUser={currentUser}
           currentBudget={currentBudget}

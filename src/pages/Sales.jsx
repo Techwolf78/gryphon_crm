@@ -697,7 +697,7 @@ function Sales() {
   if (showBudget) {
     return (
       <Suspense fallback={<ComponentLoader />}>
-        <BudgetDashboard department="Sales" onBack={() => setShowBudget(false)} />
+        <BudgetDashboard department="sales" onBack={() => setShowBudget(false)} />
       </Suspense>
     );
   }

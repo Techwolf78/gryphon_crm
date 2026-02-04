@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
+import { INDUSTRY_OPTIONS } from '../../../utils/constants';
 
 const FollowupDashboard = ({
   allLeads = [],
@@ -14,8 +15,8 @@ const FollowupDashboard = ({
   const [allFollowUps, setAllFollowUps] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 50; // Show 50 follow-ups per page
-  const [totalFollowUps, setTotalFollowUps] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const [allFollowUpsData, setAllFollowUpsData] = useState([]); // Store full dataset for KPIs
   const [filters, setFilters] = useState(() => {
     if (user && ['Manager', 'Assistant Manager', 'Executive'].includes(user.role)) {
       const userName = user.displayName || user.name;
@@ -24,7 +25,8 @@ const FollowupDashboard = ({
         assignedTo: [userName],
         dateRange: 'all',
         template: [],
-        industry: []
+        industry: [],
+        searchTerm: ''
       };
     } else {
       return {
@@ -32,7 +34,8 @@ const FollowupDashboard = ({
         assignedTo: [],
         dateRange: 'all',
         template: [],
-        industry: []
+        industry: [],
+        searchTerm: ''
       };
     }
   });
@@ -45,6 +48,7 @@ const FollowupDashboard = ({
   });
   const [chartsVisible, setChartsVisible] = useState(true);
   const [openDropdownId, setOpenDropdownId] = useState(null);
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [allUniqueTemplates, setAllUniqueTemplates] = useState([]);
   const [statusChangeModal, setStatusChangeModal] = useState({
     isOpen: false,
@@ -63,6 +67,14 @@ const FollowupDashboard = ({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [openDropdownId]);
+
+  // Debounce search term
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(filters.searchTerm);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [filters.searchTerm]);
 
   // Fetch follow-ups for current page
   const fetchFollowUpsForPage = useCallback(async (page = 1) => {
@@ -94,7 +106,7 @@ const FollowupDashboard = ({
               Object.values(allUsers).find(u => (u.uid || u.id) === lead.assignedTo)?.displayName ||
               Object.values(allUsers).find(u => (u.uid || u.id) === lead.assignedTo)?.name ||
               'Unknown User' : 'Unassigned',
-            industry: followup.industry || 'N/A'
+            industry: followup.industry && INDUSTRY_OPTIONS.includes(followup.industry) ? followup.industry : 'Other'
           });
         });
       });
@@ -110,12 +122,12 @@ const FollowupDashboard = ({
       // Sort by created date descending (most recent first)
       filteredFollowUpsData.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
 
+      // Store full dataset for KPI calculations
+      setAllFollowUpsData(filteredFollowUpsData);
+
       // Collect all unique templates from all data
       const allTemplates = [...new Set(filteredFollowUpsData.map(f => f.template).filter(Boolean))].sort();
       setAllUniqueTemplates(allTemplates);
-
-      // Set total count
-      setTotalFollowUps(filteredFollowUpsData.length);
 
       // Get current page data
       const startIndex = (page - 1) * itemsPerPage;
@@ -138,9 +150,9 @@ const FollowupDashboard = ({
     }
   }, [showDashboard, allLeads, allUsers, fetchFollowUpsForPage]);
 
-  // Get unique values for filters
-  const uniqueStatuses = [...new Set(allFollowUps.map(f => f.status).filter(Boolean))].sort();
-  const uniqueIndustries = [...new Set(allFollowUps.map(f => f.industry).filter(Boolean))].sort();
+  // Get unique values for filters from full dataset
+  const uniqueStatuses = [...new Set(allFollowUpsData.map(f => f.status).filter(Boolean))].sort();
+  const uniqueIndustries = INDUSTRY_OPTIONS; // Use fixed industry options from constants
 
   // Helper function to get display label for status
   const getStatusDisplayLabel = (status) => {
@@ -161,60 +173,116 @@ const FollowupDashboard = ({
   })();
   const uniqueTemplates = allUniqueTemplates;
 
-  // Filter follow-ups
-  const filteredFollowUps = allFollowUps.filter(followup => {
-    const statusMatch = filters.status.length === 0 || filters.status.includes(followup.status);
-    const assignedMatch = filters.assignedTo.length === 0 || filters.assignedTo.includes(followup.assignedUserName);
-    const templateMatch = filters.template.length === 0 || filters.template.includes(followup.template);
-    const industryMatch = filters.industry.length === 0 || filters.industry.includes(followup.industry);
-    const dateMatch = (() => {
-      if (filters.dateRange === 'all') return true;
-      const followupDate = new Date(followup.createdAt);
-      const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      switch (filters.dateRange) {
-        case 'today': {
-          return followupDate >= today;
+  // Filter follow-ups from full dataset (for global search)
+  const filteredFollowUpsData = useMemo(() => {
+    return allFollowUpsData.filter(followup => {
+      const statusMatch = filters.status.length === 0 || filters.status.includes(followup.status);
+      const assignedMatch = filters.assignedTo.length === 0 || filters.assignedTo.includes(followup.assignedUserName);
+      const templateMatch = filters.template.length === 0 || filters.template.includes(followup.template);
+      const industryMatch = filters.industry.length === 0 || filters.industry.includes(followup.industry);
+      const dateMatch = (() => {
+        if (filters.dateRange === 'all') return true;
+        const followupDate = new Date(followup.createdAt);
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        switch (filters.dateRange) {
+          case 'today': {
+            return followupDate >= today;
+          }
+          case 'yesterday': {
+            const yesterday = new Date(today);
+            yesterday.setDate(today.getDate() - 1);
+            return followupDate >= yesterday && followupDate < today;
+          }
+          case 'week': {
+            const weekAgo = new Date(today);
+            weekAgo.setDate(today.getDate() - 7);
+            return followupDate >= weekAgo;
+          }
+          case 'month': {
+            const monthAgo = new Date(today);
+            monthAgo.setMonth(today.getMonth() - 1);
+            return followupDate >= monthAgo;
+          }
+          case 'year': {
+            const yearAgo = new Date(today);
+            yearAgo.setFullYear(today.getFullYear() - 1);
+            return followupDate >= yearAgo;
+          }
+          default:
+            return true;
         }
-        case 'yesterday': {
-          const yesterday = new Date(today);
-          yesterday.setDate(today.getDate() - 1);
-          return followupDate >= yesterday && followupDate < today;
-        }
-        case 'week': {
-          const weekAgo = new Date(today);
-          weekAgo.setDate(today.getDate() - 7);
-          return followupDate >= weekAgo;
-        }
-        case 'month': {
-          const monthAgo = new Date(today);
-          monthAgo.setMonth(today.getMonth() - 1);
-          return followupDate >= monthAgo;
-        }
-        case 'year': {
-          const yearAgo = new Date(today);
-          yearAgo.setFullYear(today.getFullYear() - 1);
-          return followupDate >= yearAgo;
-        }
-        default:
-          return true;
-      }
-    })();
-    return statusMatch && assignedMatch && templateMatch && industryMatch && dateMatch;
-  });
+      })();
+      const searchMatch = !debouncedSearchTerm || 
+        followup.company?.toLowerCase().includes(debouncedSearchTerm.toLowerCase());
+      return statusMatch && assignedMatch && templateMatch && industryMatch && dateMatch && searchMatch;
+    });
+  }, [allFollowUpsData, filters.status, filters.assignedTo, filters.template, filters.industry, filters.dateRange, debouncedSearchTerm]);
 
-  // Calculate KPIs
+  // Get paginated data from filtered results
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedFollowUps = filteredFollowUpsData.slice(startIndex, endIndex);
+
+  // Apply filters to full dataset for charts
+  const filteredFullData = useMemo(() => {
+    return allFollowUpsData.filter(followup => {
+      const statusMatch = filters.status.length === 0 || filters.status.includes(followup.status);
+      const assignedMatch = filters.assignedTo.length === 0 || filters.assignedTo.includes(followup.assignedUserName);
+      const templateMatch = filters.template.length === 0 || filters.template.includes(followup.template);
+      const industryMatch = filters.industry.length === 0 || filters.industry.includes(followup.industry);
+      const dateMatch = (() => {
+        if (filters.dateRange === 'all') return true;
+        const followupDate = new Date(followup.createdAt);
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        switch (filters.dateRange) {
+          case 'today': {
+            return followupDate >= today;
+          }
+          case 'yesterday': {
+            const yesterday = new Date(today);
+            yesterday.setDate(today.getDate() - 1);
+            return followupDate >= yesterday && followupDate < today;
+          }
+          case 'week': {
+            const weekAgo = new Date(today);
+            weekAgo.setDate(today.getDate() - 7);
+            return followupDate >= weekAgo;
+          }
+          case 'month': {
+            const monthAgo = new Date(today);
+            monthAgo.setMonth(today.getMonth() - 1);
+            return followupDate >= monthAgo;
+          }
+          case 'year': {
+            const yearAgo = new Date(today);
+            yearAgo.setFullYear(today.getFullYear() - 1);
+            return followupDate >= yearAgo;
+          }
+          default:
+            return true;
+        }
+      })();
+      const searchMatch = !debouncedSearchTerm || 
+        followup.company?.toLowerCase().includes(debouncedSearchTerm.toLowerCase());
+      return statusMatch && assignedMatch && templateMatch && industryMatch && dateMatch && searchMatch;
+    });
+  }, [allFollowUpsData, filters.status, filters.assignedTo, filters.template, filters.industry, filters.dateRange, debouncedSearchTerm]);
+
+  // Calculate KPIs from filtered dataset
   const today = new Date().toDateString();
-  const todayFollowUpsCount = filteredFollowUps.filter(f => f.createdAt && new Date(f.createdAt).toDateString() === today).length;
-  const hotLeads = filteredFollowUps.filter(f => f.status === 'hot').length;
-  const warmLeads = filteredFollowUps.filter(f => f.status === 'warm').length;
-  const calledLeads = filteredFollowUps.filter(f => f.status === 'called' || f.status === 'dialed').length;
-  const coldLeads = filteredFollowUps.filter(f => f.status === 'cold').length;
+  const todayFollowUpsCount = filteredFullData.filter(f => f.createdAt && new Date(f.createdAt).toDateString() === today).length;
+  const hotLeads = filteredFullData.filter(f => f.status === 'hot').length;
+  const warmLeads = filteredFullData.filter(f => f.status === 'warm').length;
+  const calledLeads = filteredFullData.filter(f => f.status === 'called' || f.status === 'dialed').length;
+  const coldLeads = filteredFullData.filter(f => f.status === 'cold').length;
+  const totalLeads = filteredFullData.length;
 
-  // Calculate upcoming follow-ups in next 3 hours
+  // Calculate upcoming follow-ups in next 3 hours from filtered dataset
   const now = new Date();
   const threeHoursFromNow = new Date(now.getTime() + 3 * 60 * 60 * 1000);
-  const upcomingFollowUps = filteredFollowUps.filter(f => {
+  const upcomingFollowUps = filteredFullData.filter(f => {
     if (!f.date || !f.time) return false;
     try {
       const followupDateTime = new Date(`${f.date} ${f.time}`);
@@ -232,19 +300,19 @@ const FollowupDashboard = ({
     ? "Today's Follow-ups" 
     : "Team's Today's Follow-ups";
 
-  // Bar chart: follow-ups per day for last 7 days
+  // Bar chart: follow-ups per day for last 7 days (from filtered full dataset)
   const last7Days = Array.from({ length: 7 }, (_, i) => {
     const date = new Date();
     date.setDate(date.getDate() - i);
     return date.toDateString();
   }).reverse();
   const barData = last7Days.map(dateStr => {
-    const count = filteredFollowUps.filter(f => f.createdAt && new Date(f.createdAt).toDateString() === dateStr).length;
+    const count = filteredFullData.filter(f => f.createdAt && new Date(f.createdAt).toDateString() === dateStr).length;
     return { date: new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), count };
   });
 
-  // Bar chart: follow-ups by user (Fresh vs Re-follow-ups)
-  const leadGroups = filteredFollowUps.reduce((acc, f) => {
+  // Bar chart: follow-ups by user (Fresh vs Re-follow-ups) from filtered full dataset
+  const leadGroups = filteredFullData.reduce((acc, f) => {
     if (!acc[f.leadId]) acc[f.leadId] = [];
     acc[f.leadId].push(f);
     return acc;
@@ -357,6 +425,26 @@ const FollowupDashboard = ({
         <div className="flex items-center justify-between">
           <h3 className="text-xl font-semibold text-blue-900">Recent Follow-ups Dashboard</h3>
           <div className="flex items-center space-x-2">
+            {/* Global Search */}
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search company names..."
+                value={filters.searchTerm}
+                onChange={(e) => handleFilterChange('searchTerm', e.target.value)}
+                className="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-blue-900 text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-48"
+              />
+              {filters.searchTerm && (
+                <button
+                  onClick={() => handleFilterChange('searchTerm', '')}
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
             {/* Status Filter */}
             <div className="relative">
               <button
@@ -630,30 +718,34 @@ const FollowupDashboard = ({
       </div>
       <div className="p-4">
         {/* KPIs */}
-        <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-8">
-          <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
-            <h4 className="text-sm font-medium text-blue-700">{upcomingLabel}</h4>
-            <p className="text-2xl font-bold text-blue-900">{upcomingFollowUps}</p>
+        <div className="grid grid-cols-1 md:grid-cols-7 gap-4 mb-4">
+          <div className="bg-sky-50 p-3 rounded-lg border border-sky-100">
+            <h4 className="text-sm font-medium text-gray-800">{upcomingLabel}</h4>
+            <p className="text-2xl font-bold text-gray-900">{upcomingFollowUps}</p>
           </div>
-          <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
-            <h4 className="text-sm font-medium text-blue-700">{todaysLabel}</h4>
-            <p className="text-2xl font-bold text-blue-900">{todayFollowUpsCount}</p>
+          <div className="bg-sky-50 p-3 rounded-lg border border-sky-100">
+            <h4 className="text-sm font-medium text-gray-800">{todaysLabel}</h4>
+            <p className="text-2xl font-bold text-gray-900">{todayFollowUpsCount}</p>
           </div>
-          <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
-            <h4 className="text-sm font-medium text-blue-700">Hot Follow-ups</h4>
-            <p className="text-2xl font-bold text-blue-900">{hotLeads}</p>
+          <div className="bg-sky-50 p-3 rounded-lg border border-sky-100">
+            <h4 className="text-sm font-medium text-gray-800">Total Follow-ups</h4>
+            <p className="text-2xl font-bold text-gray-900">{totalLeads}</p>
           </div>
-          <div className="bg-blue-100 p-4 rounded-lg border border-blue-200">
-            <h4 className="text-sm font-medium text-blue-800">Warm Follow-ups</h4>
-            <p className="text-2xl font-bold text-blue-900">{warmLeads}</p>
+          <div className="bg-sky-50 p-3 rounded-lg border border-sky-100">
+            <h4 className="text-sm font-medium text-gray-800">Hot Follow-ups</h4>
+            <p className="text-2xl font-bold text-gray-900">{hotLeads}</p>
           </div>
-          <div className="bg-blue-100 p-4 rounded-lg border border-blue-200">
-            <h4 className="text-sm font-medium text-blue-800">Called Follow-ups</h4>
-            <p className="text-2xl font-bold text-blue-900">{calledLeads}</p>
+          <div className="bg-sky-50 p-3 rounded-lg border border-sky-100">
+            <h4 className="text-sm font-medium text-gray-800">Warm Follow-ups</h4>
+            <p className="text-2xl font-bold text-gray-900">{warmLeads}</p>
           </div>
-          <div className="bg-blue-100 p-4 rounded-lg border border-blue-200">
-            <h4 className="text-sm font-medium text-blue-800">Cold Follow-ups</h4>
-            <p className="text-2xl font-bold text-blue-900">{coldLeads}</p>
+          <div className="bg-sky-50 p-3 rounded-lg border border-sky-100">
+            <h4 className="text-sm font-medium text-gray-800">Called Follow-ups</h4>
+            <p className="text-2xl font-bold text-gray-900">{calledLeads}</p>
+          </div>
+          <div className="bg-sky-50 p-3 rounded-lg border border-sky-100">
+            <h4 className="text-sm font-medium text-gray-800">Cold Follow-ups</h4>
+            <p className="text-2xl font-bold text-gray-900">{coldLeads}</p>
           </div>
         </div>
 
@@ -744,7 +836,7 @@ const FollowupDashboard = ({
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredFollowUps.map((followup) => (
+                {paginatedFollowUps.map((followup) => (
                   <tr key={followup.id} className="hover:bg-blue-50 transition-colors">
                     <td className="px-3 py-2 text-sm font-medium text-gray-900">
                       {followup.company}
@@ -849,13 +941,12 @@ const FollowupDashboard = ({
             {/* Pagination */}
             <div className="flex items-center justify-between px-4 py-3 bg-white border-t border-gray-200 sm:px-6">
               <div className="flex justify-between flex-1 sm:hidden">
-                {totalFollowUps > itemsPerPage && (
+                {filteredFollowUpsData.length > itemsPerPage && (
                   <>
                     <button
                       onClick={() => {
                         const newPage = Math.max(1, currentPage - 1);
                         setCurrentPage(newPage);
-                        fetchFollowUpsForPage(newPage);
                       }}
                       disabled={currentPage === 1 || isLoading}
                       className="relative inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -864,12 +955,11 @@ const FollowupDashboard = ({
                     </button>
                     <button
                       onClick={() => {
-                        const totalPages = Math.ceil(totalFollowUps / itemsPerPage);
+                        const totalPages = Math.ceil(filteredFollowUpsData.length / itemsPerPage);
                         const newPage = Math.min(totalPages, currentPage + 1);
                         setCurrentPage(newPage);
-                        fetchFollowUpsForPage(newPage);
                       }}
-                      disabled={currentPage === Math.ceil(totalFollowUps / itemsPerPage) || isLoading}
+                      disabled={currentPage === Math.ceil(filteredFollowUpsData.length / itemsPerPage) || isLoading}
                       className="relative ml-3 inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       Next
@@ -881,18 +971,17 @@ const FollowupDashboard = ({
                 <div>
                   <p className="text-sm text-gray-700">
                     Showing <span className="font-medium">{((currentPage - 1) * itemsPerPage) + 1}</span> to{' '}
-                    <span className="font-medium">{Math.min(currentPage * itemsPerPage, totalFollowUps)}</span> of{' '}
-                    <span className="font-medium">{totalFollowUps}</span> follow-ups
+                    <span className="font-medium">{Math.min(currentPage * itemsPerPage, filteredFollowUpsData.length)}</span> of{' '}
+                    <span className="font-medium">{filteredFollowUpsData.length}</span> follow-ups
                   </p>
                 </div>
-                {totalFollowUps > itemsPerPage && (
+                {filteredFollowUpsData.length > itemsPerPage && (
                   <div>
                     <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
                       <button
                         onClick={() => {
                           const newPage = Math.max(1, currentPage - 1);
                           setCurrentPage(newPage);
-                          fetchFollowUpsForPage(newPage);
                         }}
                         disabled={currentPage === 1 || isLoading}
                         className="relative inline-flex items-center px-2 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-l-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -904,12 +993,11 @@ const FollowupDashboard = ({
                       </button>
                       <button
                         onClick={() => {
-                          const totalPages = Math.ceil(totalFollowUps / itemsPerPage);
+                          const totalPages = Math.ceil(filteredFollowUpsData.length / itemsPerPage);
                           const newPage = Math.min(totalPages, currentPage + 1);
                           setCurrentPage(newPage);
-                          fetchFollowUpsForPage(newPage);
                         }}
-                        disabled={currentPage === Math.ceil(totalFollowUps / itemsPerPage) || isLoading}
+                        disabled={currentPage === Math.ceil(filteredFollowUpsData.length / itemsPerPage) || isLoading}
                         className="relative inline-flex items-center px-2 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-r-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <span className="sr-only">Next</span>
@@ -990,6 +1078,14 @@ const FollowupDashboard = ({
                       // Update local state immediately for better UX
                       setAllFollowUps(prevFollowUps =>
                         prevFollowUps.map(f =>
+                          f.leadId === statusChangeModal.followup.leadId
+                            ? { ...f, status: statusChangeModal.selectedStatus }
+                            : f
+                        )
+                      );
+                      // Also update the full dataset
+                      setAllFollowUpsData(prevData =>
+                        prevData.map(f =>
                           f.leadId === statusChangeModal.followup.leadId
                             ? { ...f, status: statusChangeModal.selectedStatus }
                             : f

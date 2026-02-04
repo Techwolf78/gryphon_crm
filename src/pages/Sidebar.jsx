@@ -132,11 +132,12 @@ const normalizeRole = (role) => {
   return "";
 };
 
-const Sidebar = ({ collapsed, onToggle }) => {
+const Sidebar = ({ collapsed, onToggle, onHoverChange }) => {
   const { user } = useContext(AuthContext);
   const location = useLocation();
   const [isAIDrawerOpen, setIsAIDrawerOpen] = useState(false);
   const [tooltip, setTooltip] = useState({ show: false, text: "", x: 0, y: 0 });
+  const [isHovered, setIsHovered] = useState(false);
   const initializedRef = useRef(false);
 
   // Sync stored preference on mount (run once). If stored value differs from current prop, call onToggle to sync parent.
@@ -183,6 +184,18 @@ const Sidebar = ({ collapsed, onToggle }) => {
   const handleMouseLeave = useCallback(() => {
     setTooltip({ show: false, text: "", x: 0, y: 0 });
   }, []);
+
+  const handleSidebarMouseEnter = useCallback(() => {
+    if (collapsed) {
+      setIsHovered(true);
+      if (onHoverChange) onHoverChange(true);
+    }
+  }, [collapsed, onHoverChange]);
+
+  const handleSidebarMouseLeave = useCallback(() => {
+    setIsHovered(false);
+    if (onHoverChange) onHoverChange(false);
+  }, [onHoverChange]);
 
   // Hide tooltip when sidebar expands
   useEffect(() => {
@@ -284,47 +297,49 @@ const Sidebar = ({ collapsed, onToggle }) => {
 
       <aside
         className={`
-        ${collapsed ? "w-16" : "w-64 sm:w-72 lg:w-36"}
+        ${collapsed && !isHovered ? "w-16" : "w-64 sm:w-72 lg:w-36"}
         bg-white border-r border-gray-200 flex flex-col fixed h-screen z-50
         transition-all duration-300
         ${
-          collapsed
+          collapsed && !isHovered
             ? "-translate-x-full lg:translate-x-0" // Hide on mobile when collapsed, show on desktop
-            : "translate-x-0" // Always show when expanded
+            : "translate-x-0" // Always show when expanded or hovered
         }
         lg:translate-x-0
       `}
+      onMouseEnter={handleSidebarMouseEnter}
+      onMouseLeave={handleSidebarMouseLeave}
       >
         {/* Header */}
         <div
           className={`shrink-0 p-3 border-b border-gray-200 ${
-            collapsed
+            collapsed && !isHovered
               ? "flex flex-col items-center space-y-2"
               : "flex items-center justify-between"
           }`}
         >
           <img
-            src={collapsed ? compactLogo : logo}
+            src={collapsed && !isHovered ? compactLogo : logo}
             alt="SYNC"
             className={
-              collapsed ? "w-6 h-6" : "h-5 max-w-[120px] sm:max-w-none"
+              collapsed && !isHovered ? "w-6 h-6" : "h-5 max-w-[120px] sm:max-w-none"
             }
           />
           <button
             onClick={handleToggle}
             onMouseEnter={(e) =>
               handleMouseEnter(
-                collapsed ? "Expand Sidebar" : "Collapse Sidebar",
+                collapsed && !isHovered ? "Expand Sidebar" : "Collapse Sidebar",
                 e
               )
             }
             onMouseLeave={handleMouseLeave}
             className="p-1 rounded hover:bg-gray-100 lg:block"
-            aria-label={collapsed ? "Expand" : "Collapse"}
-            title={!collapsed ? "Collapse Sidebar" : ""}
+            aria-label={collapsed && !isHovered ? "Expand" : "Collapse"}
+            title={!(collapsed && !isHovered) ? "Collapse Sidebar" : ""}
           >
             <img
-              src={collapsed ? expandIcon : collapseIcon}
+              src={collapsed && !isHovered ? expandIcon : collapseIcon}
               alt=""
               className="w-4 h-4"
             />
@@ -357,20 +372,20 @@ const Sidebar = ({ collapsed, onToggle }) => {
                         onMouseEnter={(e) => handleMouseEnter(label, e)}
                         onMouseLeave={handleMouseLeave}
                         className={`w-full flex items-center ${
-                          collapsed ? "justify-center px-2 py-2" : "px-3 py-2"
+                          collapsed && !isHovered ? "justify-center px-2 py-2" : "px-3 py-2"
                         } rounded text-sm transition ${"text-gray-600 hover:bg-gray-100"} notifications-button`}
-                        title={!collapsed ? label : ""}
+                        title={!(collapsed && !isHovered) ? label : ""}
                       >
                         <span className="text-lg shrink-0 relative">
                           {icon}
-                          {collapsed && hasNotification && (
+                          {collapsed && !isHovered && hasNotification && (
                             <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
                           )}
                         </span>
-                        {!collapsed && (
+                        {!(collapsed && !isHovered) && (
                           <span className="ml-2 truncate">{label}</span>
                         )}
-                        {!collapsed && hasNotification && (
+                        {!(collapsed && !isHovered) && hasNotification && (
                           <span className="ml-auto w-2 h-2 bg-red-500 rounded-full"></span>
                         )}
                       </button>
@@ -383,13 +398,13 @@ const Sidebar = ({ collapsed, onToggle }) => {
                         onMouseEnter={(e) => handleMouseEnter(label, e)}
                         onMouseLeave={handleMouseLeave}
                         className={`flex items-center ${
-                          collapsed ? "justify-center px-2 py-2" : "px-3 py-2"
+                          collapsed && !isHovered ? "justify-center px-2 py-2" : "px-3 py-2"
                         } rounded text-sm transition ${
                           isActive(path)
                             ? "bg-blue-100 text-blue-700 font-medium shadow-sm"
                             : "text-gray-600 hover:bg-gray-200 hover:shadow-sm"
                         }`}
-                        title={!collapsed ? label : ""}
+                        title={!(collapsed && !isHovered) ? label : ""}
                         onClick={() => {
                           // Auto-close sidebar on mobile after navigation
                           if (window.innerWidth < 1024) {
@@ -399,14 +414,14 @@ const Sidebar = ({ collapsed, onToggle }) => {
                       >
                         <span className="text-lg shrink-0 relative">
                           {icon}
-                          {collapsed && hasNotification && (
+                          {collapsed && !isHovered && hasNotification && (
                             <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
                           )}
                         </span>
-                        {!collapsed && (
+                        {!(collapsed && !isHovered) && (
                           <span className="ml-2 truncate">{label}</span>
                         )}
-                        {!collapsed && hasNotification && (
+                        {!(collapsed && !isHovered) && hasNotification && (
                           <span className="ml-auto w-2 h-2 bg-red-500 rounded-full"></span>
                         )}
                       </Link>
@@ -428,12 +443,12 @@ const Sidebar = ({ collapsed, onToggle }) => {
                   onMouseEnter={(e) => handleMouseEnter("Ask AI", e)}
                   onMouseLeave={handleMouseLeave}
                   className={`w-full flex items-center ${
-                    collapsed ? "justify-center px-2 py-2" : "px-3 py-2"
+                    collapsed && !isHovered ? "justify-center px-2 py-2" : "px-3 py-2"
                   } rounded text-sm bg-linear-to-r from-blue-50 to-sky-100 text-blue-700 hover:from-blue-100 hover:to-sky-150 hover:text-blue-800 border border-blue-200 shadow-sm transition-all duration-200`}
-                  title={!collapsed ? "Ask AI" : ""}
+                  title={!(collapsed && !isHovered) ? "Ask AI" : ""}
                 >
                   <img src={`${robotTalkingGif}?v=${gifVersion}`} alt="Ask AI" className="w-6 h-6 shrink-0" />
-                  {!collapsed && <span className="ml-2">Ask AI</span>}
+                  {!(collapsed && !isHovered) && <span className="ml-2">Ask AI</span>}
                 </button>
               </div>
             </div>
@@ -442,7 +457,7 @@ const Sidebar = ({ collapsed, onToggle }) => {
       </aside>
 
       {/* Custom Tooltip */}
-      {tooltip.show && collapsed && (
+      {tooltip.show && collapsed && !isHovered && (
         <div
           className="fixed z-60 pointer-events-none"
           style={{

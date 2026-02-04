@@ -3,6 +3,7 @@ import { db } from "../../firebase";
 import { doc, getDoc, collection, addDoc } from "firebase/firestore";
 import { query, where, getDocs } from "firebase/firestore";
 import {  FiX, FiEye, FiFileText, FiSave, FiArrowLeft, FiCheckCircle, FiXCircle, FiAlertCircle } from "react-icons/fi";
+import { logInvoiceAction, AUDIT_ACTIONS } from "../../utils/trainerInvoiceAuditLogger";
 
 // Import the standardized PDF generation function
 
@@ -11,9 +12,36 @@ const roundToNearestWhole = (num) => {
   return Math.round(num);
 };
 
+// Helper function to format payment cycle for UI display
+const formatPaymentCycleForUI = (cycleStr) => {
+  if (!cycleStr || cycleStr === 'unknown') return 'Unknown';
+
+  // Parse format like "2025-12-1-15" or "2025-12-16-31"
+  const parts = cycleStr.split('-');
+  if (parts.length !== 4) return cycleStr;
+
+  const [year, month, startDay, endDay] = parts;
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const monthName = monthNames[parseInt(month) - 1] || month;
+
+  return `${monthName} ${year} (Days ${startDay}-${endDay})`;
+};
+
 function InvoiceModal({ trainer, onClose, onInvoiceGenerated, onToast }) {
-    const [invoiceData, setInvoiceData] = useState({
-    billNumber: `INV-${Date.now()}`,
+  const hasLoggedRef = useRef(false);
+
+  useEffect(() => {
+    if (!hasLoggedRef.current && trainer) {
+      // console.log('📋 INVOICE MODAL opened for trainer:', trainer.trainerName, 'ID:', trainer.trainerId, 'Cycle:', trainer.paymentCycle, 'Mode: generate');
+      hasLoggedRef.current = true;
+    }
+  }, [trainer]);
+
+  const [invoiceData, setInvoiceData] = useState({
+    billNumber: trainer?.paymentCycle 
+      ? `INV-${Date.now()}-${trainer.paymentCycle.replace('-', '')}` 
+      : `INV-${Date.now()}`,
+    trainerName: trainer?.trainerName || "",
     projectCode: Array.isArray(trainer?.allProjects) ? trainer.allProjects.join(", ") : trainer?.projectCode || "",
     domain: trainer?.domain || "",
     topics: Array.isArray(trainer?.topics) ? trainer.topics.join(", ") : "",
@@ -21,7 +49,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated, onToast }) {
     endDate: trainer?.latestEndDate || "",
     billingDate: new Date().toISOString().split("T")[0],
     trainingRate: trainer?.perHourCost || 0,
-    totalHours: trainer?.totalCollegeHours || 0,
+    totalHours: trainer?.assignedHours || 0,
     tds: 10,
     adhocAdjustment: 0,
     conveyance: trainer?.totalConveyance || 0,
@@ -48,7 +76,8 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated, onToast }) {
     gst: trainer?.gst,
     isMerged: trainer?.isMerged,
     projectCode: trainer?.projectCode,
-  }), [trainer?.trainerId, trainer?.collegeName, trainer?.phase, trainer?.gst, trainer?.isMerged, trainer?.projectCode]);
+    paymentCycle: trainer?.paymentCycle,
+  }), [trainer?.trainerId, trainer?.collegeName, trainer?.phase, trainer?.gst, trainer?.isMerged, trainer?.projectCode, trainer?.paymentCycle]);
 
   useEffect(() => {
     const fetchTrainerBankDetails = async () => {
@@ -62,6 +91,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated, onToast }) {
           const data = trainerSnap.data();
           setInvoiceData((prev) => ({
             ...prev,
+            trainerName: data.name || data.trainerName || data.displayName || prev.trainerName,
             bankName: data.bankName || "",
             accountNumber: data.accountNumber || "",
             ifscCode: data.ifsc || "",
@@ -72,14 +102,14 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated, onToast }) {
           }));
         } else {
           // Trainer document doesn't exist - this is expected for new trainers
-          console.warn(`Trainer document not found for trainerId: ${queryDeps.trainerId}`);
+          // console.warn(`Trainer document not found for trainerId: ${queryDeps.trainerId}`);
           setInvoiceData((prev) => ({
             ...prev,
             gst: prev.gst || "NA", // Default to NA if trainer not found
           }));
         }
-      } catch (error) {
-        console.error('Error fetching trainer bank details:', error);
+      } catch {
+        // console.error('Error fetching trainer bank details');
         // Continue with empty bank details - user can still fill them manually
       }
     };
@@ -87,23 +117,29 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated, onToast }) {
     const checkExistingInvoice = async () => {
       if (!queryDeps.trainerId || !queryDeps.collegeName) return;
 
+      // console.log('🔍 CHECKING EXISTING INVOICE for trainer:', queryDeps.trainerId, 'college:', queryDeps.collegeName, 'phase:', queryDeps.phase, 'paymentCycle:', trainer?.paymentCycle, 'projectCode:', queryDeps.projectCode);
+
       try {
         const q = queryDeps.isMerged
           ? query(
               collection(db, "invoices"),
               where("trainerId", "==", queryDeps.trainerId),
               where("collegeName", "==", queryDeps.collegeName),
-              where("phase", "==", queryDeps.phase)
+              where("phase", "==", queryDeps.phase),
+              where("paymentCycle", "==", trainer?.paymentCycle)
             )
           : query(
               collection(db, "invoices"),
               where("trainerId", "==", queryDeps.trainerId),
               where("collegeName", "==", queryDeps.collegeName),
               where("phase", "==", queryDeps.phase),
-              where("projectCode", "==", queryDeps.projectCode)
+              where("projectCode", "==", queryDeps.projectCode),
+              where("paymentCycle", "==", trainer?.paymentCycle)
             );
 
         const querySnapshot = await getDocs(q);
+        // console.log('📋 Existing invoice query results:', querySnapshot.size, 'documents found for payment cycle:', trainer?.paymentCycle);
+        
         if (!querySnapshot.empty) {
           // Get the most recent invoice
           const latestInvoiceDoc = querySnapshot.docs[querySnapshot.docs.length - 1];
@@ -111,6 +147,7 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated, onToast }) {
             id: latestInvoiceDoc.id,
             ...latestInvoiceDoc.data(),
           };
+          // console.log('📄 FOUND EXISTING INVOICE:', latestInvoice.billNumber, 'for cycle:', latestInvoice.paymentCycle, 'dates:', latestInvoice.startDate, 'to', latestInvoice.endDate);
           setExistingInvoice(latestInvoice);
           setViewMode(true); // Automatically set to view mode if invoice exists
 
@@ -121,16 +158,20 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated, onToast }) {
             billingDate: latestInvoice.billingDate || new Date().toISOString().split("T")[0],
             gst: latestInvoice.gst !== undefined ? String(latestInvoice.gst) : (queryDeps.gst ? "0" : "NA"),
           }));
+        } else {
+          // console.log('✅ NO EXISTING INVOICE found for this payment cycle - ready to create new invoice');
+          setExistingInvoice(null);
+          setViewMode(false);
         }
-      } catch (error) {
-        console.error('Error checking for existing invoice:', error);
+      } catch {
+        // console.error('Error checking for existing invoice');
         // Continue without existing invoice - user can create a new one
       }
     };
 
     checkExistingInvoice();
     fetchTrainerBankDetails();
-  }, [queryDeps]);
+  }, [queryDeps, trainer?.paymentCycle]);
 
 const handleSubmit = async (e) => {
   e.preventDefault();
@@ -160,11 +201,11 @@ const handleSubmit = async (e) => {
     const invoiceToSave = {
       ...invoiceData,
       trainerId: trainer?.trainerId,
-      trainerName: trainer?.trainerName,
       businessName: trainer?.businessName,
       formId: trainer?.formId,
       phase: trainer?.phase,
       projectCode: trainer?.projectCode,
+      paymentCycle: trainer?.paymentCycle,
       totalAmount: calculateTotalAmount(),
       netPayment: calculateNetPayment(),
       updatedAt: new Date(),
@@ -176,14 +217,33 @@ const handleSubmit = async (e) => {
     };
 
     invoiceToSave.createdAt = new Date();
-    await addDoc(collection(db, "invoices"), invoiceToSave);
+    // console.log('💾 SAVING INVOICE to Firebase:', {
+    //   trainer: invoiceToSave.trainerName,
+    //   id: invoiceToSave.trainerId,
+    //   cycle: invoiceToSave.paymentCycle,
+    //   billNumber: invoiceToSave.billNumber,
+    //   totalAmount: invoiceToSave.totalAmount,
+    //   netPayment: invoiceToSave.netPayment
+    // });
+    const docRef = await addDoc(collection(db, "invoices"), invoiceToSave);
+
+    // Log the invoice generation action
+    await logInvoiceAction(AUDIT_ACTIONS.GENERATE, {
+      ...trainer,
+      ...invoiceToSave,
+      invoiceId: docRef.id
+    }, {
+      generatedFrom: 'modal',
+      invoiceData: invoiceToSave
+    });
+
     onToast({ type: 'success', message: "Invoice generated successfully!" });
 
     await onInvoiceGenerated(invoiceToSave); // Pass the invoice data for undo functionality
     onClose();
 
-  } catch (error) {
-    console.error('Error generating invoice:', error);
+  } catch {
+    // console.error('Error generating invoice');
     onToast({ type: 'error', message: "Invoice not generated. Please try again." });
   } finally {
     setIsGenerating(false);
@@ -259,10 +319,18 @@ const handleSubmit = async (e) => {
           <div className="mb-2 p-1.5 bg-gray-50 rounded-lg">
             <h3 className="text-sm font-semibold text-gray-800 mb-1.5">Trainer Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-1 text-xs">
-              <div><span className="font-medium">Name:</span> {trainer?.trainerName}</div>
+              <div><span className="font-medium">Name:</span> {invoiceData.trainerName || trainer?.trainerName}</div>
               <div><span className="font-medium">ID:</span> {trainer?.trainerId}</div>
               <div><span className="font-medium">College:</span> {trainer?.businessName}</div>
               <div><span className="font-medium">Phase:</span> {trainer?.phase}</div>
+              {trainer?.paymentCycle && (
+                <div className="col-span-2">
+                  <span className="font-medium">Payment Cycle:</span>
+                  <span className="ml-1 bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs font-medium">
+                    {formatPaymentCycleForUI(trainer.paymentCycle)}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -618,8 +686,8 @@ const handleSubmit = async (e) => {
                   })()}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="font-medium">TDS ({invoiceData.tds}% on Training Fees + GST only):</span>
-                  <span>₹{(() => {
+                  <span className="font-medium text-red-600">TDS ({invoiceData.tds}% on Training Fees + GST only):</span>
+                  <span className="text-red-600">-₹{(() => {
                     const trainingFees = roundToNearestWhole((invoiceData.trainingRate || 0) * (invoiceData.totalHours || 0));
                     const gstAmount = invoiceData.gst === "18" ? roundToNearestWhole(trainingFees * 0.18) : 0;
                     const taxableAmount = trainingFees + gstAmount;
