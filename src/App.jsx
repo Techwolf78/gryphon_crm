@@ -55,6 +55,7 @@ const TrainerInvoiceAuditLogs = React.lazy(() => import("./components/Learning/I
 
 // Lazy load Intro page
 const Intro = React.lazy(() => import("./pages/Intro"));
+const ExportProjectCode = React.lazy(() => import("./pages/ExportProjectCode"));
 
 // Loading component
 const PageLoader = () => (
@@ -112,6 +113,7 @@ const AppContent = () => {
             <Route index element={<DashboardOrRedirect />} />
             <Route path="profile" element={<UpdateProfile />} />
             <Route path="admin" element={<Admin />} />
+            <Route path="admin/code" element={<ExportProjectCode />} />
             <Route path="sales" element={<Sales />} />
             <Route path="placement" element={<Placement />} />
             <Route path="placement/admin" element={<PlacementAdminAuditLogs />} />

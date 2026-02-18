@@ -578,33 +578,16 @@ function GenerateTrainerInvoice() {
             let cycleEndDate = null;
 
             if (trainer.activeDates && trainer.activeDates.length > 0) {
-              // FIXED: Count working days (excluding weekends) for proper hour allocation
-              const workingDaysInCycle = cycleAssignments.filter((dateStr) => {
-                const date = new Date(dateStr);
-                const dayOfWeek = date.getDay();
-                return dayOfWeek !== 0 && dayOfWeek !== 6; // Exclude Sunday (0) and Saturday (6)
-              }).length;
-
-              const totalWorkingDays = trainer.activeDates.filter((dateStr) => {
-                const date = new Date(dateStr);
-                const dayOfWeek = date.getDay();
-                return dayOfWeek !== 0 && dayOfWeek !== 6; // Exclude Sunday (0) and Saturday (6)
-              }).length;
-
-              // Allocate hours proportionally based on working days in each cycle
-              cycleHours =
-                totalWorkingDays > 0
-                  ? (workingDaysInCycle / totalWorkingDays) *
-                    trainer.assignedHours
-                  : 0;
+              // Use full assigned hours since the batch is in the cycle
+              cycleHours = trainer.assignedHours;
 
               if (cycleAssignments.length > 0) {
                 cycleStartDate = cycleAssignments[0];
                 cycleEndDate = cycleAssignments[cycleAssignments.length - 1];
               }
             } else {
-              // Fallback: split the trainer's total hours and date range proportionally
-              const totalCycles = paymentCycles.length;
+              // Fallback: use full assigned hours since activeDates is not set
+              const totalCycles = 1; // Changed from paymentCycles.length to avoid splitting when activeDates is unavailable
               cycleHours = trainer.assignedHours / totalCycles;
 
               // For date range, use the full training period for each cycle

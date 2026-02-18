@@ -42,6 +42,26 @@ const formatCurrency = (amount) => {
   }
 };
 
+const formatNumber = (num) => {
+  const number = Number(num);
+  if (number >= 10000000) { // 1 crore
+    const crores = number / 10000000;
+    if (crores >= 100) return `${Math.floor(crores)}CR`;
+    if (crores >= 10) return `${crores.toFixed(0)}CR`;
+    return `${crores.toFixed(1).replace(/\.0$/, '')}CR`;
+  } else if (number >= 100000) { // 1 lakh
+    const lakhs = number / 100000;
+    if (lakhs >= 10) return `${lakhs.toFixed(0)}L`;
+    return `${lakhs.toFixed(1).replace(/\.0$/, '')}L`;
+  } else if (number >= 1000) { // 1 thousand
+    const thousands = number / 1000;
+    if (thousands >= 10) return `${thousands.toFixed(0)}k`;
+    return `${thousands.toFixed(1).replace(/\.0$/, '')}k`;
+  } else {
+    return number.toString();
+  }
+};
+
 const CustomTooltip = ({ active, payload, label, timePeriod }) => {
   if (active && payload && payload.length) {
     const dataPoint = payload[0].payload;
@@ -134,10 +154,10 @@ const TeamPerformance = ({
       {teamPerformance.map((member) => (
         <div
           key={member.id}
-          className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition-colors cursor-pointer"
+          className="flex items-center p-3 hover:bg-gray-50 rounded-lg transition-colors cursor-pointer"
           onClick={() => onMemberClick && onMemberClick(member)}
         >
-          <div className="flex items-center">
+          <div className="flex items-center flex-1">
             <div className="bg-indigo-100 text-indigo-600 w-8 h-8 rounded-full flex items-center justify-center font-medium">
               {member.name.charAt(0)}
             </div>
@@ -145,6 +165,13 @@ const TeamPerformance = ({
               <p className="text-sm font-medium text-gray-900">{member.name}</p>
               <p className="text-xs text-gray-500">{member.role}</p>
             </div>
+          </div>
+          <div className="flex items-center justify-center mx-4">
+            {member.closedRevenue > 0 && (
+              <span className="bg-green-100 text-green-600 px-2 py-1 rounded-full text-xs font-medium">
+                CL {formatNumber(member.closedRevenue)}
+              </span>
+            )}
           </div>
           <div className="flex items-center">
             <div className="w-32 h-2 bg-gray-200 rounded-full mr-3">
@@ -170,6 +197,7 @@ TeamPerformance.propTypes = {
     PropTypes.shape({
       name: PropTypes.string,
       value: PropTypes.number,
+      closedRevenue: PropTypes.number,
       role: PropTypes.string,
     })
   ),
@@ -956,10 +984,14 @@ if (selectedUserId) {
             id: memberId,
             name: memberName,
             value: 0,
+            closedRevenue: 0,
             role: lead.assignedTo.role || "Sales Rep",
           };
         }
         teamPerformance[memberId].value += 1; // Count of leads
+        if (lead.phase === "closed" && lead.totalCost) {
+          teamPerformance[memberId].closedRevenue += lead.totalCost;
+        }
       }
 
       let createdDate = new Date(lead.createdAt);
@@ -1099,7 +1131,15 @@ if (selectedUserId) {
       const usersRef = collection(db, "users");
       
       let usersQuery;
-      if (currentUser?.department?.toLowerCase() === "sales" || currentUser?.department?.toLowerCase() === "dm" || currentUser?.department === "Admin") {
+      const isPrivilegedUser = 
+        currentUser?.department?.toLowerCase() === "sales" || 
+        currentUser?.department?.toLowerCase() === "dm" || 
+        currentUser?.department === "Admin" ||
+        currentUser?.departments?.includes("Sales") ||
+        currentUser?.departments?.includes("DM") ||
+        currentUser?.departments?.includes("Admin");
+      
+      if (isPrivilegedUser) {
         usersQuery = query(usersRef);
       } else {
         usersQuery = query(
@@ -1115,9 +1155,28 @@ if (selectedUserId) {
         ...doc.data(),
       }));
 
-      const filteredUsers = usersData.filter(user => 
-        user.department?.toLowerCase() === "sales" || user.department === "Admin"
-      );
+      const filteredUsers = usersData.filter(user => {
+        // Exclude specific user UIDs
+        const excludedUserUids = ['Xw3HsAZEgYNAxnEyX8I5THO4eub2', 'voMWYTXfLNZ70sAnHalC0qoqGD03'];
+        if (excludedUserUids.includes(user.uid)) {
+          return false;
+        }
+
+        // Exclude users with multiple departments
+        const hasMultipleDepartments = user.departments && Array.isArray(user.departments) && user.departments.length > 1;
+        if (hasMultipleDepartments) {
+          return false;
+        }
+
+        if (user.department) {
+          // Old format: single department field
+          return user.department.toLowerCase() === "sales" || user.department === "Admin";
+        } else if (user.departments && Array.isArray(user.departments) && user.departments.length === 1) {
+          // New format: departments array - only if exactly one department
+          return user.departments[0].toLowerCase() === "sales" || user.departments[0] === "Admin";
+        }
+        return false;
+      });
       setUsers(filteredUsers);
     } catch (error) {
       console.error("Error fetching users:", error);
@@ -1587,6 +1646,8 @@ if (selectedUserId) {
                         {user.name} (
                         {user.department
                           ? `${user.role} (${user.department})`
+                          : user.departments && user.departments.length > 0
+                          ? `${user.role} (${user.departments.join(", ")})`
                           : user.role || "User"}
                         )
                       </button>
