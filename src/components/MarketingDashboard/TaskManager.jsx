@@ -448,7 +448,7 @@ const TaskCard = ({ task, getRoleDisplay, getRoleColor, handleDelete, moveTask, 
         className="font-medium text-gray-900 mb-0.5 pr-6 text-xs"
         style={getStatusStyles(task.status)}
       >
-        {task.description || task.title}
+        {task.title || task.description}
       </h4>
       <p
         className={`text-xs mb-0.5 ${task.status === "cancelled" ? "text-gray-500" : "text-gray-600"}`}
@@ -548,8 +548,6 @@ const parseDate = (dateStr) => {
   }
   return null;
 };
-
-
 
 const CalendarView = ({
   tasks,
@@ -687,9 +685,9 @@ const CalendarView = ({
                       task.status === 'cancelled' ? 'bg-red-100 text-red-800' :
                       'bg-gray-100 text-gray-800'
                     }`}
-                    title={task.description || task.title}
+                    title={task.title || task.description}
                   >
-                    {task.description || task.title}
+                    {task.title || task.description}
                   </div>
                 ))}
                 {dayTasks.length > 3 && (
@@ -767,8 +765,6 @@ const TableView = ({
     }
   };
 
-
-
   const formatDate = (dateString) => {
     const date = parseDate(dateString);
     if (!date || isNaN(date.getTime())) return '—';
@@ -835,9 +831,9 @@ const TableView = ({
                     <div className="min-w-0 flex-1">
                       <div
                         className="text-sm font-medium text-gray-900 wrap-break-word"
-                        title={task.description || task.title}
+                        title={task.title || task.description}
                       >
-                        {task.description || task.title}
+                        {task.title || task.description}
                       </div>
                       {task.images && task.images.length > 1 && (
                         <div className="text-xs text-gray-500 mt-1">
@@ -1026,11 +1022,13 @@ const TaskManager = ({ onBack }) => {
   const [selectedAccount, setSelectedAccount] = useState("");
   const [selectedRole, setSelectedRole] = useState("");
   const [selectedTask, setSelectedTask] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [dueDate, setDueDate] = useState("");
   const [activeId, setActiveId] = useState(null);
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState("");
   const [uploadingImage, setUploadingImage] = useState(false);
-  const [currentView, setCurrentView] = useState("kanban"); // "kanban", "calendar", "table", or "logs"
+  const [currentView, setCurrentView] = useState("kanban");
   const [logsConfirmed, setLogsConfirmed] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -1044,10 +1042,7 @@ const TaskManager = ({ onBack }) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { user } = useAuth();
   const [filters, setFilters] = useState({
-    user:
-      user?.role === "Director" || user?.role === "Head"
-        ? ""
-        : user?.displayName || "",
+    user: user?.role === "Director" || user?.role === "Head" ? "" : user?.displayName || "",
     startDate: "",
     endDate: "",
     role: "",
@@ -1093,34 +1088,51 @@ const TaskManager = ({ onBack }) => {
     });
   };
 
-  const uniqueTasksList = [...new Set(tasksData.map((item) => item.task))];
+  // Helper function to get all tasks from the new structure
+  const getAllTasksFromData = () => {
+    const allTasks = [];
+    tasksData.forEach(account => {
+      account.roles.forEach(role => {
+        role.tasks.forEach(task => {
+          if (task) {
+            allTasks.push({
+              account: account.account,
+              role: role.name,
+              task: task
+            });
+          }
+        });
+      });
+    });
+    return allTasks;
+  };
+
+  // Helper function to get tasks for a specific account and role
+  const getTasksForAccountAndRole = (account, roleName) => {
+    const accountData = tasksData.find(acc => acc.account === account);
+    if (accountData) {
+      const roleData = accountData.roles.find(r => r.name === roleName);
+      return roleData ? roleData.tasks : [];
+    }
+    return [];
+  };
+
+  const allTasksFlat = getAllTasksFromData();
+  const uniqueTasksList = [...new Set(allTasksFlat.map((item) => item.task))];
   const typingTasks = uniqueTasksList.slice(0, 5);
   const [placeholderText, setPlaceholderText] = useState("");
   const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
   const [charIndex, setCharIndex] = useState(0);
 
-  const uniqueAccounts = [...new Set(tasksData.map((item) => item.account))];
+  const uniqueAccounts = tasksData.map((item) => item.account);
+  
   const rolesForAccount = selectedAccount
-    ? [
-        ...new Set(
-          tasksData
-            .filter((item) => item.account === selectedAccount)
-            .map((item) => item.role),
-        ),
-      ]
+    ? tasksData.find(acc => acc.account === selectedAccount)?.roles.map(r => r.name) || []
     : [];
-  const tasksForRole = selectedRole
-    ? [
-        ...new Set(
-          tasksData
-            .filter(
-              (item) =>
-                item.account === selectedAccount && item.role === selectedRole,
-            )
-            .map((item) => item.task),
-        ),
-      ]
+  
+  const tasksForRole = selectedRole && selectedAccount
+    ? getTasksForAccountAndRole(selectedAccount, selectedRole)
     : [];
 
   const sensors = useSensors(
@@ -1138,14 +1150,11 @@ const TaskManager = ({ onBack }) => {
       return;
     }
 
-    // Load cached assignees
     const cachedAssignees = localStorage.getItem("dmAssignees");
     if (cachedAssignees) {
       const parsedAssignees = JSON.parse(cachedAssignees);
       setAssignees(parsedAssignees);
-      // Set default filter based on user preference
-      const filterPreference =
-        localStorage.getItem("dmFilterPreference") || "user";
+      const filterPreference = localStorage.getItem("dmFilterPreference") || "user";
       const userName = user?.displayName;
       if (
         filterPreference === "user" &&
@@ -1158,7 +1167,6 @@ const TaskManager = ({ onBack }) => {
       }
     }
 
-    // Set up limited real-time listener for tasks
     const calendarLimit = currentView === "calendar" ? 500 : currentLimit;
     
     let qConstraints = [
@@ -1186,7 +1194,6 @@ const TaskManager = ({ onBack }) => {
           return {
             id: docSnap.id,
             ...data,
-            // Migrate old imageUrl format to new images array format if needed
             images: data.images || (data.imageUrl ? [data.imageUrl] : []),
           };
         });
@@ -1200,19 +1207,15 @@ const TaskManager = ({ onBack }) => {
         if (loadingMore) {
           const newTasksCount = tasksData.length - previousLength;
 
-          // Only process when we actually have new tasks loaded
           if (newTasksCount > 0) {
-            // Clear the timeout since tasks were loaded
             if (loadMoreTimeoutRef.current) {
               clearTimeout(loadMoreTimeoutRef.current);
               loadMoreTimeoutRef.current = null;
             }
             setLoadingMore(false);
 
-            // Calculate how many new tasks are visible after filtering
             const newFilteredTasks = tasksData.filter((task) => {
-              if (filters.user && task.assignedTo !== filters.user)
-                return false;
+              if (filters.user && task.assignedTo !== filters.user) return false;
               if (filters.role && task.role !== filters.role) return false;
               if (filters.startDate && task.startDate) {
                 const taskStart = new Date(task.startDate);
@@ -1224,7 +1227,6 @@ const TaskManager = ({ onBack }) => {
                 const filterEnd = new Date(filters.endDate);
                 if (taskEnd > filterEnd) return false;
               }
-              // Week filter
               const weekStart = new Date(currentWeek);
               const weekEnd = new Date(weekStart);
               weekEnd.setDate(weekStart.getDate() + 6);
@@ -1237,18 +1239,14 @@ const TaskManager = ({ onBack }) => {
                   ? task.createdAt.toDate()
                   : new Date(task.createdAt);
               }
-              if (taskDate && (taskDate < weekStart || taskDate > weekEnd))
-                return false;
+              if (taskDate && (taskDate < weekStart || taskDate > weekEnd)) return false;
               return true;
             });
 
-            const newVisibleTasksCount =
-              newFilteredTasks.length - previousFilteredLength;
-
-            const message =
-              newVisibleTasksCount > 0
-                ? `${newVisibleTasksCount} tasks fetched.`
-                : `${newTasksCount} tasks loaded (${newTasksCount - newVisibleTasksCount} filtered out).`;
+            const newVisibleTasksCount = newFilteredTasks.length - previousFilteredLength;
+            const message = newVisibleTasksCount > 0
+              ? `${newVisibleTasksCount} tasks fetched.`
+              : `${newTasksCount} tasks loaded (${newTasksCount - newVisibleTasksCount} filtered out).`;
 
             setToastMessage(message);
             setShowToast(true);
@@ -1256,8 +1254,6 @@ const TaskManager = ({ onBack }) => {
             setNoMoreTasks(false);
             setNoMoreCount(0);
           } else {
-            // If no new tasks were loaded, it means no more tasks available
-            // Clear the timeout since we determined no more tasks
             if (loadMoreTimeoutRef.current) {
               clearTimeout(loadMoreTimeoutRef.current);
               loadMoreTimeoutRef.current = null;
@@ -1273,7 +1269,6 @@ const TaskManager = ({ onBack }) => {
           }
         }
         if (loadingMore) {
-          // Clear the timeout on error
           if (loadMoreTimeoutRef.current) {
             clearTimeout(loadMoreTimeoutRef.current);
             loadMoreTimeoutRef.current = null;
@@ -1283,7 +1278,6 @@ const TaskManager = ({ onBack }) => {
       },
     );
 
-    // Fetch users once and cache
     const fetchUsers = async () => {
       try {
         const usersSnapshot = await getDocs(collection(db, "users"));
@@ -1291,17 +1285,14 @@ const TaskManager = ({ onBack }) => {
           .map((doc) => ({ id: doc.id, ...doc.data() }))
           .filter((user) => {
             const hasDM = user.departments && user.departments.includes("DM");
-            const hasAdminDept =
-              user.departments && user.departments.includes("Admin");
+            const hasAdminDept = user.departments && user.departments.includes("Admin");
             return hasDM || hasAdminDept;
           })
           .map((user) => user.displayName || user.name || user.email)
           .filter(Boolean);
         setAssignees(dmUsers);
         localStorage.setItem("dmAssignees", JSON.stringify(dmUsers));
-        // Set default filter based on user preference
-        const filterPreference =
-          localStorage.getItem("dmFilterPreference") || "user";
+        const filterPreference = localStorage.getItem("dmFilterPreference") || "user";
         const userName = user?.displayName;
         if (
           filterPreference === "user" &&
@@ -1324,7 +1315,7 @@ const TaskManager = ({ onBack }) => {
     return () => {
       unsubscribeTasks();
     };
-  }, [user?.uid, user?.displayName, refreshTrigger, currentLimit, currentView, filters.user]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user?.uid, user?.displayName, refreshTrigger, currentLimit, currentView, filters.user]);
 
   useEffect(() => {
     if (currentView === "logs" && logsConfirmed) {
@@ -1373,7 +1364,7 @@ const TaskManager = ({ onBack }) => {
           setPlaceholderText(currentTask.substring(0, charIndex + 1));
           setCharIndex(charIndex + 1);
           if (charIndex + 1 === currentTask.length) {
-            setTimeout(() => setIsDeleting(true), 1000); // pause before deleting
+            setTimeout(() => setIsDeleting(true), 1000);
           }
         } else {
           setPlaceholderText(currentTask.substring(0, charIndex - 1));
@@ -1385,11 +1376,10 @@ const TaskManager = ({ onBack }) => {
         }
       },
       isDeleting ? 50 : 100,
-    ); // faster deleting
+    );
     return () => clearTimeout(timeout);
   }, [charIndex, isDeleting, currentTaskIndex, typingTasks]);
 
-  // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
       if (loadMoreTimeoutRef.current) {
@@ -1443,7 +1433,6 @@ const TaskManager = ({ onBack }) => {
     try {
       setUploadingImage(true);
 
-      // Compress the image
       const compressedFile = await new Promise((resolve, reject) => {
         new ImageCompressor(file, {
           quality: 0.8,
@@ -1454,13 +1443,11 @@ const TaskManager = ({ onBack }) => {
         });
       });
 
-      // Create FormData for Cloudinary upload
       const formData = new FormData();
       formData.append("file", compressedFile);
       formData.append("upload_preset", "react_profile_upload");
       formData.append("cloud_name", "da0ypp61n");
 
-      // Upload to Cloudinary
       const response = await fetch(
         `https://api.cloudinary.com/v1_1/da0ypp61n/image/upload`,
         {
@@ -1511,33 +1498,39 @@ const TaskManager = ({ onBack }) => {
       setFormError("Please select an assignee.");
       return;
     }
-    setFormError(""); // Clear any previous error
+    setFormError("");
 
-    // Close modal and clear form immediately
     setShowForm(false);
+    
+    const taskTitle = title.trim();
+    const taskAssignedTo = assignedTo.trim();
+    const taskRole = role;
+    const taskAccount = selectedAccount;
+    const taskRolePlay = selectedRole;
+    const taskStartDate = startDate;
+    const taskDueDate = dueDate;
+    
     setTitle("");
     setAssignedTo("");
     setRole("");
     setSelectedAccount("");
     setSelectedRole("");
     setSelectedTask("");
+    setStartDate("");
+    setDueDate("");
     clearImage();
 
-    // Do the rest asynchronously in background
     (async () => {
       try {
         const taskId = await getNextTaskId();
 
         let images = [];
         if (imageFile) {
-          // Upload image asynchronously
           uploadImage(imageFile)
             .then((imageUrl) => {
-              // Update the task in DB with the image
               updateDoc(doc(db, "marketing_tasks", taskId), {
                 images: [imageUrl],
               });
-              // Update in local state
               setTasks((prev) =>
                 prev.map((t) =>
                   t.id === taskId ? { ...t, images: [imageUrl] } : t,
@@ -1549,17 +1542,28 @@ const TaskManager = ({ onBack }) => {
             });
         }
 
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        const todayFormatted = `${year}-${month}-${day}`;
+
         const taskData = {
-          description: title.trim(),
-          assignedTo: assignedTo.trim(),
-          role: role || null,
-          account: selectedAccount || null,
-          rolePlay: selectedRole || null,
-          task: selectedTask || null,
+          title: taskTitle,
+          description: taskTitle,
+          assignedTo: taskAssignedTo,
+          role: taskRole || null,
+          account: taskAccount || null,
+          rolePlay: taskRolePlay || null,
+          task: "",
+          dueDate: taskDueDate || todayFormatted,
+          startDate: taskStartDate || todayFormatted,
           status: "not_started",
           images,
           userId: user.uid,
+          originalUserId: user.uid,
           createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
         };
 
         const docRef = doc(db, "marketing_tasks", taskId);
@@ -1587,11 +1591,9 @@ const TaskManager = ({ onBack }) => {
       alert("You can only change the status of your own tasks.");
       return;
     }
-    // Update local state immediately
     setTasks(
       tasks.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t)),
     );
-    // Update Firestore immediately
     try {
       await moveTaskImmediate(taskId, newStatus);
     } catch (error) {
@@ -1617,7 +1619,6 @@ const TaskManager = ({ onBack }) => {
       if (taskEnd > filterEnd) return false;
     }
 
-    // Date filtering based on current view
     let taskDate = null;
     if (task.startDate) {
       taskDate = new Date(task.startDate);
@@ -1629,17 +1630,13 @@ const TaskManager = ({ onBack }) => {
         : new Date(task.createdAt);
     }
 
-    // New Rule: If User Filter is active AND task is active (not started/in progress),
-    // SHOW IT regardless of date (Persistent Backlog)
     if (
       filters.user &&
       (task.status === "not_started" || task.status === "in_progress")
     ) {
-      // Do nothing here to skip the date check return false below
-      // implicitly "return true" at the end unless other filters failed above
+      // Skip date filter for active tasks when user filter is active
     } else if (taskDate) {
       if (currentView === "calendar") {
-        // For calendar view, filter by current month
         const monthStart = new Date(
           calendarCurrentDate.getFullYear(),
           calendarCurrentDate.getMonth(),
@@ -1653,7 +1650,6 @@ const TaskManager = ({ onBack }) => {
         monthEnd.setHours(23, 59, 59, 999);
         if (taskDate < monthStart || taskDate > monthEnd) return false;
       } else {
-        // For kanban and table views, filter by current week
         const weekStart = new Date(currentWeek);
         const weekEnd = new Date(weekStart);
         weekEnd.setDate(weekStart.getDate() + 6);
@@ -1699,7 +1695,6 @@ const TaskManager = ({ onBack }) => {
       alert("You can only delete your own tasks.");
       return;
     }
-    // Log the deletion
     await logMarketingActivity("Task Deleted", {
       id: task.id,
       title: task.title,
@@ -1708,9 +1703,7 @@ const TaskManager = ({ onBack }) => {
       status: task.status,
       role: task.role
     });
-    // Update local state immediately
     setTasks(tasks.filter((t) => t.id !== id));
-    // Update Firestore immediately
     try {
       await handleDeleteImmediate(id);
     } catch (error) {
@@ -1794,7 +1787,6 @@ const TaskManager = ({ onBack }) => {
     const activeId = String(active.id);
     const overId = String(over.id);
 
-    // If dropping on a column
     if (
       overId === "not_started" ||
       overId === "in_progress" ||
@@ -1918,7 +1910,6 @@ const TaskManager = ({ onBack }) => {
                       onClick={() => {
                         setIsRefreshing(true);
                         setRefreshTrigger((prev) => prev + 1);
-                        // Reset refreshing state after animation completes
                         setTimeout(() => setIsRefreshing(false), 800);
                       }}
                       disabled={isRefreshing}
@@ -1961,7 +1952,6 @@ const TaskManager = ({ onBack }) => {
                         onChange={(e) => {
                           const newValue = e.target.value;
                           setFilters((prev) => ({ ...prev, user: newValue }));
-                          // Save preference: 'all' if empty, 'user' if specific user
                           localStorage.setItem(
                             "dmFilterPreference",
                             newValue === "" ? "all" : "user",
@@ -2062,7 +2052,6 @@ const TaskManager = ({ onBack }) => {
                           if (!buttonDisabled && !noMoreTasks) {
                             setLoadingMore(true);
                             setCurrentLimit((prev) => prev + 100);
-                            // Set timeout to show "no more tasks" popup after 5 seconds if no tasks loaded
                             loadMoreTimeoutRef.current = setTimeout(() => {
                               if (loadingMore) {
                                 setLoadingMore(false);
@@ -2089,7 +2078,7 @@ const TaskManager = ({ onBack }) => {
                   </div>
                 )}
 
-                {/* Task Creation Form - Now a Modal */}
+                {/* Task Creation Form Modal */}
                 {showForm && (
                   <div className="fixed inset-0 bg-transparent backdrop-blur-sm bg-opacity-20 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-lg p-4 max-w-lg w-full mx-4">
@@ -2213,6 +2202,7 @@ const TaskManager = ({ onBack }) => {
                             {title.length}/150
                           </div>
                         </div>
+                   
                         <div className="sm:col-span-2 lg:col-span-4 flex items-center gap-2">
                           <input
                             ref={fileInputRef}
@@ -2255,6 +2245,8 @@ const TaskManager = ({ onBack }) => {
                               setSelectedAccount("");
                               setSelectedRole("");
                               setSelectedTask("");
+                              setStartDate("");
+                              setDueDate("");
                               clearImage();
                               setShowForm(false);
                             }}
@@ -2279,7 +2271,6 @@ const TaskManager = ({ onBack }) => {
               {/* Conditional View Rendering */}
               {currentView === "kanban" ? (
                 <>
-                  {/* Kanban Board */}
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     <Column
                       id="not_started"
@@ -2436,8 +2427,6 @@ const TaskManager = ({ onBack }) => {
           </div>
         </div>
       )}
-
-
 
       {showToast && (
         <div className="fixed bottom-4 left-4 z-50">
