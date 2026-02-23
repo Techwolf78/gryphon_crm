@@ -224,9 +224,14 @@ function TrainersDashboard() {
       ];
     });
 
+    const sanitizeCell = (value) => {
+      const str = (value || "").toString();
+      return /^[=+\-@\t\r\n]/.test(str) ? `\t${str}` : str;
+    };
+
     const csvContent = [
       headers.join(","),
-      ...rows.map(row => row.map(cell => `"${(cell || "").toString().replace(/"/g, '""')}"`).join(","))
+      ...rows.map(row => row.map(cell => `"${sanitizeCell(cell).replace(/"/g, '""')}"`).join(","))
     ].join("\n");
 
     const BOM = "\uFEFF";
