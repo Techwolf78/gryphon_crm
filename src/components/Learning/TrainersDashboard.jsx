@@ -7,7 +7,7 @@ import AddTrainer from "./AddTrainer.jsx";
 import EditTrainer from "./EditTrainer.jsx";
 import DeleteTrainer from "./DeleteTrainer.jsx";
 import TrainerLeadDetails from "./TrainerLeadDetails.jsx";
-import { FiPlusCircle, FiEdit, FiTrash2, FiChevronLeft, FiCheck, FiX, FiBell, FiFilter, FiChevronDown, FiChevronUp } from "react-icons/fi";
+import { FiPlusCircle, FiEdit, FiTrash2, FiChevronLeft, FiCheck, FiX, FiBell, FiFilter, FiChevronDown, FiChevronUp, FiDownload } from "react-icons/fi";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import TrainersDashboardTour from "../tours/TrainersDashboardTour";
 import SendRequestModal from './SendRequestModal';
@@ -190,6 +190,63 @@ function TrainersDashboard() {
     const numB = parseInt((b.trainerId || "").replace("GA-T", ""), 10);
     return sortOrder === "asc" ? numA - numB : numB - numA;
   });
+
+  const exportToCSV = () => {
+    const headers = ["Id", "Full name", "email", "Domain", "Specialization"];
+    
+    const rows = sortedTrainers.map(trainer => {
+      const email = trainer.email || "";
+      const domains = Array.isArray(trainer.domain) ? trainer.domain.join(", ") : trainer.domain || "";
+      
+      let specs = [];
+      if (Array.isArray(trainer.specialization)) {
+        specs = [...trainer.specialization];
+      } else if (typeof trainer.specialization === "string") {
+        specs = trainer.specialization.split(",").map((s) => s.trim());
+      }
+
+      if (Array.isArray(trainer.otherSpecialization)) {
+        specs = [...specs, ...trainer.otherSpecialization];
+      } else if (typeof trainer.otherSpecialization === "string") {
+        specs = [
+          ...specs,
+          ...trainer.otherSpecialization.split(",").map((s) => s.trim()),
+        ];
+      }
+      const specialization = specs.filter(s => s && s.length > 0).join(", ");
+
+      return [
+        trainer.trainerId || "",
+        trainer.name || "",
+        email,
+        domains,
+        specialization
+      ];
+    });
+
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(row => row.map(cell => `"${(cell || "").toString().replace(/"/g, '""')}"`).join(","))
+    ].join("\n");
+
+    const BOM = "\uFEFF";
+    const blob = new Blob([BOM + csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+
+    try {
+      link.setAttribute("href", url);
+      link.setAttribute("download", `trainers_export_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+    } finally {
+      if (link.parentNode) {
+        document.body.removeChild(link);
+      }
+      URL.revokeObjectURL(url);
+    }
+  };
 
   const handleBack = () => {
     navigate('/dashboard/learning-development');
@@ -424,7 +481,7 @@ function TrainersDashboard() {
                     <div className="absolute -top-2 left-4 w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-white shadow-sm"></div>
                     
                     {/* Header */}
-                    <div className="flex items-center justify-between p-2 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white rounded-t-xl">
+                    <div className="flex items-center justify-between p-2 border-b border-gray-100 bg-linear-to-r from-gray-50 to-white rounded-t-xl">
                       <h3 className="text-xs font-semibold text-gray-900" id="filter-heading">Filters</h3>
                       <button
                         onClick={() => setShowFilters(false)}
@@ -554,7 +611,7 @@ function TrainersDashboard() {
                       <div className="absolute -top-2 right-6 w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-white shadow-sm"></div>
                       
                       {/* Header */}
-                      <div className="flex items-center justify-between p-2 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white rounded-t-xl">
+                      <div className="flex items-center justify-between p-2 border-b border-gray-100 bg-linear-to-r from-gray-50 to-white rounded-t-xl">
                         <h3 className="text-sm font-medium text-gray-900" id="notifications-heading">Delete Requests</h3>
                         <button
                           onClick={() => setShowNotifications(false)}
@@ -594,7 +651,7 @@ function TrainersDashboard() {
                                   <div className="flex gap-1 ml-1">
                                     <button
                                       onClick={() => handleApprove(req)}
-                                      className="inline-flex items-center gap-1 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-2 py-1 rounded text-xs font-medium transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1 shadow-sm hover:shadow-md"
+                                      className="inline-flex items-center gap-1 bg-linear-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-2 py-1 rounded text-xs font-medium transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1 shadow-sm hover:shadow-md"
                                       aria-label={`Approve delete request for ${req.trainerName}`}
                                     >
                                       <FiCheck className="w-3 h-3" />
@@ -602,7 +659,7 @@ function TrainersDashboard() {
                                     </button>
                                     <button
                                       onClick={() => handleReject(req)}
-                                      className="inline-flex items-center gap-1 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-2 py-1 rounded text-xs font-medium transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 shadow-sm hover:shadow-md"
+                                      className="inline-flex items-center gap-1 bg-linear-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-2 py-1 rounded text-xs font-medium transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 shadow-sm hover:shadow-md"
                                       aria-label={`Reject delete request for ${req.trainerName}`}
                                     >
                                       <FiX className="w-3 h-3" />
@@ -621,8 +678,16 @@ function TrainersDashboard() {
               </div>
             )}
             <button
+              onClick={exportToCSV}
+              className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-xl font-semibold transition-all shadow-sm flex items-center text-sm"
+              title="Export to CSV"
+            >
+              <FiDownload className="h-4 w-4 mr-2" />
+              Export
+            </button>
+            <button
               onClick={() => setShowAddTrainer(true)}
-              className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white px-3 py-1.5 rounded-xl font-semibold hover:opacity-90 transition-all shadow-sm flex items-center text-sm"
+              className="bg-linear-to-r from-blue-600 to-indigo-700 text-white px-3 py-1.5 rounded-xl font-semibold hover:opacity-90 transition-all shadow-sm flex items-center text-sm"
               data-tour="add-trainer-button"
             >
               <FiPlusCircle className="h-4 w-4 mr-2" />
