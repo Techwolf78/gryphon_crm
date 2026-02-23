@@ -344,10 +344,20 @@ function Sales() {
   };
 
   useEffect(() => {
-    // TCV display logic for Admin Director users
+    // TCV display logic for Admin Director users (no longer restricted here)
+    // kept for potential future side effects but currently unused
   }, [userData, totalTCV]);
 
-  const showTCV = userData?.department === "Admin" && userData?.role === "Director";
+  const showTCV = Boolean(
+    userData &&
+    (
+      // existing Admin Director condition
+      (userData.department === "Admin" && userData.role === "Director") ||
+      // sales users should also see TCV info
+      userData.department === "Sales" ||
+      (Array.isArray(userData.departments) && userData.departments.includes("Sales"))
+    )
+  );
 
   const filteredLeads = useMemo(() => {
     return Object.entries(leads).filter(([, lead]) => {
