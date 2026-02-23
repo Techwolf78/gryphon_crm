@@ -455,13 +455,24 @@ const TaskCard = ({ task, getRoleDisplay, getRoleColor, handleDelete, moveTask, 
       >
         {task.assignedTo || "Unassigned"}
       </p>
-      {task.role && (
-        <div
-          className={`inline-flex items-center px-1 py-0 rounded-full text-xs font-medium ${getRoleColor(task.role)} mb-0.5`}
-        >
-          👤 {getRoleDisplay(task.role)}
+      <div className="flex justify-between mb-0.5">
+        <div className="flex gap-1">
+          {task.role && (
+            <div
+              className={`inline-flex items-center px-1 py-0 rounded-full text-xs font-medium ${getRoleColor(task.role)}`}
+            >
+              👤 {getRoleDisplay(task.role)}
+            </div>
+          )}
         </div>
-      )}
+        <div className="flex gap-1">
+          {task.account && (
+            <div className="inline-flex items-center px-1 py-0 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+              🏢 {task.account}
+            </div>
+          )}
+        </div>
+      </div>
       <div className="flex items-center justify-between mt-1">
         {getActionButtons(task.status, task, onEditTask, user)}
         {task.dueDate && task.status !== "completed" && (() => {
