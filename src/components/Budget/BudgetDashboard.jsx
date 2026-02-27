@@ -788,7 +788,7 @@ function BudgetDashboard({
               >
                 <PlusIcon className="w-3.5 h-3.5" /> Create Purchase Intent
               </button>
-              {department?.toLowerCase() === "dm" && (
+              {department?.toLowerCase() === "dm" && activeTab === "csdd" && (
                 <button
                   onClick={() => setShowCsddIntentModal(true)}
                   className="bg-amber-600 text-white px-3 py-2 rounded-lg font-semibold hover:opacity-90 transition-all shadow-[inset_0_1px_3px_rgba(255,255,255,0.3),0_3px_5px_rgba(0,0,0,0.4)] active:shadow-[inset_0_3px_5px_rgba(0,0,0,0.4)] active:translate-y-0.5 flex items-center gap-1.5 text-xs"
