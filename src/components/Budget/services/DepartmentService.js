@@ -42,6 +42,7 @@ export const DepartmentService = {
       admin: "MAN",
       management: "MAN",
       placement: "CR",
+      purchase: "PUR",
     };
     return map[department?.toLowerCase()] || department?.toUpperCase();
   },
