@@ -11,7 +11,7 @@ const CalculatorModal = ({ onClose }) => {
     <div className="modal-overlay">
       <div className="modal-content">
         <h2>Verify You Are Human</h2>
-        <Captcha onVerify={handleVerify} siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY} disabled={window.location.hostname === 'localhost' || !import.meta.env.VITE_TURNSTILE_SITE_KEY || typeof import.meta.env.VITE_TURNSTILE_SITE_KEY !== 'string'} />
+        <Captcha onVerify={handleVerify} siteKey="0x4AAAAAACKk8LLVAxXiubXe" disabled={window.location.hostname === 'localhost'} />
       </div>
     </div>
   );

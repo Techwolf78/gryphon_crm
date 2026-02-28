@@ -11,8 +11,27 @@ import {
 import { useDroppable } from "@dnd-kit/core";
 import { useDraggable } from "@dnd-kit/core";
 import ImageCompressor from "image-compressor.js";
-import { FiPaperclip, FiImage, FiX, FiChevronLeft, FiChevronRight, FiEdit2, FiRefreshCw, FiAlertCircle } from "react-icons/fi";
+import { FiPaperclip, FiImage, FiX, FiChevronLeft, FiChevronRight, FiEdit2, FiRefreshCw, FiAlertCircle, FiFileText } from "react-icons/fi";
 import { Hourglass } from "lucide-react";
+
+const isPDF = (url) => {
+  if (!url) return false;
+  const urlStr = typeof url === 'string' ? url : '';
+  return urlStr.toLowerCase().split('?')[0].endsWith('.pdf') || 
+         urlStr.includes('/raw/upload/') || 
+         urlStr.includes('/pdf/upload/') ||
+         urlStr.startsWith('data:application/pdf');
+};
+
+const getTodayIST = () => {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(new Date());
+};
+
 import { db } from "../../firebase";
 import { useAuth } from "../../context/AuthContext";
 import tasksData from "./task.js";
@@ -363,30 +382,49 @@ const TaskCard = ({ task, getRoleDisplay, getRoleColor, handleDelete, moveTask, 
       {task.images && task.images.length > 0 && (
         <div className="mb-0.5">
           {task.images.length === 1 ? (
-            <img
-              src={task.images[0]}
-              alt="Task"
-              className="w-full h-10 object-cover rounded-md cursor-pointer hover:opacity-80 transition-opacity"
-              onClick={() => {
-                setCurrentImageIndex(0);
-                setShowImageModal(true);
-              }}
-            />
+            isPDF(task.images[0]) ? (
+              <div 
+                onClick={() => window.open(task.images[0], '_blank')}
+                className="w-full h-10 bg-gray-50 rounded-md cursor-pointer hover:bg-gray-100 transition-colors flex items-center justify-center gap-1 border border-gray-200"
+              >
+                <FiFileText className="text-red-500 w-4 h-4" />
+                <span className="text-[10px] text-gray-600 font-medium">View PDF</span>
+              </div>
+            ) : (
+              <img
+                src={task.images[0]}
+                alt="Task"
+                className="w-full h-10 object-cover rounded-md cursor-pointer hover:opacity-80 transition-opacity"
+                onClick={() => {
+                  setCurrentImageIndex(0);
+                  setShowImageModal(true);
+                }}
+              />
+            )
           ) : (
             <div className="grid grid-cols-2 gap-1">
               {task.images.slice(0, 4).map((image, index) => (
                 <div key={index} className="relative">
-                  <img
-                    src={image}
-                    alt={`Task ${index + 1}`}
-                    className="w-full h-6 object-cover rounded cursor-pointer hover:opacity-80 transition-opacity"
-                    onClick={() => {
-                      setCurrentImageIndex(index);
-                      setShowImageModal(true);
-                    }}
-                  />
+                  {isPDF(image) ? (
+                    <div 
+                      onClick={() => window.open(image, '_blank')}
+                      className="w-full h-6 bg-gray-50 rounded cursor-pointer hover:bg-gray-100 transition-colors flex items-center justify-center border border-gray-200"
+                    >
+                      <FiFileText className="text-red-500 w-3 h-3" />
+                    </div>
+                  ) : (
+                    <img
+                      src={image}
+                      alt={`Task ${index + 1}`}
+                      className="w-full h-6 object-cover rounded cursor-pointer hover:opacity-80 transition-opacity"
+                      onClick={() => {
+                        setCurrentImageIndex(index);
+                        setShowImageModal(true);
+                      }}
+                    />
+                  )}
                   {index === 3 && task.images.length > 4 && (
-                    <div className="absolute inset-0 bg-black bg-opacity-50 rounded flex items-center justify-center">
+                    <div className="absolute inset-0 bg-black bg-opacity-50 rounded flex items-center justify-center pointer-events-none">
                       <span className="text-white font-bold text-xs">
                         +{task.images.length - 4}
                       </span>
@@ -403,11 +441,24 @@ const TaskCard = ({ task, getRoleDisplay, getRoleColor, handleDelete, moveTask, 
       {showImageModal && task.images && task.images.length > 0 && (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-54 p-4">
           <div className="relative max-w-4xl max-h-[90vh] overflow-y-auto">
-            <img
-              src={task.images[currentImageIndex]}
-              alt={`Task ${currentImageIndex + 1}`}
-              className="max-w-full max-h-full object-contain rounded-lg"
-            />
+            {isPDF(task.images[currentImageIndex]) ? (
+              <div className="bg-white p-8 rounded-2xl flex flex-col items-center gap-4">
+                <FiFileText className="w-16 h-16 text-red-500" />
+                <p className="text-gray-900 font-medium">PDF Document</p>
+                <button
+                  onClick={() => window.open(task.images[currentImageIndex], '_blank')}
+                  className="px-6 py-2 bg-red-600 text-white rounded-full hover:bg-red-700 transition-colors font-medium shadow-md"
+                >
+                  Open PDF
+                </button>
+              </div>
+            ) : (
+              <img
+                src={task.images[currentImageIndex]}
+                alt={`Task ${currentImageIndex + 1}`}
+                className="max-w-full max-h-full object-contain rounded-lg"
+              />
+            )}
             <button
               onClick={() => setShowImageModal(false)}
               className="absolute top-4 right-4 text-white bg-black bg-opacity-50 rounded-full p-2 hover:bg-opacity-75 transition-colors"
@@ -1028,12 +1079,15 @@ const LogsView = ({ logs, loading, confirmed, onConfirm }) => {
 const TaskManager = ({ onBack }) => {
   const [tasks, setTasks] = useState([]);
   const [title, setTitle] = useState("");
-  const [assignedTo, setAssignedTo] = useState("");
+  const { user } = useAuth();
+  const canEditDueDate = ["Admin", "Director", "Head"].includes(user?.role);
+  const canAssignOthers = ["Admin", "Director", "Head"].includes(user?.role);
+  const [assignedTo, setAssignedTo] = useState(canAssignOthers ? "" : user?.displayName || "");
   const [role, setRole] = useState("");
   const [selectedAccount, setSelectedAccount] = useState("");
   const [selectedRole, setSelectedRole] = useState("");
   const [selectedTask, setSelectedTask] = useState("");
-  const [startDate, setStartDate] = useState("");
+  const [startDate, setStartDate] = useState(getTodayIST());
   const [dueDate, setDueDate] = useState("");
   const [activeId, setActiveId] = useState(null);
   const [imageFile, setImageFile] = useState(null);
@@ -1051,7 +1105,6 @@ const TaskManager = ({ onBack }) => {
   const [logsLoading, setLogsLoading] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const { user } = useAuth();
   const [filters, setFilters] = useState({
     user: user?.role === "Director" || user?.role === "Head" ? "" : user?.displayName || "",
     startDate: "",
@@ -1444,18 +1497,23 @@ const TaskManager = ({ onBack }) => {
     try {
       setUploadingImage(true);
 
-      const compressedFile = await new Promise((resolve, reject) => {
-        new ImageCompressor(file, {
-          quality: 0.8,
-          maxWidth: 1200,
-          maxHeight: 1200,
-          success: resolve,
-          error: reject,
+      let fileToUpload = file;
+
+      // Only compress if it's an image
+      if (file.type.startsWith('image/')) {
+        fileToUpload = await new Promise((resolve, reject) => {
+          new ImageCompressor(file, {
+            quality: 0.8,
+            maxWidth: 1200,
+            maxHeight: 1200,
+            success: resolve,
+            error: reject,
+          });
         });
-      });
+      }
 
       const formData = new FormData();
-      formData.append("file", compressedFile);
+      formData.append("file", fileToUpload);
       formData.append("upload_preset", "react_profile_upload");
       formData.append("cloud_name", "da0ypp61n");
 
@@ -1518,16 +1576,17 @@ const TaskManager = ({ onBack }) => {
     const taskRole = role;
     const taskAccount = selectedAccount;
     const taskRolePlay = selectedRole;
+    const taskSpecific = selectedTask;
     const taskStartDate = startDate;
     const taskDueDate = dueDate;
     
     setTitle("");
-    setAssignedTo("");
+    setAssignedTo(canAssignOthers ? "" : user?.displayName || "");
     setRole("");
     setSelectedAccount("");
     setSelectedRole("");
     setSelectedTask("");
-    setStartDate("");
+    setStartDate(getTodayIST());
     setDueDate("");
     clearImage();
 
@@ -1553,12 +1612,6 @@ const TaskManager = ({ onBack }) => {
             });
         }
 
-        const today = new Date();
-        const year = today.getFullYear();
-        const month = String(today.getMonth() + 1).padStart(2, '0');
-        const day = String(today.getDate()).padStart(2, '0');
-        const todayFormatted = `${year}-${month}-${day}`;
-
         const taskData = {
           title: taskTitle,
           description: taskTitle,
@@ -1566,9 +1619,9 @@ const TaskManager = ({ onBack }) => {
           role: taskRole || null,
           account: taskAccount || null,
           rolePlay: taskRolePlay || null,
-          task: "",
-          dueDate: taskDueDate || todayFormatted,
-          startDate: taskStartDate || todayFormatted,
+          task: taskSpecific || null,
+          dueDate: taskDueDate || null,
+          startDate: taskStartDate || getTodayIST(),
           status: "not_started",
           images,
           userId: user.uid,
@@ -2114,6 +2167,7 @@ const TaskManager = ({ onBack }) => {
                         className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2"
                       >
                         <div>
+                          <label className="block text-[10px] font-medium text-gray-500 ml-1 mb-0.5">Role (opt)</label>
                           <select
                             value={role}
                             onChange={(e) => setRole(e.target.value)}
@@ -2132,10 +2186,12 @@ const TaskManager = ({ onBack }) => {
                           </select>
                         </div>
                         <div>
+                          <label className="block text-[10px] font-medium text-gray-500 ml-1 mb-0.5">Assignee*</label>
                           <select
                             value={assignedTo}
                             onChange={(e) => setAssignedTo(e.target.value)}
-                            className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-gray-50"
+                            disabled={!canAssignOthers}
+                            className={`w-full px-2 py-1.5 text-xs border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-gray-50 ${!canAssignOthers ? 'cursor-not-allowed opacity-75' : ''}`}
                           >
                             <option value="">Select assignee*</option>
                             {assignees.map((assignee) => (
@@ -2146,6 +2202,7 @@ const TaskManager = ({ onBack }) => {
                           </select>
                         </div>
                         <div>
+                          <label className="block text-[10px] font-medium text-gray-500 ml-1 mb-0.5">Account (opt)</label>
                           <select
                             value={selectedAccount}
                             onChange={(e) => {
@@ -2164,6 +2221,7 @@ const TaskManager = ({ onBack }) => {
                           </select>
                         </div>
                         <div>
+                          <label className="block text-[10px] font-medium text-gray-500 ml-1 mb-0.5">Role Play (opt)</label>
                           <select
                             value={selectedRole}
                             onChange={(e) => {
@@ -2182,6 +2240,7 @@ const TaskManager = ({ onBack }) => {
                           </select>
                         </div>
                         <div>
+                          <label className="block text-[10px] font-medium text-gray-500 ml-1 mb-0.5">Task (opt)</label>
                           <select
                             value={selectedTask}
                             onChange={(e) => setSelectedTask(e.target.value)}
@@ -2196,6 +2255,28 @@ const TaskManager = ({ onBack }) => {
                             ))}
                           </select>
                         </div>
+                        <div>
+                          <label className="block text-[10px] font-medium text-gray-500 ml-1 mb-0.5">Start Date</label>
+                          <input
+                            type="date"
+                            value={startDate}
+                            onChange={(e) => setStartDate(e.target.value)}
+                            className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-gray-50"
+                            placeholder="Start Date"
+                          />
+                        </div>
+                        {canEditDueDate && (
+                          <div>
+                            <label className="block text-[10px] font-medium text-gray-500 ml-1 mb-0.5">Due Date</label>
+                            <input
+                              type="date"
+                              value={dueDate}
+                              onChange={(e) => setDueDate(e.target.value)}
+                              className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-gray-50"
+                              placeholder="Due Date"
+                            />
+                          </div>
+                        )}
                         <div className="sm:col-span-2 lg:col-span-4">
                           <textarea
                             value={title}
@@ -2218,7 +2299,7 @@ const TaskManager = ({ onBack }) => {
                           <input
                             ref={fileInputRef}
                             type="file"
-                            accept="image/*"
+                            accept="image/*,application/pdf"
                             onChange={handleImageChange}
                             className="flex-1 px-2 py-1.5 text-xs border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors file:mr-2 file:py-1 file:px-2 file:rounded-xl file:border-0 file:text-xs file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 bg-gray-50"
                           />
@@ -2235,7 +2316,7 @@ const TaskManager = ({ onBack }) => {
                         <div className="sm:col-span-2 lg:col-span-4 flex items-center gap-3">
                           <button
                             type="submit"
-                            disabled={uploadingImage}
+                            disabled={uploadingImage || !title.trim() || !assignedTo.trim()}
                             className="px-3 py-1.5 bg-blue-500 text-white rounded-full hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium text-xs shadow-sm"
                           >
                             {uploadingImage ? (
@@ -2251,12 +2332,12 @@ const TaskManager = ({ onBack }) => {
                             type="button"
                             onClick={() => {
                               setTitle("");
-                              setAssignedTo("");
+                              setAssignedTo(canAssignOthers ? "" : user?.displayName || "");
                               setRole("");
                               setSelectedAccount("");
                               setSelectedRole("");
                               setSelectedTask("");
-                              setStartDate("");
+                              setStartDate(getTodayIST());
                               setDueDate("");
                               clearImage();
                               setShowForm(false);
@@ -2266,11 +2347,17 @@ const TaskManager = ({ onBack }) => {
                             Reset
                           </button>
                           {imagePreview && (
-                            <img
-                              src={imagePreview}
-                              alt="Preview"
-                              className="w-10 h-10 object-cover rounded-xl border border-gray-200 shadow-sm"
-                            />
+                             isPDF(imagePreview) ? (
+                               <div className="w-10 h-10 flex items-center justify-center bg-gray-100 rounded-xl border border-gray-200 shadow-sm">
+                                 <FiFileText className="text-red-500 w-5 h-5" />
+                               </div>
+                             ) : (
+                               <img
+                                 src={imagePreview}
+                                 alt="Preview"
+                                 className="w-10 h-10 object-cover rounded-xl border border-gray-200 shadow-sm"
+                               />
+                             )
                           )}
                         </div>
                       </form>
