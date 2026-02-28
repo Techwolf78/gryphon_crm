@@ -914,7 +914,7 @@ const InterviewSchedulerTab = () => {
         <div className="fixed inset-0 backdrop-blur-md bg-transparent bg-opacity-25 flex items-center justify-center z-54 p-4">
           <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl animate-in slide-in-from-bottom-5 max-h-[90vh] flex flex-col">
             {/* Header */}
-            <div className="px-6 py-3 border-b border-gray-100 flex justify-between items-center flex-shrink-0">
+            <div className="px-6 py-3 border-b border-gray-100 flex justify-between items-center shrink-0">
               <h3 className="text-base font-semibold text-gray-900">Activity Timeline</h3>
               <button
                 onClick={() => {
@@ -1027,7 +1027,7 @@ const InterviewSchedulerTab = () => {
             </div>
 
             {/* Footer */}
-            <div className="px-6 py-3 border-t border-gray-100 bg-gray-50 rounded-b-3xl flex-shrink-0">
+            <div className="px-6 py-3 border-t border-gray-100 bg-gray-50 rounded-b-3xl shrink-0">
               <button
                 onClick={() => {
                   setShowActivitiesModal(false);
