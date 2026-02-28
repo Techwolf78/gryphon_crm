@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { exportPurchaseOrderToPDF } from "./utils/exportPOtoPDF"; // Make sure this path is correct
+import { exportCsddPurchaseOrderToPDF } from "./utils/exportCsddPOtoPDF";
 import ViewPurchaseOrderModal from "./ViewPurchaseOrderModal";
 
 const PurchaseOrdersList = ({
@@ -166,14 +167,17 @@ const PurchaseOrdersList = ({
       address: getVendorAddress(order),
     };
 
-    console.log(vendorData.name);
-
-    exportPurchaseOrderToPDF(
-      order,
-      vendorData,
-      budgetComponents,
-      getComponentsForItem
-    );
+    // Use CSDD-specific export for CSDD POs (includes client budget sheet)
+    if (order.intentType === "csdd") {
+      exportCsddPurchaseOrderToPDF(order, vendorData);
+    } else {
+      exportPurchaseOrderToPDF(
+        order,
+        vendorData,
+        budgetComponents,
+        getComponentsForItem,
+      );
+    }
   };
 
   return (
@@ -355,7 +359,7 @@ const PurchaseOrdersList = ({
                     <td className="p-2 whitespace-nowrap">
                       <span
                         className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
-                          order.status
+                          order.status,
                         )}`}
                       >
                         {order.status}
