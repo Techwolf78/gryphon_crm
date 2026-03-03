@@ -299,6 +299,7 @@ const NewUser = ({ onUserAdded }) => {
             ? selectedReportingManager
             : null,
         createdAt: serverTimestamp(),
+        isActive: true, // New users are active by default
       });
  
       // Send welcome email

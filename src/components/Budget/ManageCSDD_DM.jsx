@@ -29,6 +29,7 @@ const ClientComponentForm = lazy(() => import("./ClientComponentForm"));
 // ============================================================================
 // UI COMPONENT: Client Grid Card (Updated 2x2 Layout)
 // ============================================================================
+// eslint-disable-next-line react-refresh/only-export-components
 const ClientCard = ({ client, forecastAmount, onClick }) => {
   // Utilization based on Actual Spend vs Allocated
 
@@ -141,6 +142,7 @@ const ClientCard = ({ client, forecastAmount, onClick }) => {
 };
 
 // ... [ClientSheetView remains unchanged] ...
+// eslint-disable-next-line react-refresh/only-export-components
 const ClientSheetView = ({
   client,
   clientData,
@@ -373,7 +375,7 @@ export default function ManageCSDD_DM({
   const clientBudgets = useMemo(() => {
     if (!currentBudget?.csddExpenses) return [];
     return Object.entries(currentBudget.csddExpenses)
-      .filter(([_, val]) => typeof val === "object" && val.type === "client")
+      .filter(([, val]) => typeof val === "object" && val.type === "client")
       .map(([key, val]) => ({
         key,
         name: val.client_name,
@@ -519,7 +521,7 @@ export default function ManageCSDD_DM({
     }
   };
 
-  const handleDeleteComponent = async (componentKey) => {
+  const _handleDeleteComponent = async (componentKey) => {
     if (!window.confirm("Are you sure you want to delete this component?"))
       return;
     if (!selectedClient || !currentBudget?.id || !clientData) return;

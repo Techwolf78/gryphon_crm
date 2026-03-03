@@ -1,11 +1,25 @@
 import React, { useMemo } from "react";
 
 const BudgetDetailTable = ({ budget }) => {
-  if (!budget) return null;
-
   // Helper to format currency
   const formatCurrency = (amount) =>
     `₹${(amount || 0).toLocaleString("en-IN")}`;
+
+  // 2. Calculate Totals (Grand Total) - moved before conditional check
+  const totals = useMemo(() => {
+    const summary = budget?.summary || { totalBudget: 0, totalSpent: 0 };
+    const totalAllocated = summary.totalBudget;
+    const totalSpent = summary.totalSpent;
+    const totalRemaining = totalAllocated - totalSpent;
+    const totalPercent =
+      totalAllocated > 0
+        ? ((totalSpent / totalAllocated) * 100).toFixed(2) + "%"
+        : "0%";
+
+    return { totalAllocated, totalSpent, totalRemaining, totalPercent };
+  }, [budget]);
+
+  if (!budget) return null;
 
   // Helper to process a section's data for the table
   const processSection = (categoryName, data) => {
@@ -34,20 +48,6 @@ const BudgetDetailTable = ({ budget }) => {
 
   // Combine all rows for rendering
   const allRows = [...fixedRows, ...deptRows, ...csddRows];
-
-  // 2. Calculate Totals (Grand Total)
-  const totals = useMemo(() => {
-    const summary = budget.summary || { totalBudget: 0, totalSpent: 0 };
-    const totalAllocated = summary.totalBudget;
-    const totalSpent = summary.totalSpent;
-    const totalRemaining = totalAllocated - totalSpent;
-    const totalPercent =
-      totalAllocated > 0
-        ? ((totalSpent / totalAllocated) * 100).toFixed(2) + "%"
-        : "0%";
-
-    return { totalAllocated, totalSpent, totalRemaining, totalPercent };
-  }, [budget]);
 
   return (
     <div className="overflow-x-auto bg-white rounded-xl shadow-sm border border-gray-200 mt-6">

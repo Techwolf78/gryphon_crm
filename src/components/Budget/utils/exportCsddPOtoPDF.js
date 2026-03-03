@@ -381,7 +381,6 @@ export const exportCsddPurchaseOrderToPDF = async (order, vendorData) => {
 
     pdf.setFont("helvetica", "normal");
     pdf.setFontSize(10);
-    const clientBudgetInfo = budgetData.csddExpenses?.[clientKey] || {};
 
     // Component-level breakdown
     const componentRows = [];
