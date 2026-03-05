@@ -311,7 +311,7 @@ const tasksData = [
       }
     ]
   },
-    {
+  {
     account: 'IGSB',
     roles: [
       {
@@ -1559,7 +1559,6 @@ const tasksData = [
       }
     ]
   },
-
   {
     account: 'SB',
     roles: [
