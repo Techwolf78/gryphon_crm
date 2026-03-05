@@ -22,6 +22,9 @@ export default function ClientBudgetForm({
   onSubmit,
   client,
   existingData = null, // Pass existing client document data if editing
+  currentUser = null,
+  fiscalYear = "",
+  budgetId = "",
 }) {
   // Form State
   const [formData, setFormData] = useState({
@@ -50,9 +53,10 @@ export default function ClientBudgetForm({
         // Editing existing document
         setFormData({
           client_name: existingData.client_name || client?.name || "",
-          owner_name: existingData.owner_name || "direc2",
+          owner_name: existingData.owner_name || currentUser?.displayName || "",
           status: existingData.status || "active",
-          budgetRef: existingData.budgetRef || `dm_FY-2025-26`,
+          budgetRef:
+            existingData.budgetRef || budgetId || `dm_FY-20${fiscalYear}`,
           client_components: existingData.client_components || {},
         });
 
@@ -74,9 +78,9 @@ export default function ClientBudgetForm({
         // Creating new document
         setFormData({
           client_name: client?.name || "",
-          owner_name: "direc2",
+          owner_name: currentUser?.displayName || "",
           status: "active",
-          budgetRef: `dm_FY-2025-26`,
+          budgetRef: budgetId || `dm_FY-20${fiscalYear}`,
           client_components: {},
         });
         setComponents([]);

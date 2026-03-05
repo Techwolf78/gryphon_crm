@@ -26,7 +26,10 @@ const BudgetDetailTable = ({ budget }) => {
 
   // 1. Prepare Data
   const fixedRows = processSection("Fixed Costs", budget.fixedCosts);
-  const deptRows = processSection("Department Expenses", budget.departmentExpenses);
+  const deptRows = processSection(
+    "Department Expenses",
+    budget.departmentExpenses,
+  );
   const csddRows = processSection("CSDD Expenses", budget.csddExpenses);
 
   // Combine all rows for rendering
@@ -51,7 +54,10 @@ const BudgetDetailTable = ({ budget }) => {
       {/* Title Header matching Excel Title */}
       <div className="bg-gray-50 border-b border-gray-200 p-4 text-center">
         <h3 className="text-lg font-bold text-gray-900 uppercase">
-          {budget.department} Budget {budget.fiscalYear ? `FY-${budget.fiscalYear}` : ""}
+          {budget.department?.toLowerCase() === "lnd"
+            ? "L&D"
+            : budget.department}{" "}
+          Budget {budget.fiscalYear ? `FY-${budget.fiscalYear}` : ""}
         </h3>
       </div>
 
@@ -60,17 +66,23 @@ const BudgetDetailTable = ({ budget }) => {
           <tr>
             <th className="py-3 px-4 border-r border-gray-200">Category</th>
             <th className="py-3 px-4 border-r border-gray-200">Description</th>
-            <th className="py-3 px-4 text-right border-r border-gray-200">Amount Approved</th>
-            <th className="py-3 px-4 text-center border-r border-gray-200">Spent %</th>
-            <th className="py-3 px-4 text-right border-r border-gray-200">Amount Spent</th>
+            <th className="py-3 px-4 text-right border-r border-gray-200">
+              Amount Approved
+            </th>
+            <th className="py-3 px-4 text-center border-r border-gray-200">
+              Spent %
+            </th>
+            <th className="py-3 px-4 text-right border-r border-gray-200">
+              Amount Spent
+            </th>
             <th className="py-3 px-4 text-right">Amount Remaining</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
           {allRows.length > 0 ? (
             allRows.map((row, index) => (
-              <tr 
-                key={`${row.description}-${index}`} 
+              <tr
+                key={`${row.description}-${index}`}
                 className="hover:bg-gray-50 transition-colors"
               >
                 {/* Category Column */}
@@ -95,8 +107,8 @@ const BudgetDetailTable = ({ budget }) => {
                       parseFloat(row.percent) > 90
                         ? "bg-red-100 text-red-700"
                         : parseFloat(row.percent) > 50
-                        ? "bg-yellow-100 text-yellow-700"
-                        : "bg-green-100 text-green-700"
+                          ? "bg-yellow-100 text-yellow-700"
+                          : "bg-green-100 text-green-700"
                     }`}
                   >
                     {row.percent}
@@ -109,7 +121,9 @@ const BudgetDetailTable = ({ budget }) => {
                 </td>
 
                 {/* Remaining */}
-                <td className={`py-3 px-4 text-right font-medium ${row.remaining < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                <td
+                  className={`py-3 px-4 text-right font-medium ${row.remaining < 0 ? "text-red-600" : "text-emerald-600"}`}
+                >
                   {formatCurrency(row.remaining)}
                 </td>
               </tr>
@@ -124,7 +138,9 @@ const BudgetDetailTable = ({ budget }) => {
 
           {/* TOTAL ROW (Matches Excel "Total" row style) */}
           <tr className="bg-yellow-100/50 border-t-2 border-gray-300 font-bold text-gray-900">
-            <td className="py-4 px-4 uppercase border-r border-gray-300">Total</td>
+            <td className="py-4 px-4 uppercase border-r border-gray-300">
+              Total
+            </td>
             <td className="py-4 px-4 border-r border-gray-300"></td>
             <td className="py-4 px-4 text-right border-r border-gray-300">
               {formatCurrency(totals.totalAllocated)}
@@ -135,7 +151,9 @@ const BudgetDetailTable = ({ budget }) => {
             <td className="py-4 px-4 text-right border-r border-gray-300">
               {formatCurrency(totals.totalSpent)}
             </td>
-            <td className={`py-4 px-4 text-right ${totals.totalRemaining < 0 ? 'text-red-700' : 'text-emerald-700'}`}>
+            <td
+              className={`py-4 px-4 text-right ${totals.totalRemaining < 0 ? "text-red-700" : "text-emerald-700"}`}
+            >
               {formatCurrency(totals.totalRemaining)}
             </td>
           </tr>

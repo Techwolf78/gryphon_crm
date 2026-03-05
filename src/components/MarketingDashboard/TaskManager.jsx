@@ -11,8 +11,27 @@ import {
 import { useDroppable } from "@dnd-kit/core";
 import { useDraggable } from "@dnd-kit/core";
 import ImageCompressor from "image-compressor.js";
-import { FiPaperclip, FiImage, FiX, FiChevronLeft, FiChevronRight, FiEdit2, FiRefreshCw, FiAlertCircle } from "react-icons/fi";
+import { FiPaperclip, FiImage, FiX, FiChevronLeft, FiChevronRight, FiEdit2, FiRefreshCw, FiAlertCircle, FiFileText } from "react-icons/fi";
 import { Hourglass } from "lucide-react";
+
+const isPDF = (url) => {
+  if (!url) return false;
+  const urlStr = typeof url === 'string' ? url : '';
+  return urlStr.toLowerCase().split('?')[0].endsWith('.pdf') || 
+         urlStr.includes('/raw/upload/') || 
+         urlStr.includes('/pdf/upload/') ||
+         urlStr.startsWith('data:application/pdf');
+};
+
+const getTodayIST = () => {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(new Date());
+};
+
 import { db } from "../../firebase";
 import { useAuth } from "../../context/AuthContext";
 import tasksData from "./task.js";
@@ -363,30 +382,49 @@ const TaskCard = ({ task, getRoleDisplay, getRoleColor, handleDelete, moveTask, 
       {task.images && task.images.length > 0 && (
         <div className="mb-0.5">
           {task.images.length === 1 ? (
-            <img
-              src={task.images[0]}
-              alt="Task"
-              className="w-full h-10 object-cover rounded-md cursor-pointer hover:opacity-80 transition-opacity"
-              onClick={() => {
-                setCurrentImageIndex(0);
-                setShowImageModal(true);
-              }}
-            />
+            isPDF(task.images[0]) ? (
+              <div 
+                onClick={() => window.open(task.images[0], '_blank')}
+                className="w-full h-10 bg-gray-50 rounded-md cursor-pointer hover:bg-gray-100 transition-colors flex items-center justify-center gap-1 border border-gray-200"
+              >
+                <FiFileText className="text-red-500 w-4 h-4" />
+                <span className="text-[10px] text-gray-600 font-medium">View PDF</span>
+              </div>
+            ) : (
+              <img
+                src={task.images[0]}
+                alt="Task"
+                className="w-full h-10 object-cover rounded-md cursor-pointer hover:opacity-80 transition-opacity"
+                onClick={() => {
+                  setCurrentImageIndex(0);
+                  setShowImageModal(true);
+                }}
+              />
+            )
           ) : (
             <div className="grid grid-cols-2 gap-1">
               {task.images.slice(0, 4).map((image, index) => (
                 <div key={index} className="relative">
-                  <img
-                    src={image}
-                    alt={`Task ${index + 1}`}
-                    className="w-full h-6 object-cover rounded cursor-pointer hover:opacity-80 transition-opacity"
-                    onClick={() => {
-                      setCurrentImageIndex(index);
-                      setShowImageModal(true);
-                    }}
-                  />
+                  {isPDF(image) ? (
+                    <div 
+                      onClick={() => window.open(image, '_blank')}
+                      className="w-full h-6 bg-gray-50 rounded cursor-pointer hover:bg-gray-100 transition-colors flex items-center justify-center border border-gray-200"
+                    >
+                      <FiFileText className="text-red-500 w-3 h-3" />
+                    </div>
+                  ) : (
+                    <img
+                      src={image}
+                      alt={`Task ${index + 1}`}
+                      className="w-full h-6 object-cover rounded cursor-pointer hover:opacity-80 transition-opacity"
+                      onClick={() => {
+                        setCurrentImageIndex(index);
+                        setShowImageModal(true);
+                      }}
+                    />
+                  )}
                   {index === 3 && task.images.length > 4 && (
-                    <div className="absolute inset-0 bg-black bg-opacity-50 rounded flex items-center justify-center">
+                    <div className="absolute inset-0 bg-black bg-opacity-50 rounded flex items-center justify-center pointer-events-none">
                       <span className="text-white font-bold text-xs">
                         +{task.images.length - 4}
                       </span>
@@ -403,11 +441,24 @@ const TaskCard = ({ task, getRoleDisplay, getRoleColor, handleDelete, moveTask, 
       {showImageModal && task.images && task.images.length > 0 && (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-54 p-4">
           <div className="relative max-w-4xl max-h-[90vh] overflow-y-auto">
-            <img
-              src={task.images[currentImageIndex]}
-              alt={`Task ${currentImageIndex + 1}`}
-              className="max-w-full max-h-full object-contain rounded-lg"
-            />
+            {isPDF(task.images[currentImageIndex]) ? (
+              <div className="bg-white p-8 rounded-2xl flex flex-col items-center gap-4">
+                <FiFileText className="w-16 h-16 text-red-500" />
+                <p className="text-gray-900 font-medium">PDF Document</p>
+                <button
+                  onClick={() => window.open(task.images[currentImageIndex], '_blank')}
+                  className="px-6 py-2 bg-red-600 text-white rounded-full hover:bg-red-700 transition-colors font-medium shadow-md"
+                >
+                  Open PDF
+                </button>
+              </div>
+            ) : (
+              <img
+                src={task.images[currentImageIndex]}
+                alt={`Task ${currentImageIndex + 1}`}
+                className="max-w-full max-h-full object-contain rounded-lg"
+              />
+            )}
             <button
               onClick={() => setShowImageModal(false)}
               className="absolute top-4 right-4 text-white bg-black bg-opacity-50 rounded-full p-2 hover:bg-opacity-75 transition-colors"
@@ -448,20 +499,31 @@ const TaskCard = ({ task, getRoleDisplay, getRoleColor, handleDelete, moveTask, 
         className="font-medium text-gray-900 mb-0.5 pr-6 text-xs"
         style={getStatusStyles(task.status)}
       >
-        {task.description || task.title}
+        {task.title || task.description}
       </h4>
       <p
         className={`text-xs mb-0.5 ${task.status === "cancelled" ? "text-gray-500" : "text-gray-600"}`}
       >
         {task.assignedTo || "Unassigned"}
       </p>
-      {task.role && (
-        <div
-          className={`inline-flex items-center px-1 py-0 rounded-full text-xs font-medium ${getRoleColor(task.role)} mb-0.5`}
-        >
-          👤 {getRoleDisplay(task.role)}
+      <div className="flex justify-between mb-0.5">
+        <div className="flex gap-1">
+          {task.role && (
+            <div
+              className={`inline-flex items-center px-1 py-0 rounded-full text-xs font-medium ${getRoleColor(task.role)}`}
+            >
+              👤 {getRoleDisplay(task.role)}
+            </div>
+          )}
         </div>
-      )}
+        <div className="flex gap-1">
+          {task.account && (
+            <div className="inline-flex items-center px-1 py-0 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+              🏢 {task.account}
+            </div>
+          )}
+        </div>
+      </div>
       <div className="flex items-center justify-between mt-1">
         {getActionButtons(task.status, task, onEditTask, user)}
         {task.dueDate && task.status !== "completed" && (() => {
@@ -548,8 +610,6 @@ const parseDate = (dateStr) => {
   }
   return null;
 };
-
-
 
 const CalendarView = ({
   tasks,
@@ -687,9 +747,9 @@ const CalendarView = ({
                       task.status === 'cancelled' ? 'bg-red-100 text-red-800' :
                       'bg-gray-100 text-gray-800'
                     }`}
-                    title={task.description || task.title}
+                    title={task.title || task.description}
                   >
-                    {task.description || task.title}
+                    {task.title || task.description}
                   </div>
                 ))}
                 {dayTasks.length > 3 && (
@@ -767,8 +827,6 @@ const TableView = ({
     }
   };
 
-
-
   const formatDate = (dateString) => {
     const date = parseDate(dateString);
     if (!date || isNaN(date.getTime())) return '—';
@@ -835,9 +893,9 @@ const TableView = ({
                     <div className="min-w-0 flex-1">
                       <div
                         className="text-sm font-medium text-gray-900 wrap-break-word"
-                        title={task.description || task.title}
+                        title={task.title || task.description}
                       >
-                        {task.description || task.title}
+                        {task.title || task.description}
                       </div>
                       {task.images && task.images.length > 1 && (
                         <div className="text-xs text-gray-500 mt-1">
@@ -1021,16 +1079,21 @@ const LogsView = ({ logs, loading, confirmed, onConfirm }) => {
 const TaskManager = ({ onBack }) => {
   const [tasks, setTasks] = useState([]);
   const [title, setTitle] = useState("");
-  const [assignedTo, setAssignedTo] = useState("");
+  const { user } = useAuth();
+  const canEditDueDate = ["Admin", "Director", "Head"].includes(user?.role);
+  const canAssignOthers = ["Admin", "Director", "Head"].includes(user?.role);
+  const [assignedTo, setAssignedTo] = useState(canAssignOthers ? "" : user?.displayName || "");
   const [role, setRole] = useState("");
   const [selectedAccount, setSelectedAccount] = useState("");
   const [selectedRole, setSelectedRole] = useState("");
   const [selectedTask, setSelectedTask] = useState("");
+  const [startDate, setStartDate] = useState(getTodayIST());
+  const [dueDate, setDueDate] = useState("");
   const [activeId, setActiveId] = useState(null);
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState("");
   const [uploadingImage, setUploadingImage] = useState(false);
-  const [currentView, setCurrentView] = useState("kanban"); // "kanban", "calendar", "table", or "logs"
+  const [currentView, setCurrentView] = useState("kanban");
   const [logsConfirmed, setLogsConfirmed] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -1042,12 +1105,8 @@ const TaskManager = ({ onBack }) => {
   const [logsLoading, setLogsLoading] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const { user } = useAuth();
   const [filters, setFilters] = useState({
-    user:
-      user?.role === "Director" || user?.role === "Head"
-        ? ""
-        : user?.displayName || "",
+    user: user?.role === "Director" || user?.role === "Head" ? "" : user?.displayName || "",
     startDate: "",
     endDate: "",
     role: "",
@@ -1093,34 +1152,51 @@ const TaskManager = ({ onBack }) => {
     });
   };
 
-  const uniqueTasksList = [...new Set(tasksData.map((item) => item.task))];
+  // Helper function to get all tasks from the new structure
+  const getAllTasksFromData = () => {
+    const allTasks = [];
+    tasksData.forEach(account => {
+      account.roles.forEach(role => {
+        role.tasks.forEach(task => {
+          if (task) {
+            allTasks.push({
+              account: account.account,
+              role: role.name,
+              task: task
+            });
+          }
+        });
+      });
+    });
+    return allTasks;
+  };
+
+  // Helper function to get tasks for a specific account and role
+  const getTasksForAccountAndRole = (account, roleName) => {
+    const accountData = tasksData.find(acc => acc.account === account);
+    if (accountData) {
+      const roleData = accountData.roles.find(r => r.name === roleName);
+      return roleData ? roleData.tasks : [];
+    }
+    return [];
+  };
+
+  const allTasksFlat = getAllTasksFromData();
+  const uniqueTasksList = [...new Set(allTasksFlat.map((item) => item.task))];
   const typingTasks = uniqueTasksList.slice(0, 5);
   const [placeholderText, setPlaceholderText] = useState("");
   const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
   const [charIndex, setCharIndex] = useState(0);
 
-  const uniqueAccounts = [...new Set(tasksData.map((item) => item.account))];
+  const uniqueAccounts = tasksData.map((item) => item.account);
+  
   const rolesForAccount = selectedAccount
-    ? [
-        ...new Set(
-          tasksData
-            .filter((item) => item.account === selectedAccount)
-            .map((item) => item.role),
-        ),
-      ]
+    ? tasksData.find(acc => acc.account === selectedAccount)?.roles.map(r => r.name) || []
     : [];
-  const tasksForRole = selectedRole
-    ? [
-        ...new Set(
-          tasksData
-            .filter(
-              (item) =>
-                item.account === selectedAccount && item.role === selectedRole,
-            )
-            .map((item) => item.task),
-        ),
-      ]
+  
+  const tasksForRole = selectedRole && selectedAccount
+    ? getTasksForAccountAndRole(selectedAccount, selectedRole)
     : [];
 
   const sensors = useSensors(
@@ -1138,14 +1214,11 @@ const TaskManager = ({ onBack }) => {
       return;
     }
 
-    // Load cached assignees
     const cachedAssignees = localStorage.getItem("dmAssignees");
     if (cachedAssignees) {
       const parsedAssignees = JSON.parse(cachedAssignees);
       setAssignees(parsedAssignees);
-      // Set default filter based on user preference
-      const filterPreference =
-        localStorage.getItem("dmFilterPreference") || "user";
+      const filterPreference = localStorage.getItem("dmFilterPreference") || "user";
       const userName = user?.displayName;
       if (
         filterPreference === "user" &&
@@ -1158,7 +1231,6 @@ const TaskManager = ({ onBack }) => {
       }
     }
 
-    // Set up limited real-time listener for tasks
     const calendarLimit = currentView === "calendar" ? 500 : currentLimit;
     
     let qConstraints = [
@@ -1186,7 +1258,6 @@ const TaskManager = ({ onBack }) => {
           return {
             id: docSnap.id,
             ...data,
-            // Migrate old imageUrl format to new images array format if needed
             images: data.images || (data.imageUrl ? [data.imageUrl] : []),
           };
         });
@@ -1200,19 +1271,15 @@ const TaskManager = ({ onBack }) => {
         if (loadingMore) {
           const newTasksCount = tasksData.length - previousLength;
 
-          // Only process when we actually have new tasks loaded
           if (newTasksCount > 0) {
-            // Clear the timeout since tasks were loaded
             if (loadMoreTimeoutRef.current) {
               clearTimeout(loadMoreTimeoutRef.current);
               loadMoreTimeoutRef.current = null;
             }
             setLoadingMore(false);
 
-            // Calculate how many new tasks are visible after filtering
             const newFilteredTasks = tasksData.filter((task) => {
-              if (filters.user && task.assignedTo !== filters.user)
-                return false;
+              if (filters.user && task.assignedTo !== filters.user) return false;
               if (filters.role && task.role !== filters.role) return false;
               if (filters.startDate && task.startDate) {
                 const taskStart = new Date(task.startDate);
@@ -1224,7 +1291,6 @@ const TaskManager = ({ onBack }) => {
                 const filterEnd = new Date(filters.endDate);
                 if (taskEnd > filterEnd) return false;
               }
-              // Week filter
               const weekStart = new Date(currentWeek);
               const weekEnd = new Date(weekStart);
               weekEnd.setDate(weekStart.getDate() + 6);
@@ -1237,18 +1303,14 @@ const TaskManager = ({ onBack }) => {
                   ? task.createdAt.toDate()
                   : new Date(task.createdAt);
               }
-              if (taskDate && (taskDate < weekStart || taskDate > weekEnd))
-                return false;
+              if (taskDate && (taskDate < weekStart || taskDate > weekEnd)) return false;
               return true;
             });
 
-            const newVisibleTasksCount =
-              newFilteredTasks.length - previousFilteredLength;
-
-            const message =
-              newVisibleTasksCount > 0
-                ? `${newVisibleTasksCount} tasks fetched.`
-                : `${newTasksCount} tasks loaded (${newTasksCount - newVisibleTasksCount} filtered out).`;
+            const newVisibleTasksCount = newFilteredTasks.length - previousFilteredLength;
+            const message = newVisibleTasksCount > 0
+              ? `${newVisibleTasksCount} tasks fetched.`
+              : `${newTasksCount} tasks loaded (${newTasksCount - newVisibleTasksCount} filtered out).`;
 
             setToastMessage(message);
             setShowToast(true);
@@ -1256,8 +1318,6 @@ const TaskManager = ({ onBack }) => {
             setNoMoreTasks(false);
             setNoMoreCount(0);
           } else {
-            // If no new tasks were loaded, it means no more tasks available
-            // Clear the timeout since we determined no more tasks
             if (loadMoreTimeoutRef.current) {
               clearTimeout(loadMoreTimeoutRef.current);
               loadMoreTimeoutRef.current = null;
@@ -1273,7 +1333,6 @@ const TaskManager = ({ onBack }) => {
           }
         }
         if (loadingMore) {
-          // Clear the timeout on error
           if (loadMoreTimeoutRef.current) {
             clearTimeout(loadMoreTimeoutRef.current);
             loadMoreTimeoutRef.current = null;
@@ -1283,7 +1342,6 @@ const TaskManager = ({ onBack }) => {
       },
     );
 
-    // Fetch users once and cache
     const fetchUsers = async () => {
       try {
         const usersSnapshot = await getDocs(collection(db, "users"));
@@ -1291,17 +1349,14 @@ const TaskManager = ({ onBack }) => {
           .map((doc) => ({ id: doc.id, ...doc.data() }))
           .filter((user) => {
             const hasDM = user.departments && user.departments.includes("DM");
-            const hasAdminDept =
-              user.departments && user.departments.includes("Admin");
+            const hasAdminDept = user.departments && user.departments.includes("Admin");
             return hasDM || hasAdminDept;
           })
           .map((user) => user.displayName || user.name || user.email)
           .filter(Boolean);
         setAssignees(dmUsers);
         localStorage.setItem("dmAssignees", JSON.stringify(dmUsers));
-        // Set default filter based on user preference
-        const filterPreference =
-          localStorage.getItem("dmFilterPreference") || "user";
+        const filterPreference = localStorage.getItem("dmFilterPreference") || "user";
         const userName = user?.displayName;
         if (
           filterPreference === "user" &&
@@ -1324,7 +1379,7 @@ const TaskManager = ({ onBack }) => {
     return () => {
       unsubscribeTasks();
     };
-  }, [user?.uid, user?.displayName, refreshTrigger, currentLimit, currentView, filters.user]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user?.uid, user?.displayName, refreshTrigger, currentLimit, currentView, filters.user]);
 
   useEffect(() => {
     if (currentView === "logs" && logsConfirmed) {
@@ -1373,7 +1428,7 @@ const TaskManager = ({ onBack }) => {
           setPlaceholderText(currentTask.substring(0, charIndex + 1));
           setCharIndex(charIndex + 1);
           if (charIndex + 1 === currentTask.length) {
-            setTimeout(() => setIsDeleting(true), 1000); // pause before deleting
+            setTimeout(() => setIsDeleting(true), 1000);
           }
         } else {
           setPlaceholderText(currentTask.substring(0, charIndex - 1));
@@ -1385,11 +1440,10 @@ const TaskManager = ({ onBack }) => {
         }
       },
       isDeleting ? 50 : 100,
-    ); // faster deleting
+    );
     return () => clearTimeout(timeout);
   }, [charIndex, isDeleting, currentTaskIndex, typingTasks]);
 
-  // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
       if (loadMoreTimeoutRef.current) {
@@ -1443,24 +1497,26 @@ const TaskManager = ({ onBack }) => {
     try {
       setUploadingImage(true);
 
-      // Compress the image
-      const compressedFile = await new Promise((resolve, reject) => {
-        new ImageCompressor(file, {
-          quality: 0.8,
-          maxWidth: 1200,
-          maxHeight: 1200,
-          success: resolve,
-          error: reject,
-        });
-      });
+      let fileToUpload = file;
 
-      // Create FormData for Cloudinary upload
+      // Only compress if it's an image
+      if (file.type.startsWith('image/')) {
+        fileToUpload = await new Promise((resolve, reject) => {
+          new ImageCompressor(file, {
+            quality: 0.8,
+            maxWidth: 1200,
+            maxHeight: 1200,
+            success: resolve,
+            error: reject,
+          });
+        });
+      }
+
       const formData = new FormData();
-      formData.append("file", compressedFile);
+      formData.append("file", fileToUpload);
       formData.append("upload_preset", "react_profile_upload");
       formData.append("cloud_name", "da0ypp61n");
 
-      // Upload to Cloudinary
       const response = await fetch(
         `https://api.cloudinary.com/v1_1/da0ypp61n/image/upload`,
         {
@@ -1511,33 +1567,40 @@ const TaskManager = ({ onBack }) => {
       setFormError("Please select an assignee.");
       return;
     }
-    setFormError(""); // Clear any previous error
+    setFormError("");
 
-    // Close modal and clear form immediately
     setShowForm(false);
+    
+    const taskTitle = title.trim();
+    const taskAssignedTo = assignedTo.trim();
+    const taskRole = role;
+    const taskAccount = selectedAccount;
+    const taskRolePlay = selectedRole;
+    const taskSpecific = selectedTask;
+    const taskStartDate = startDate;
+    const taskDueDate = dueDate;
+    
     setTitle("");
-    setAssignedTo("");
+    setAssignedTo(canAssignOthers ? "" : user?.displayName || "");
     setRole("");
     setSelectedAccount("");
     setSelectedRole("");
     setSelectedTask("");
+    setStartDate(getTodayIST());
+    setDueDate("");
     clearImage();
 
-    // Do the rest asynchronously in background
     (async () => {
       try {
         const taskId = await getNextTaskId();
 
         let images = [];
         if (imageFile) {
-          // Upload image asynchronously
           uploadImage(imageFile)
             .then((imageUrl) => {
-              // Update the task in DB with the image
               updateDoc(doc(db, "marketing_tasks", taskId), {
                 images: [imageUrl],
               });
-              // Update in local state
               setTasks((prev) =>
                 prev.map((t) =>
                   t.id === taskId ? { ...t, images: [imageUrl] } : t,
@@ -1550,16 +1613,21 @@ const TaskManager = ({ onBack }) => {
         }
 
         const taskData = {
-          description: title.trim(),
-          assignedTo: assignedTo.trim(),
-          role: role || null,
-          account: selectedAccount || null,
-          rolePlay: selectedRole || null,
-          task: selectedTask || null,
+          title: taskTitle,
+          description: taskTitle,
+          assignedTo: taskAssignedTo,
+          role: taskRole || null,
+          account: taskAccount || null,
+          rolePlay: taskRolePlay || null,
+          task: taskSpecific || null,
+          dueDate: taskDueDate || null,
+          startDate: taskStartDate || getTodayIST(),
           status: "not_started",
           images,
           userId: user.uid,
+          originalUserId: user.uid,
           createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
         };
 
         const docRef = doc(db, "marketing_tasks", taskId);
@@ -1587,11 +1655,9 @@ const TaskManager = ({ onBack }) => {
       alert("You can only change the status of your own tasks.");
       return;
     }
-    // Update local state immediately
     setTasks(
       tasks.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t)),
     );
-    // Update Firestore immediately
     try {
       await moveTaskImmediate(taskId, newStatus);
     } catch (error) {
@@ -1617,7 +1683,6 @@ const TaskManager = ({ onBack }) => {
       if (taskEnd > filterEnd) return false;
     }
 
-    // Date filtering based on current view
     let taskDate = null;
     if (task.startDate) {
       taskDate = new Date(task.startDate);
@@ -1629,17 +1694,13 @@ const TaskManager = ({ onBack }) => {
         : new Date(task.createdAt);
     }
 
-    // New Rule: If User Filter is active AND task is active (not started/in progress),
-    // SHOW IT regardless of date (Persistent Backlog)
     if (
       filters.user &&
       (task.status === "not_started" || task.status === "in_progress")
     ) {
-      // Do nothing here to skip the date check return false below
-      // implicitly "return true" at the end unless other filters failed above
+      // Skip date filter for active tasks when user filter is active
     } else if (taskDate) {
       if (currentView === "calendar") {
-        // For calendar view, filter by current month
         const monthStart = new Date(
           calendarCurrentDate.getFullYear(),
           calendarCurrentDate.getMonth(),
@@ -1653,7 +1714,6 @@ const TaskManager = ({ onBack }) => {
         monthEnd.setHours(23, 59, 59, 999);
         if (taskDate < monthStart || taskDate > monthEnd) return false;
       } else {
-        // For kanban and table views, filter by current week
         const weekStart = new Date(currentWeek);
         const weekEnd = new Date(weekStart);
         weekEnd.setDate(weekStart.getDate() + 6);
@@ -1699,7 +1759,6 @@ const TaskManager = ({ onBack }) => {
       alert("You can only delete your own tasks.");
       return;
     }
-    // Log the deletion
     await logMarketingActivity("Task Deleted", {
       id: task.id,
       title: task.title,
@@ -1708,9 +1767,7 @@ const TaskManager = ({ onBack }) => {
       status: task.status,
       role: task.role
     });
-    // Update local state immediately
     setTasks(tasks.filter((t) => t.id !== id));
-    // Update Firestore immediately
     try {
       await handleDeleteImmediate(id);
     } catch (error) {
@@ -1794,7 +1851,6 @@ const TaskManager = ({ onBack }) => {
     const activeId = String(active.id);
     const overId = String(over.id);
 
-    // If dropping on a column
     if (
       overId === "not_started" ||
       overId === "in_progress" ||
@@ -1918,7 +1974,6 @@ const TaskManager = ({ onBack }) => {
                       onClick={() => {
                         setIsRefreshing(true);
                         setRefreshTrigger((prev) => prev + 1);
-                        // Reset refreshing state after animation completes
                         setTimeout(() => setIsRefreshing(false), 800);
                       }}
                       disabled={isRefreshing}
@@ -1961,7 +2016,6 @@ const TaskManager = ({ onBack }) => {
                         onChange={(e) => {
                           const newValue = e.target.value;
                           setFilters((prev) => ({ ...prev, user: newValue }));
-                          // Save preference: 'all' if empty, 'user' if specific user
                           localStorage.setItem(
                             "dmFilterPreference",
                             newValue === "" ? "all" : "user",
@@ -2062,7 +2116,6 @@ const TaskManager = ({ onBack }) => {
                           if (!buttonDisabled && !noMoreTasks) {
                             setLoadingMore(true);
                             setCurrentLimit((prev) => prev + 100);
-                            // Set timeout to show "no more tasks" popup after 5 seconds if no tasks loaded
                             loadMoreTimeoutRef.current = setTimeout(() => {
                               if (loadingMore) {
                                 setLoadingMore(false);
@@ -2089,7 +2142,7 @@ const TaskManager = ({ onBack }) => {
                   </div>
                 )}
 
-                {/* Task Creation Form - Now a Modal */}
+                {/* Task Creation Form Modal */}
                 {showForm && (
                   <div className="fixed inset-0 bg-transparent backdrop-blur-sm bg-opacity-20 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-lg p-4 max-w-lg w-full mx-4">
@@ -2114,6 +2167,7 @@ const TaskManager = ({ onBack }) => {
                         className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2"
                       >
                         <div>
+                          <label className="block text-[10px] font-medium text-gray-500 ml-1 mb-0.5">Role (opt)</label>
                           <select
                             value={role}
                             onChange={(e) => setRole(e.target.value)}
@@ -2132,10 +2186,12 @@ const TaskManager = ({ onBack }) => {
                           </select>
                         </div>
                         <div>
+                          <label className="block text-[10px] font-medium text-gray-500 ml-1 mb-0.5">Assignee*</label>
                           <select
                             value={assignedTo}
                             onChange={(e) => setAssignedTo(e.target.value)}
-                            className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-gray-50"
+                            disabled={!canAssignOthers}
+                            className={`w-full px-2 py-1.5 text-xs border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-gray-50 ${!canAssignOthers ? 'cursor-not-allowed opacity-75' : ''}`}
                           >
                             <option value="">Select assignee*</option>
                             {assignees.map((assignee) => (
@@ -2146,6 +2202,7 @@ const TaskManager = ({ onBack }) => {
                           </select>
                         </div>
                         <div>
+                          <label className="block text-[10px] font-medium text-gray-500 ml-1 mb-0.5">Account (opt)</label>
                           <select
                             value={selectedAccount}
                             onChange={(e) => {
@@ -2164,6 +2221,7 @@ const TaskManager = ({ onBack }) => {
                           </select>
                         </div>
                         <div>
+                          <label className="block text-[10px] font-medium text-gray-500 ml-1 mb-0.5">Role Play (opt)</label>
                           <select
                             value={selectedRole}
                             onChange={(e) => {
@@ -2182,6 +2240,7 @@ const TaskManager = ({ onBack }) => {
                           </select>
                         </div>
                         <div>
+                          <label className="block text-[10px] font-medium text-gray-500 ml-1 mb-0.5">Task (opt)</label>
                           <select
                             value={selectedTask}
                             onChange={(e) => setSelectedTask(e.target.value)}
@@ -2196,6 +2255,28 @@ const TaskManager = ({ onBack }) => {
                             ))}
                           </select>
                         </div>
+                        <div>
+                          <label className="block text-[10px] font-medium text-gray-500 ml-1 mb-0.5">Start Date</label>
+                          <input
+                            type="date"
+                            value={startDate}
+                            onChange={(e) => setStartDate(e.target.value)}
+                            className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-gray-50"
+                            placeholder="Start Date"
+                          />
+                        </div>
+                        {canEditDueDate && (
+                          <div>
+                            <label className="block text-[10px] font-medium text-gray-500 ml-1 mb-0.5">Due Date</label>
+                            <input
+                              type="date"
+                              value={dueDate}
+                              onChange={(e) => setDueDate(e.target.value)}
+                              className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-gray-50"
+                              placeholder="Due Date"
+                            />
+                          </div>
+                        )}
                         <div className="sm:col-span-2 lg:col-span-4">
                           <textarea
                             value={title}
@@ -2213,11 +2294,12 @@ const TaskManager = ({ onBack }) => {
                             {title.length}/150
                           </div>
                         </div>
+                   
                         <div className="sm:col-span-2 lg:col-span-4 flex items-center gap-2">
                           <input
                             ref={fileInputRef}
                             type="file"
-                            accept="image/*"
+                            accept="image/*,application/pdf"
                             onChange={handleImageChange}
                             className="flex-1 px-2 py-1.5 text-xs border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors file:mr-2 file:py-1 file:px-2 file:rounded-xl file:border-0 file:text-xs file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 bg-gray-50"
                           />
@@ -2234,7 +2316,7 @@ const TaskManager = ({ onBack }) => {
                         <div className="sm:col-span-2 lg:col-span-4 flex items-center gap-3">
                           <button
                             type="submit"
-                            disabled={uploadingImage}
+                            disabled={uploadingImage || !title.trim() || !assignedTo.trim()}
                             className="px-3 py-1.5 bg-blue-500 text-white rounded-full hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium text-xs shadow-sm"
                           >
                             {uploadingImage ? (
@@ -2250,11 +2332,13 @@ const TaskManager = ({ onBack }) => {
                             type="button"
                             onClick={() => {
                               setTitle("");
-                              setAssignedTo("");
+                              setAssignedTo(canAssignOthers ? "" : user?.displayName || "");
                               setRole("");
                               setSelectedAccount("");
                               setSelectedRole("");
                               setSelectedTask("");
+                              setStartDate(getTodayIST());
+                              setDueDate("");
                               clearImage();
                               setShowForm(false);
                             }}
@@ -2263,11 +2347,17 @@ const TaskManager = ({ onBack }) => {
                             Reset
                           </button>
                           {imagePreview && (
-                            <img
-                              src={imagePreview}
-                              alt="Preview"
-                              className="w-10 h-10 object-cover rounded-xl border border-gray-200 shadow-sm"
-                            />
+                             isPDF(imagePreview) ? (
+                               <div className="w-10 h-10 flex items-center justify-center bg-gray-100 rounded-xl border border-gray-200 shadow-sm">
+                                 <FiFileText className="text-red-500 w-5 h-5" />
+                               </div>
+                             ) : (
+                               <img
+                                 src={imagePreview}
+                                 alt="Preview"
+                                 className="w-10 h-10 object-cover rounded-xl border border-gray-200 shadow-sm"
+                               />
+                             )
                           )}
                         </div>
                       </form>
@@ -2279,7 +2369,6 @@ const TaskManager = ({ onBack }) => {
               {/* Conditional View Rendering */}
               {currentView === "kanban" ? (
                 <>
-                  {/* Kanban Board */}
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     <Column
                       id="not_started"
@@ -2436,8 +2525,6 @@ const TaskManager = ({ onBack }) => {
           </div>
         </div>
       )}
-
-
 
       {showToast && (
         <div className="fixed bottom-4 left-4 z-50">

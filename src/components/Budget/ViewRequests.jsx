@@ -97,14 +97,7 @@ export default function ViewRequests({
     });
 
     return () => unsub();
-  }, [
-    department,
-    fiscalYear,
-    searchText,
-    filterStatus,
-    searchText,
-    filterStatus,
-  ]);
+  }, [department, fiscalYear, searchText, filterStatus]);
   useEffect(() => {
     setCurrentPage(1);
   }, [searchText, filterStatus]);
@@ -179,7 +172,7 @@ export default function ViewRequests({
 
       // Success (Transaction automatically commits here)
       setActionLoading(null);
-      toast.success("Approved Successfully")
+      toast.success("Approved Successfully");
       // Optional: Add a success toast here
     } catch (err) {
       console.error("Transaction failed: ", err);
@@ -202,11 +195,11 @@ export default function ViewRequests({
       });
 
       setActionLoading(null);
-      toast.success("Rejected Successfully")
+      toast.success("Rejected Successfully");
     } catch (err) {
       console.error(err);
       setActionLoading(null);
-      toast.success("Rejection Failed");
+      toast.error("Rejection Failed");
     }
   };
 

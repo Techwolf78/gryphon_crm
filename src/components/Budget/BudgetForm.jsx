@@ -599,21 +599,6 @@ const BudgetForm = ({
 
   if (!show) return null;
 
-  useEffect(() => {
-    const preventScrollChange = (e) => {
-      if (
-        document.activeElement.type === "number" &&
-        document.activeElement.contains(e.target)
-      ) {
-        e.preventDefault(); // stop value change
-      }
-    };
-
-    window.addEventListener("wheel", preventScrollChange, { passive: false });
-
-    return () => window.removeEventListener("wheel", preventScrollChange);
-  }, []);
-
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-1000">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden border border-gray-200/50">
@@ -703,7 +688,7 @@ const BudgetForm = ({
                     <option value="">Select Department</option>
                     <option value="dm">DM</option>
                     <option value="placement">Placement</option>
-                    <option value="lnd">LND</option>
+                    <option value="lnd">L&D</option>
                     <option value="hr">HR</option>
                     <option value="sales">Sales</option>
                     <option value="management">Management</option>
