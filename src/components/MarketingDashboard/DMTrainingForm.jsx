@@ -8,6 +8,7 @@ import {
   getDoc,
 } from "firebase/firestore";
 import { db } from "../../firebase";
+import { useAuth } from "../../context/AuthContext";
 import DMCollegeInfoSection from "./DMCollegeInfoSection";
 import DMPOCInfoSection from "./DMPOCInfoSection";
 import DMStudentBreakdownSection from "./DMStudentBreakdownSection";
@@ -23,9 +24,9 @@ const DMTrainingForm = ({
   show,
   onClose,
   lead,
-  users,
   existingFormData,
 }) => {
+  const { user: currentUser } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [formData, setFormData] = useState({
@@ -201,7 +202,6 @@ const DMTrainingForm = ({
     }
   }, [existingFormData, lead]);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const { collegeCode, course, year, deliveryType, passingYear } = formData;
     if (collegeCode && course && year && deliveryType && passingYear) {
@@ -379,7 +379,6 @@ const DMTrainingForm = ({
                 mouFile ? uploadFileToCloudinary(mouFile, "training-forms/mou-files") : null
             ]);
  
-            const assignedUser = users?.[lead?.assignedTo?.uid] || {};
             const formDataWithoutStudents = formData; // No need to remove studentList anymore
 
             // No more cleaning - use data as-is
@@ -406,9 +405,9 @@ const DMTrainingForm = ({
               studentCount: parseInt(formData.studentCount),
               createdAt: serverTimestamp(),
               createdBy: {
-                email: lead?.assignedTo?.email || assignedUser?.email || "Unknown",
-                uid: lead?.assignedTo?.uid || "",
-                name: lead?.assignedTo?.name || assignedUser?.name || "",
+                email: currentUser?.email || "Unknown",
+                uid: currentUser?.uid || "",
+                name: currentUser?.name || "",
               },
               status: closureType,
               lastUpdated: serverTimestamp()
@@ -447,6 +446,7 @@ const DMTrainingForm = ({
             <div className="bg-white w-full max-w-7xl h-[98vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col relative animate-fadeIn">
                 <div className="flex justify-between items-center px-4 py-2 border-b bg-blue-100">
                     <h2 className="text-xl font-bold text-blue-800">Digital Marketing Onboarding Form</h2>
+                    <p className="text-sm text-blue-600">Created by: {currentUser?.name || currentUser?.email || "Unknown"}</p>
                     <div className="flex items-center space-x-3 w-[450px]">
                         <input
                             name="projectCode"
