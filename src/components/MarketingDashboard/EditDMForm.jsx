@@ -6,6 +6,7 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { db } from "../../firebase";
+import { useAuth } from "../../context/AuthContext";
 import DMCollegeInfoSection from "./DMCollegeInfoSection";
 import DMPOCInfoSection from "./DMPOCInfoSection";
 import DMStudentBreakdownSection from "./DMStudentBreakdownSection";
@@ -23,6 +24,7 @@ const EditDMForm = ({
   existingFormData,
   readOnly = false,
 }) => {
+  const { user: currentUser } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [formData, setFormData] = useState({
@@ -288,11 +290,16 @@ const EditDMForm = ({
         netPayableAmount: parseFloat(formData.netPayableAmount),
         studentCount: parseInt(formData.studentCount),
         status: closureType,
+        createdBy: {
+          uid: currentUser?.uid || "",
+          name: currentUser?.name || "",
+          email: currentUser?.email || "",
+        },
+        createdAt: serverTimestamp(),
         lastUpdated: serverTimestamp()
       };
 
       await updateDoc(doc(db, "digitalMarketing", sanitizedProjectCode), updateData);
-      await updateDoc(doc(db, "placementData", sanitizedProjectCode), updateData);
 
       setHasUnsavedChanges(false);
       setTimeout(onClose, 1000);
@@ -320,6 +327,7 @@ const EditDMForm = ({
       <div className="bg-white w-full max-w-7xl h-[98vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col relative animate-fadeIn">
         <div className="flex justify-between items-center px-4 py-2 border-b bg-blue-100">
           <h2 className="text-xl font-bold text-blue-800">{readOnly ? "View" : "Edit"} Digital Marketing Contract</h2>
+          <p className="text-sm text-blue-600">Created by: {currentUser?.name || currentUser?.email || "Unknown"}</p>
           <div className="flex items-center space-x-3 w-[450px]">
             <input
               name="projectCode"
