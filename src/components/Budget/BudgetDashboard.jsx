@@ -321,7 +321,7 @@ function BudgetDashboard({
   // Subscribe to Users Collection (For ready state)
   useEffect(() => {
     if (!currentUser) return;
-    const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
+    const unsubUsers = onSnapshot(collection(db, "users"), () => {
       setUsersLoaded(true);
       setLoading(false);
     });

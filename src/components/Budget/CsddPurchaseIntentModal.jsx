@@ -295,7 +295,7 @@ const CsddPurchaseIntentModal = ({
     <div className="mt-10 fixed inset-0 bg-black/30 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-hidden">
         {/* Header */}
-        <div className="flex justify-between items-center p-6 border-b border-gray-200 bg-gradient-to-r from-amber-50 to-orange-50">
+        <div className="flex justify-between items-center p-6 border-b border-gray-200 bg-linear-to-r from-amber-50 to-orange-50">
           <div>
             <h2 className="text-xl font-bold text-gray-900">
               CSDD Purchase Intent
@@ -615,7 +615,7 @@ const CsddPurchaseIntentModal = ({
             {formData.csddComponent &&
               calculateFinalTotal() > getComponentRemaining() && (
                 <div className="flex items-center gap-2 mt-2 text-red-600 text-xs">
-                  <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                   <span>
                     Exceeds component budget by ₹
                     {(

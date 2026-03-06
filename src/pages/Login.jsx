@@ -172,7 +172,11 @@ export default function LoginPage() {
     }
 
     try {
+      // Attempt login (isActive status is checked in AuthContext)
+      console.log("🔐 Attempting login for:", email);
       await login(email, password);
+      console.log("✅ Login successful! User is ACTIVE");
+      
       if (rememberMe) {
         localStorage.setItem("rememberedEmail", email);
         localStorage.setItem("rememberedPassword", password);
@@ -181,12 +185,18 @@ export default function LoginPage() {
         localStorage.removeItem("rememberedPassword");
       }
     } catch (error) {
+      console.error("❌ Login error:", error.code, error.message);
+      
       // Login failed - error handled through UI feedback
 
       let errorMessage = "Login failed. Please try again.";
 
       // Handle Firebase authentication errors
       switch (error.code) {
+        case "auth/user-deactivated":
+          console.warn("🚫 User account is DEACTIVATED - Access denied");
+          errorMessage = "❌ Your account has been deactivated. Please contact your administrator to regain access.";
+          break;
         case "auth/user-not-found":
           setFieldErrors(prev => ({
             ...prev,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useAuth } from "../../context/AuthContext";
 import ImageCompressor from 'image-compressor.js';
 import { FiX, FiFileText } from 'react-icons/fi';
@@ -69,11 +69,11 @@ const EditTaskModal = ({ task, isOpen, onClose, onSave, assignees, tasksData }) 
     return null;
   };
 
-  const formatDateForInput = (dateValue) => {
+  const formatDateForInput = useCallback((dateValue) => {
     const date = parseDate(dateValue);
     if (!date || isNaN(date.getTime())) return '';
     return date.toISOString().split('T')[0];
-  };
+  }, []);
 
   useEffect(() => {
     if (task) {
@@ -87,7 +87,7 @@ const EditTaskModal = ({ task, isOpen, onClose, onSave, assignees, tasksData }) 
       setSelectedTask(task.task || '');
       setImages(task.images || []);
     }
-  }, [task]);
+  }, [task, formatDateForInput]);
 
   const uploadImage = async (file) => {
     if (!file) return null;
