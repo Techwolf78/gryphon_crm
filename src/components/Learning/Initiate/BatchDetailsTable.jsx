@@ -31,6 +31,36 @@ import Select from 'react-select';
 
 const DAY_DURATION_OPTIONS = ["AM", "PM", "AM & PM"];
 
+// ✅ Timezone-safe date normalizer utility (avoids UTC conversion day-shift in IST and other non-UTC timezones)
+// Converts Date objects or YYYY-MM-DD strings to normalized YYYY-MM-DD string using local date parts
+const normalizeDateSafe = (d) => {
+  if (!d) return null;
+  
+  // Handle Date objects
+  if (d instanceof Date) {
+    if (isNaN(d.getTime())) return null;
+    // Use local date parts to avoid timezone shift when converting to UTC
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+  
+  // Handle string dates (YYYY-MM-DD format)
+  if (typeof d === 'string') {
+    const parts = d.split('-');
+    if (parts.length !== 3) return null;
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10);
+    const day = parseInt(parts[2], 10);
+    if (isNaN(year) || isNaN(month) || isNaN(day)) return null;
+    // Return normalized string
+    return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  }
+  
+  return null;
+};
+
 // Color palette options (can be expanded)
 const COLOR_PALETTE = [
   {
@@ -140,8 +170,16 @@ const TrainerRow = React.memo(
     // ✅ ADD: Local function to generate date list with exclusions
     const getDateList = (start, end, excludeDays, excludedDates = []) => {
       if (!start || !end) return [];
-      const startDate = new Date(start);
-      const endDate = new Date(end);
+
+      // ✅ FIXED: Parsing date strings directly can cause UTC shifts
+      // Parse YYYY-MM-DD into local-midnight Date
+      const parseLocal = (dateStr) => {
+        const [year, month, day] = dateStr.split("-").map(Number);
+        return new Date(year, month - 1, day);
+      };
+
+      const startDate = parseLocal(start);
+      const endDate = parseLocal(end);
 
       // Validate dates
       if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) return [];
@@ -163,8 +201,8 @@ const TrainerRow = React.memo(
         // If excludeDays === "None", include all days
         
         if (shouldInclude) {
-          const dateStr = current.toISOString().slice(0, 10);
-          if (!excludedDates.includes(dateStr)) {
+          const dateStr = normalizeDateSafe(current);
+          if (dateStr && !excludedDates.includes(dateStr)) {
             dates.push(new Date(current));
           }
         }
@@ -598,7 +636,7 @@ const TrainerRow = React.memo(
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      const dateStr = date.toISOString().slice(0, 10);
+                                      const dateStr = normalizeDateSafe(date);
                                       const newExcluded = [...(trainer.excludedDates || []), dateStr];
                                       handleTrainerField(rowIndex, batchIndex, trainerIdx, "excludedDates", newExcluded);
                                       // Remove from dailyHours
@@ -1756,7 +1794,6 @@ const filteredTrainers = useMemo(() => {
     return total > 0 ? +(total / 60).toFixed(2) : 0;
   };
 
-  // ✅ UPDATE: handleTrainerField function to handle dailyHours updates
   const handleTrainerField = (
     rowIndex,
     batchIndex,
@@ -1794,28 +1831,23 @@ const filteredTrainers = useMemo(() => {
         return;
       }
 
-      // Prepare dates
-      const normalizeDate = (dateStr) => {
-        if (!dateStr) return null;
-        const date = new Date(dateStr);
-        if (isNaN(date.getTime())) return null;
-        return date.toISOString().slice(0, 10);
-      };
+      // Prepare dates with timezone-safe normalization
       const newTrainerDates = getDateList(
         tempTrainer.startDate,
         tempTrainer.endDate
       );
       const newTrainerDatesNormalized = newTrainerDates
-        .map(normalizeDate)
+        .map(normalizeDateSafe)
         .filter((date) => date !== null);
 
+      // ✅ FIXED: Check for conflicts ONLY within the same batch using proper batchIndex
       const hasConflict = batch.trainers.some((t, idx) => {
-        if (idx === trainerIdx) return false;
+        if (idx === trainerIdx) return false; // Skip the current trainer being edited
 
         const existingDates =
           t.activeDates || getDateList(t.startDate, t.endDate);
         const existingDatesNormalized = existingDates
-          .map(normalizeDate)
+          .map(normalizeDateSafe)
           .filter((date) => date !== null);
 
         const overlap = newTrainerDatesNormalized.some((date) =>
@@ -1834,7 +1866,7 @@ const filteredTrainers = useMemo(() => {
 
       if (hasConflict) {
         alert(
-          `This batch already has a trainer for ${tempTrainer.dayDuration} slot on overlapping dates.`
+          `Batch ${batchIndex + 1} (${batch.batchCode || 'unnamed'}) already has a trainer assigned for the ${tempTrainer.dayDuration} slot on one or more overlapping dates. Each batch can only have one trainer per time slot.`
         );
         return;
       }
@@ -1991,7 +2023,7 @@ const filteredTrainers = useMemo(() => {
     excludeTrainerKey = null,
     currentBatchKey = null
   ) => {
-    // 1. Check current table (local)
+    // 1. Check current table (local) - checks SAME TRAINER across different batches
     for (let rowIdx = 0; rowIdx < table1Data.length; rowIdx++) {
       const row = table1Data[rowIdx];
       for (let batchIdx = 0; batchIdx < row.batches.length; batchIdx++) {
@@ -2028,7 +2060,7 @@ const filteredTrainers = useMemo(() => {
               dateObj >= startDateObj &&
               dateObj <= endDateObj
             ) {
-              // Conflict logic
+              // Conflict logic for SAME TRAINER
               if (
                 trainer.dayDuration === "AM & PM" ||
                 dayDuration === "AM & PM" ||
@@ -2042,43 +2074,24 @@ const filteredTrainers = useMemo(() => {
         }
       }
     }
-    // 2. Check global assignments
-    const normalizeDate = (d) => {
-      if (!d) return null;
-      if (d instanceof Date) {
-        if (isNaN(d.getTime())) return null;
-        return d.toISOString().slice(0, 10);
-      }
-      if (typeof d === 'string') {
-        const parts = d.split('-');
-        if (parts.length !== 3) return null;
-        const year = parseInt(parts[0], 10);
-        const month = parseInt(parts[1], 10) - 1;
-        const day = parseInt(parts[2], 10);
-        const dateObj = new Date(year, month, day);
-        if (isNaN(dateObj.getTime())) return null;
-        return dateObj.toISOString().slice(0, 10);
-      }
-      return null;
-    };
-
+    // 2. Check global assignments with timezone-safe normalization
     for (let assignment of globalTrainerAssignments) {
       if (assignment.trainerId !== trainerId) continue;
 
       // Build list of dates for the assignment (supports single date or range)
       let assignDates = [];
       if (assignment.date) {
-        const d = normalizeDate(assignment.date);
+        const d = normalizeDateSafe(assignment.date);
         if (d) assignDates.push(d);
       } else if (assignment.startDate && assignment.endDate) {
         const list = getDateList(
           assignment.startDate,
           assignment.endDate
         );
-        assignDates = list.map((dd) => normalizeDate(dd)).filter(Boolean);
+        assignDates = list.map((dd) => normalizeDateSafe(dd)).filter(Boolean);
       }
 
-      const dateNorm = normalizeDate(date);
+      const dateNorm = normalizeDateSafe(date);
       if (!dateNorm) continue;
 
       if (assignDates.includes(dateNorm)) {
@@ -2593,25 +2606,6 @@ const filteredTrainers = useMemo(() => {
     const trainerMap = new Map();
     const errors = [];
 
-    const normalizeDate = (d) => {
-      if (!d) return null;
-      if (d instanceof Date) {
-        if (isNaN(d.getTime())) return null;
-        return d.toISOString().slice(0, 10);
-      }
-      if (typeof d === 'string') {
-        const parts = d.split('-');
-        if (parts.length !== 3) return null;
-        const year = parseInt(parts[0], 10);
-        const month = parseInt(parts[1], 10) - 1;
-        const day = parseInt(parts[2], 10);
-        const dateObj = new Date(year, month, day);
-        if (isNaN(dateObj.getTime())) return null;
-        return dateObj.toISOString().slice(0, 10);
-      }
-      return null;
-    };
-
     table1Data.forEach((row, rowIndex) => {
       row.batches?.forEach((batch, batchIndex) => {
         batch.trainers?.forEach((trainer, trainerIdx) => {
@@ -2621,16 +2615,16 @@ const filteredTrainers = useMemo(() => {
           let dates = [];
           if (trainer.activeDates && trainer.activeDates.length > 0) {
             dates = trainer.activeDates
-              .map((dd) => normalizeDate(dd))
+              .map((dd) => normalizeDateSafe(dd))
               .filter(Boolean);
           } else if (trainer.startDate && trainer.endDate) {
             const generated = getDateList(
               trainer.startDate,
               trainer.endDate
             );
-            dates = generated.map((dd) => normalizeDate(dd)).filter(Boolean);
+            dates = generated.map((dd) => normalizeDateSafe(dd)).filter(Boolean);
           } else if (trainer.startDate) {
-            const single = normalizeDate(trainer.startDate);
+            const single = normalizeDateSafe(trainer.startDate);
             if (single) dates = [single];
           }
 
@@ -2670,14 +2664,14 @@ const filteredTrainers = useMemo(() => {
               });
             }
 
-            // Check global assignments (normalize their date too)
+            // Check global assignments with timezone-safe normalization
             for (let assignment of globalTrainerAssignments) {
               // Skip assignments from the current training project
               if (assignment.sourceTrainingId === training?.id) {
                 continue;
               }
               
-              const assignDate = normalizeDate(assignment.date);
+              const assignDate = normalizeDateSafe(assignment.date);
               if (!assignDate) continue;
               if (
                 assignment.trainerId === trainer.trainerId &&
@@ -2725,7 +2719,7 @@ const filteredTrainers = useMemo(() => {
 
             // Check current training assignments from other domains
             for (let assignment of currentTrainingAssignments) {
-              const assignDate = normalizeDate(assignment.date || assignment.startDate);
+              const assignDate = normalizeDateSafe(assignment.date || assignment.startDate);
               if (!assignDate) continue;
               if (
                 assignment.trainerId === trainer.trainerId &&
@@ -2831,25 +2825,6 @@ const filteredTrainers = useMemo(() => {
       sourceTrainerData: swapConfirmationModal.sourceTrainerData,
       targetTrainerData: swapConfirmationModal.targetTrainerData
     });
-
-    const normalizeDate = (d) => {
-      if (!d) return null;
-      if (d instanceof Date) {
-        if (isNaN(d.getTime())) return null;
-        return d.toISOString().slice(0, 10);
-      }
-      if (typeof d === 'string') {
-        const parts = d.split('-');
-        if (parts.length !== 3) return null;
-        const year = parseInt(parts[0], 10);
-        const month = parseInt(parts[1], 10) - 1;
-        const day = parseInt(parts[2], 10);
-        const dateObj = new Date(year, month, day);
-        if (isNaN(dateObj.getTime())) return null;
-        return dateObj.toISOString().slice(0, 10);
-      }
-      return null;
-    };
 
     // Create simulated post-swap table data
     const simulatedData = table1Data.map((row, rowIdx) => ({
@@ -2962,16 +2937,16 @@ const filteredTrainers = useMemo(() => {
           let dates = [];
           if (trainer.activeDates && trainer.activeDates.length > 0) {
             dates = trainer.activeDates
-              .map((dd) => normalizeDate(dd))
+              .map((dd) => normalizeDateSafe(dd))
               .filter(Boolean);
           } else if (trainer.startDate && trainer.endDate) {
             const generated = getDateList(
               trainer.startDate,
               trainer.endDate
             );
-            dates = generated.map((dd) => normalizeDate(dd)).filter(Boolean);
+            dates = generated.map((dd) => normalizeDateSafe(dd)).filter(Boolean);
           } else if (trainer.startDate) {
-            const single = normalizeDate(trainer.startDate);
+            const single = normalizeDateSafe(trainer.startDate);
             if (single) dates = [single];
           }
 
