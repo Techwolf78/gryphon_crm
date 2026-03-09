@@ -170,8 +170,16 @@ const TrainerRow = React.memo(
     // ✅ ADD: Local function to generate date list with exclusions
     const getDateList = (start, end, excludeDays, excludedDates = []) => {
       if (!start || !end) return [];
-      const startDate = new Date(start);
-      const endDate = new Date(end);
+
+      // ✅ FIXED: Parsing date strings directly can cause UTC shifts
+      // Parse YYYY-MM-DD into local-midnight Date
+      const parseLocal = (dateStr) => {
+        const [year, month, day] = dateStr.split("-").map(Number);
+        return new Date(year, month - 1, day);
+      };
+
+      const startDate = parseLocal(start);
+      const endDate = parseLocal(end);
 
       // Validate dates
       if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) return [];
