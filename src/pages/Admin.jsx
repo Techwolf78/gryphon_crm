@@ -56,6 +56,7 @@ const Admin = () => {
   const [currentUser, setCurrentUser] = useState(null);
   const [timeReports, setTimeReports] = useState([]);
   const [timeFilter, setTimeFilter] = useState('all');
+  const [userStatusFilter, setUserStatusFilter] = useState('active'); // status filter for time reports
   const [loadingTime, setLoadingTime] = useState(false);
   const [sortOrder, setSortOrder] = useState(null);
   
@@ -110,6 +111,11 @@ const Admin = () => {
     });
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    // Re-fetch time reports when userStatusFilter changes
+    fetchTimeReports(timeFilter);
+  }, [userStatusFilter]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -286,7 +292,7 @@ const Admin = () => {
     }
   };
 
-  const fetchTimeReports = async (filter = 'all') => {
+  const fetchTimeReports = async (filter = timeFilter) => {
     setLoadingTime(true);
     try {
       // First, clean up stale sessions (inactive sessions that haven't been updated in 10+ minutes)
@@ -308,6 +314,25 @@ const Admin = () => {
       }
       const snap = await getDocs(q);
       const sessions = snap.docs.map(d => d.data());
+      
+      // Get all relevant users based on status filter
+      let userListQuery = collection(db, "users");
+      if (userStatusFilter === 'active') {
+        userListQuery = query(userListQuery, where('isActive', '==', true));
+      } else if (userStatusFilter === 'inactive') {
+        userListQuery = query(userListQuery, where('isActive', '==', false));
+      }
+      const usersSnap = await getDocs(userListQuery);
+      const filteredUserIds = new Set(usersSnap.docs.map(doc => doc.data().uid));
+      const userNamesMap = {};
+      usersSnap.docs.forEach(doc => {
+        const data = doc.data();
+        userNamesMap[data.uid] = data.name || 'Unknown';
+      });
+
+      // Filter sessions by the selected users
+      const filteredSessions = sessions.filter(s => filteredUserIds.has(s.userId));
+
       // Aggregate by user - get latest location for each user
       const userTotals = {};
       const userLocations = {};
@@ -315,7 +340,7 @@ const Admin = () => {
       const userLastEndTime = {};
       const now = new Date();
       
-      sessions.forEach(s => {
+      filteredSessions.forEach(s => {
         let dur = s.duration || 0;
         if (s.isActive) {
           const start = s.startTime.toDate();
@@ -340,24 +365,7 @@ const Admin = () => {
         }
         userTotals[s.userId] += dur;
       });
-      // Fetch user names
-      const userIds = Object.keys(userTotals);
-      const userNames = {};
-      for (const uid of userIds) {
-        try {
-          const userQuery = query(collection(db, "users"), where("uid", "==", uid));
-          const userSnap = await getDocs(userQuery);
-          if (!userSnap.empty) {
-            const userData = userSnap.docs[0].data();
-            userNames[uid] = userData.name || 'Unknown';
-          } else {
-            userNames[uid] = 'Unknown';
-          }
-        } catch (error) {
-          console.error("Error fetching user:", error);
-          userNames[uid] = 'Unknown';
-        }
-      }
+
       const reports = Object.entries(userTotals).map(([uid, totalSeconds]) => {
         const hours = Math.floor(totalSeconds / 3600);
         const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -367,7 +375,7 @@ const Admin = () => {
         const status = userLastActive[uid] === "Active now" ? "Active now" : formatTimeAgo(lastEndTime);
         return {
           userId: uid,
-          name: userNames[uid] || 'Unknown',
+          name: userNamesMap[uid] || 'Unknown',
           timeString: `${hours}h ${minutes}m ${seconds}s`,
           location: location.error ? "Location unavailable" : location.address || "Unknown",
           city: location.city || "Unknown",
@@ -877,6 +885,7 @@ const Admin = () => {
               </p>
             </div>
             <div className="flex flex-col sm:flex-row gap-3">
+          
               <select
                 value={timeFilter}
                 onChange={(e) => {
@@ -890,6 +899,15 @@ const Admin = () => {
                 <option value="3days">Last 3 Days</option>
                 <option value="7days">Last 7 Days</option>
                 <option value="30days">Last 30 Days</option>
+              </select>
+                  <select
+                value={userStatusFilter}
+                onChange={(e) => setUserStatusFilter(e.target.value)}
+                className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              >
+                <option value="active">Active Users</option>
+                <option value="inactive">Inactive Users</option>
+                <option value="all">All Users</option>
               </select>
               <button
                 onClick={() => fetchTimeReports(timeFilter)}
