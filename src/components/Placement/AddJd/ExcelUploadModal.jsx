@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { XIcon, UploadIcon } from '@heroicons/react/outline';
 import { db } from '../../../firebase';
 import { doc, setDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { getDocs, deleteDoc } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
 
 const ExcelUploadModal = ({ show, onClose, college, companyName }) => {
@@ -162,13 +163,22 @@ const ExcelUploadModal = ({ show, onClose, college, companyName }) => {
         totalUploads: await getTotalUploads(companyCode) + 1 // Optional: upload count
       }, { merge: true });
 
-      // Step 2: Delete all previous uploads for this company
+      // Step 2: Delete only previous uploads for this company and college
       const uploadsCollectionRef = collection(db, 'studentList', companyCode, 'uploads');
-      // Import getDocs and deleteDoc from firestore
-      const { getDocs, deleteDoc } = await import('firebase/firestore');
       const prevUploadsSnap = await getDocs(uploadsCollectionRef);
-      const deletePromises = prevUploadsSnap.docs.map(docSnap => deleteDoc(docSnap.ref));
-      await Promise.all(deletePromises);
+      // Delete previous uploads in controlled batches to avoid large concurrent deletes
+      const docsToDelete = prevUploadsSnap.docs.filter(docSnap => {
+        const data = docSnap.data();
+        // Compare college name (case-insensitive, trimmed)
+        return (data.college || '').trim().toLowerCase() === (college || '').trim().toLowerCase();
+      });
+      const deleteInBatches = async (docs, batchSize = 50) => {
+        for (let i = 0; i < docs.length; i += batchSize) {
+          const batch = docs.slice(i, i + batchSize);
+          await Promise.all(batch.map(docSnap => deleteDoc(docSnap.ref)));
+        }
+      };
+      await deleteInBatches(docsToDelete);
 
       // Step 3: Add new upload
       const uploadData = {
