@@ -175,7 +175,7 @@ const TransferClosedLeadsModal = ({ show, onClose, users, leads }) => {
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
         {/* Header */}
-        <div className="bg-gradient-to-r from-red-500 to-orange-500 px-6 py-4 rounded-t-2xl flex items-center justify-between">
+        <div className="bg-linear-to-r from-red-500 to-orange-500 px-6 py-4 rounded-t-2xl flex items-center justify-between">
           <div className="flex items-center gap-2">
             <svg
               xmlns="http://www.w3.org/2000/svg"

@@ -100,7 +100,7 @@ const AppContent = () => {
           <Route path="/invoice/*" element={<PublicInvoiceDetails />} />
           
           {/* Public route for college data upload */}
-<Route path="/sync/upload-student-data" element={<UploadStudentData />} />
+<Route path="/upload-student-data" element={<UploadStudentData />} />
 
           <Route
             path="/dashboard"

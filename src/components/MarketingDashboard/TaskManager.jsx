@@ -1038,18 +1038,43 @@ const TableView = ({
   );
 };
 
-const SummaryView = ({ tasks, selectedMonth }) => {
+const SummaryView = ({ tasks, selectedMonth, selectedUser, customDateRange }) => {
   const [selectedAccount, setSelectedAccount] = useState(null);
 
-  // Filter tasks by selected month based on createdAt
+  // Filter tasks by selected month and user
   const getFilteredTasks = () => {
-    if (!selectedMonth || selectedMonth === 'lifetime') return tasks;
+    let filtered = tasks;
 
-    const [year, month] = selectedMonth.split('-');
-    const monthStart = new Date(parseInt(year), parseInt(month) - 1, 1);
-    const monthEnd = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59);
+    // Filter by User
+    if (selectedUser) {
+      filtered = filtered.filter(task => task.assignedTo === selectedUser);
+    }
 
-    return tasks.filter(task => {
+    // Filter by Month
+    if (!selectedMonth || selectedMonth === 'lifetime') return filtered;
+
+    let monthStart, monthEnd;
+
+    if (selectedMonth === 'custom' && customDateRange?.startDate) {
+      monthStart = new Date(customDateRange.startDate);
+      monthStart.setHours(0, 0, 0, 0);
+      
+      if (customDateRange.endDate) {
+        monthEnd = new Date(customDateRange.endDate);
+        monthEnd.setHours(23, 59, 59, 999);
+      } else {
+        monthEnd = new Date(); // Default to today if no end date
+        monthEnd.setHours(23, 59, 59, 999);
+      }
+    } else if (selectedMonth !== 'custom') {
+      const [year, month] = selectedMonth.split('-');
+      monthStart = new Date(parseInt(year), parseInt(month) - 1, 1);
+      monthEnd = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59);
+    } else {
+      return filtered; // If custom selected but no start date
+    }
+
+    return filtered.filter(task => {
       let taskDate = null;
 
       if (task.createdAt) {
@@ -1140,7 +1165,7 @@ const SummaryView = ({ tasks, selectedMonth }) => {
     }
   ];
 
-  if (selectedAccount) {
+  if (selectedAccount && accountsSummary[selectedAccount]) {
     const accountTasks = accountsSummary[selectedAccount].tasks;
     return (
       <div className="space-y-3">
@@ -1546,6 +1571,11 @@ const TaskManager = ({ onBack }) => {
   const [calendarCurrentDate, setCalendarCurrentDate] = useState(new Date());
   const [showSummary, setShowSummary] = useState(false);
   const [selectedSummaryMonth, setSelectedSummaryMonth] = useState("lifetime");
+  const [selectedSummaryUser, setSelectedSummaryUser] = useState("");
+  const [summaryCustomDateRange, setSummaryCustomDateRange] = useState({
+    startDate: "",
+    endDate: "",
+  });
   const [allTasksForSummary, setAllTasksForSummary] = useState([]);
 
   const roleAbbreviations = {
@@ -2450,21 +2480,22 @@ const TaskManager = ({ onBack }) => {
                     <div className="flex items-center justify-between flex-wrap gap-4">
                       <div className="flex items-center gap-4">
                         <div>
-                          <h2 className="text-lg font-bold text-gray-900">Summary Analytics</h2>
+                          <h2 className="text-md font-bold text-gray-900">Summary Analytics</h2>
                           <p className="text-xs text-gray-600 mt-0.5">View task distribution across all accounts</p>
                         </div>
                         <div className="h-12 w-px bg-gray-300 hidden sm:block"></div>
                         <div className="flex items-center gap-2">
-                          <label htmlFor="monthFilter" className="text-sm font-semibold text-gray-700">
+                          <label htmlFor="monthFilter" className="text-xs font-semibold text-gray-700">
                             Filter by Month:
                           </label>
                           <select
                             id="monthFilter"
                             value={selectedSummaryMonth}
                             onChange={(e) => setSelectedSummaryMonth(e.target.value)}
-                            className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white shadow-sm hover:border-gray-400 transition-colors font-medium"
+                            className="px-2 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white shadow-sm hover:border-gray-400 transition-colors font-medium"
                           >
                             <option value="lifetime">📅 Lifetime (All Months)</option>
+                            <option value="custom">📅 Custom Date Range</option>
                             {Array.from({ length: 12 }, (_, i) => {
                               const date = new Date();
                               date.setMonth(date.getMonth() - i);
@@ -2479,10 +2510,54 @@ const TaskManager = ({ onBack }) => {
                             })}
                           </select>
                         </div>
+
+                        {selectedSummaryMonth === "custom" && (
+                          <div className="flex items-center gap-2 animate-in fade-in slide-in-from-left-2 duration-300">
+                            <div className="flex items-center gap-1.5">
+                              <label htmlFor="summaryStartDate" className="text-[10px] font-semibold text-gray-500 uppercase">From</label>
+                              <input
+                                type="date"
+                                id="summaryStartDate"
+                                value={summaryCustomDateRange.startDate}
+                                onChange={(e) => setSummaryCustomDateRange(prev => ({ ...prev, startDate: e.target.value }))}
+                                className="px-2 py-1 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
+                              />
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <label htmlFor="summaryEndDate" className="text-[10px] font-semibold text-gray-500 uppercase">To</label>
+                              <input
+                                type="date"
+                                id="summaryEndDate"
+                                value={summaryCustomDateRange.endDate}
+                                onChange={(e) => setSummaryCustomDateRange(prev => ({ ...prev, endDate: e.target.value }))}
+                                className="px-2 py-1 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="flex items-center gap-2">
+                          <label htmlFor="userFilter" className="text-xs font-semibold text-gray-700">
+                            Filter by Users:
+                          </label>
+                          <select
+                            id="userFilter"
+                            value={selectedSummaryUser}
+                            onChange={(e) => setSelectedSummaryUser(e.target.value)}
+                            className="px-2 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white shadow-sm hover:border-gray-400 transition-colors font-medium"
+                          >
+                            <option value="">👤 All Users</option>
+                            {assignees.map((assignee) => (
+                              <option key={assignee} value={assignee}>
+                                {assignee}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                       </div>
                       <button
                         onClick={() => setShowSummary(false)}
-                        className="px-4 py-2 bg-linear-to-r from-gray-600 to-gray-700 text-white rounded-lg hover:from-gray-700 hover:to-gray-800 transition-all shadow-md hover:shadow-lg text-sm font-semibold flex items-center gap-2"
+                        className="px-2 py-1 bg-linear-to-r from-gray-600 to-gray-700 text-white rounded-lg hover:from-gray-700 hover:to-gray-800 transition-all shadow-md hover:shadow-lg text-xs font-semibold flex items-center gap-2"
                       >
                         ← Back to Table
                       </button>
@@ -2976,7 +3051,13 @@ const TaskManager = ({ onBack }) => {
                 <div key={showSummary ? "summary" : "table"}>
                   {showSummary ? (
                     <div className="summary-flip-in">
-                      <SummaryView tasks={allTasksForSummary} selectedMonth={selectedSummaryMonth} />
+                      <SummaryView 
+                        tasks={allTasksForSummary} 
+                        selectedMonth={selectedSummaryMonth} 
+                        selectedUser={selectedSummaryUser} 
+                        customDateRange={summaryCustomDateRange}
+                        assignees={assignees}
+                      />
                     </div>
                   ) : (
                     <div className="table-flip-in">

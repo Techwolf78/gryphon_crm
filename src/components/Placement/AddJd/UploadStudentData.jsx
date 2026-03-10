@@ -320,7 +320,7 @@ const UploadStudentData = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8">
+    <div className="min-h-screen bg-linear-to-br from-gray-50 to-blue-50 py-8">
       <div className="max-w-6xl mx-auto px-4">
         {/* Header Section */}
         <HeaderSection college={college} company={company} course={course} />
@@ -384,7 +384,7 @@ const UploadStudentData = () => {
           <div id="responses-section" className="mt-6 bg-white rounded-2xl shadow-lg p-4 md:p-6">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
               <div className="flex items-center">
-                <svg className="h-6 w-6 text-blue-600 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="h-6 w-6 text-blue-600 mr-2 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
                 <h3 className="text-lg md:text-xl font-bold text-gray-800">Form Responses</h3>
@@ -420,7 +420,7 @@ const UploadStudentData = () => {
                     className="flex flex-col items-center gap-1 p-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded transition-all duration-200"
                     title="Download responses as Excel file"
                   >
-                    <svg className="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                     </svg>
                     <span className="text-xs font-medium">Download</span>
@@ -458,7 +458,7 @@ const UploadStudentData = () => {
                       className="flex flex-col items-center gap-1 p-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded transition-all duration-200"
                       title="Submit responses to the system"
                     >
-                      <svg className="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                       </svg>
                       <span className="text-xs font-medium">Submit</span>
@@ -474,7 +474,7 @@ const UploadStudentData = () => {
                   <table className="w-full text-xs sm:text-sm">
                     <thead className="bg-gray-100 border-b border-gray-200 sticky top-0">
                       <tr>
-                        <th className="px-2 sm:px-4 py-2 sm:py-3 text-left font-semibold text-gray-700 flex-shrink-0">#</th>
+                        <th className="px-2 sm:px-4 py-2 sm:py-3 text-left font-semibold text-gray-700 shrink-0">#</th>
                         {responseSummary?.questionStats &&
                           Object.keys(responseSummary.questionStats).map((question) => (
                             <th key={question} className="px-2 sm:px-4 py-2 sm:py-3 text-left font-semibold text-gray-700 whitespace-nowrap">
@@ -487,7 +487,7 @@ const UploadStudentData = () => {
                     <tbody>
                       {responses.map((response, index) => (
                         <tr key={response.id || index} className="border-b border-gray-200 hover:bg-gray-50 transition-colors">
-                          <td className="px-2 sm:px-4 py-2 sm:py-3 font-medium text-gray-600 flex-shrink-0">{index + 1}</td>
+                          <td className="px-2 sm:px-4 py-2 sm:py-3 font-medium text-gray-600 shrink-0">{index + 1}</td>
                           {responseSummary?.questionStats &&
                             Object.keys(responseSummary.questionStats).map((question) => {
                               const answer = response.answers?.[question];

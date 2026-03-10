@@ -137,7 +137,11 @@ const GoogleFormManager = ({
       }
       return null;
     } catch (error) {
-      console.error("Error fetching form from Firebase:", error);
+      if (error.code === 'permission-denied') {
+        console.warn("Firestore access denied. User might not be logged in, but this is expected for public upload forms if rules allow read.");
+      } else {
+        console.error("Error fetching form from Firebase:", error);
+      }
       return null;
     }
   }, [college, company]);
@@ -575,7 +579,7 @@ const GoogleFormManager = ({
             <button
               onClick={handleCreateGoogleFormWithStorage}
               disabled={isCreatingForm}
-              className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white rounded-xl shadow-md transition-all duration-300 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full flex items-center justify-between p-4 bg-linear-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white rounded-xl shadow-md transition-all duration-300 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <div className="flex items-center">
                 {isCreatingForm ? (
@@ -604,7 +608,7 @@ const GoogleFormManager = ({
               onClick={fetchFormResponses}
               disabled={isFetchingResponses}
               title="Click to view form responses from Google Forms"
-              className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-xl shadow-md transition-all duration-300 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full flex items-center justify-between p-4 bg-linear-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-xl shadow-md transition-all duration-300 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <div className="flex items-center">
                 {isFetchingResponses ? (
