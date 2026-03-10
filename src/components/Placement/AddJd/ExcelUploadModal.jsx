@@ -119,16 +119,11 @@ const ExcelUploadModal = ({ show, onClose, college, companyName }) => {
     try {
       // Company code generate karo
       const companyCode = companyName.replace(/\s+/g, '_').toUpperCase();
-      
-      console.log('🔄 Starting Firebase save...');
-      console.log('Company:', companyName);
-      console.log('College:', college);
-      console.log('Students count:', validationResults.jsonStudents.length);
 
       // Field names mapping
       const fieldMapping = {
         'STUDENT NAME': 'studentName',
-        'ENROLLMENT NUMBER': 'enrollmentNo', 
+        'ENROLLMENT NUMBER': 'enrollmentNo',
         'EMAIL': 'email',
         'PHONE NUMBER': 'phone',
         'COURSE': 'course',
@@ -145,14 +140,10 @@ const ExcelUploadModal = ({ show, onClose, college, companyName }) => {
       // Process students data
       const processedStudents = validationResults.jsonStudents.map((student, index) => {
         const processedStudent = {};
-        
-        // Convert field names
         Object.keys(student).forEach(key => {
           const newKey = fieldMapping[key] || key.toLowerCase();
           processedStudent[newKey] = student[key];
         });
-
-        // Add metadata
         return {
           ...processedStudent,
           college: college,
@@ -164,7 +155,6 @@ const ExcelUploadModal = ({ show, onClose, college, companyName }) => {
 
       // Step 1: Company document create/update karo
       const companyDocRef = doc(db, 'studentList', companyCode);
-      
       await setDoc(companyDocRef, {
         companyName: companyName,
         companyCode: companyCode,
@@ -172,9 +162,15 @@ const ExcelUploadModal = ({ show, onClose, college, companyName }) => {
         totalUploads: await getTotalUploads(companyCode) + 1 // Optional: upload count
       }, { merge: true });
 
-      // Step 2: Subcollection mein new document add karo with timestamp
+      // Step 2: Delete all previous uploads for this company
       const uploadsCollectionRef = collection(db, 'studentList', companyCode, 'uploads');
-      
+      // Import getDocs and deleteDoc from firestore
+      const { getDocs, deleteDoc } = await import('firebase/firestore');
+      const prevUploadsSnap = await getDocs(uploadsCollectionRef);
+      const deletePromises = prevUploadsSnap.docs.map(docSnap => deleteDoc(docSnap.ref));
+      await Promise.all(deletePromises);
+
+      // Step 3: Add new upload
       const uploadData = {
         college: college,
         uploadedAt: serverTimestamp(),
@@ -183,24 +179,13 @@ const ExcelUploadModal = ({ show, onClose, college, companyName }) => {
         templateFields: validationResults.headers,
         collegeCode: college.replace(/\s+/g, '_').toUpperCase()
       };
-
-      console.log('📦 Uploading data to:', `studentList/${companyCode}/uploads`);
-      console.log('📊 Data:', uploadData);
-      
       await addDoc(uploadsCollectionRef, uploadData);
 
-      console.log(`✅ ${processedStudents.length} students saved to studentList/${companyCode}/uploads`);
       alert(`✅ ${processedStudents.length} students saved successfully!\n\n📍 Location: studentList/${companyCode}/uploads\n🏫 College: ${college}\n💼 Company: ${companyName}`);
-      
-      // Reset and close
       setUploadedFile(null);
       setValidationResults(null);
       onClose();
-      
     } catch (error) {
-      console.error('❌ Detailed Error saving students:', error);
-      console.error('Error message:', error.message);
-      console.error('Error code:', error.code);
       alert('❌ Error saving student data: ' + error.message);
     } finally {
       setIsUploading(false);
