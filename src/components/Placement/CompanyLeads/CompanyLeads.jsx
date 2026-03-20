@@ -1318,10 +1318,13 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         )
       );
 
-      // Switch to "called" tab when status is changed to "called"
-      if (normalizedStatus === "called") {
-        setActiveTab("called");
-      }
+      // Previously we would switch the UI to the "called" tab whenever a lead
+      // was marked as called.  That behavior caused the view to jump away from the
+      // current tab (often Cold) during bulk actions, which users found disruptive.
+      // The requirement has changed: when a lead is moved from cold to dialed/called
+      // via the dropdown, the list should remain on the same tab.  Leave the active
+      // tab untouched so the lead stays visible.
+      // (code removed intentionally)
 
       // ✅ If marked as onboarded → open AddJD modal
       if (normalizedStatus === "onboarded") {

@@ -18,6 +18,7 @@ import {
   FaRedo,
   FaHistory,
   FaClock,
+  FaSearch,
 } from "react-icons/fa";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "../../../firebase";
@@ -56,8 +57,11 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
   const [maliciousWarning, setMaliciousWarning] = useState("");
   const [connecting, setConnecting] = useState(false);
   const [expandedFollowups, setExpandedFollowups] = useState(new Set());
+  const [showIndustryDropdown, setShowIndustryDropdown] = useState(false);
+  const [industrySearch, setIndustrySearch] = useState("");
 
   const timePickerRef = useRef(null);
+  const industryDropdownRef = useRef(null);
 
   const { instance, accounts } = useMsal();
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -89,11 +93,14 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
     });
   };
 
-  // Close time picker when clicking outside
+  // Close time picker and industry dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(event) {
       if (timePickerRef.current && !timePickerRef.current.contains(event.target)) {
         setShowTimePicker(false);
+      }
+      if (industryDropdownRef.current && !industryDropdownRef.current.contains(event.target)) {
+        setShowIndustryDropdown(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -976,23 +983,78 @@ const FollowUpCompany = ({ company, onClose, onFollowUpScheduled }) => {
                     </div>
                   ) : (
                     // Show industry dropdown
-                    <div className="space-y-1">
+                    <div className="space-y-1 relative" ref={industryDropdownRef}>
                       <label className="block text-sm font-medium text-slate-700">
                         Industry <span className="text-red-500">*</span>
                       </label>
-                      <select
-                        value={selectedIndustry}
-                        onChange={(e) => setSelectedIndustry(e.target.value)}
-                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-slate-400"
-                        required
-                      >
-                        <option value="">Select industry to schedule</option>
-                        {INDUSTRY_OPTIONS.filter(industry => industry !== 'Other').map((industry) => (
-                          <option key={industry} value={industry}>
-                            {industry}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={showIndustryDropdown ? industrySearch : selectedIndustry}
+                          onChange={(e) => {
+                            setIndustrySearch(e.target.value);
+                            if (!showIndustryDropdown) setShowIndustryDropdown(true);
+                          }}
+                          onFocus={() => {
+                            setIndustrySearch(selectedIndustry);
+                            setShowIndustryDropdown(true);
+                          }}
+                          placeholder="Search or select industry"
+                          className="w-full pl-10 pr-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-slate-400"
+                          required
+                        />
+                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                          <FaSearch className="w-4 h-4" />
+                        </div>
+                      </div>
+
+                      {showIndustryDropdown && (
+                        <div className="absolute z-[100] w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-60 overflow-y-auto overflow-x-hidden animate-in fade-in zoom-in duration-200">
+                          <div className="p-1">
+                            {INDUSTRY_OPTIONS.filter(
+                              (ind) =>
+                                ind !== "Other" &&
+                                ind.toLowerCase().includes(industrySearch.toLowerCase())
+                            ).length > 0 ? (
+                              INDUSTRY_OPTIONS.filter(
+                                (ind) =>
+                                  ind !== "Other" &&
+                                  ind.toLowerCase().includes(industrySearch.toLowerCase())
+                              ).map((industry) => (
+                                <button
+                                  key={industry}
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedIndustry(industry);
+                                    setIndustrySearch(industry);
+                                    setShowIndustryDropdown(false);
+                                  }}
+                                  className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-600 rounded-md transition-colors duration-150 flex items-center justify-between group"
+                                >
+                                  <span>{industry}</span>
+                                  {selectedIndustry === industry && (
+                                    <FaCheckCircle className="text-blue-500 w-3 h-3" />
+                                  )}
+                                </button>
+                              ))
+                            ) : (
+                              <div className="px-3 py-4 text-center">
+                                <p className="text-sm text-slate-500 mb-1">No industries found</p>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedIndustry(industrySearch);
+                                    setShowIndustryDropdown(false);
+                                  }}
+                                  className="text-xs text-blue-600 font-medium hover:underline"
+                                >
+                                  Use "{industrySearch}"
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )
                 )}

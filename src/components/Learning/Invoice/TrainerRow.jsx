@@ -241,10 +241,13 @@ function TrainerRow({
             <div className="text-sm font-semibold text-green-600">
               {(() => {
                 // Calculate net payment for pending trainers using default values
-                const trainingFees = Math.round((item.perHourCost || 0) * (item.assignedHours || item.totalCollegeHours || 0));
+                const trainingFees = Math.round(
+                  item.totalTrainingFees ||
+                  (item.perHourCost || 0) * (item.assignedHours || item.totalCollegeHours || 0),
+                );
                 const gstAmount = 0; // Default to NA (no GST)
                 const taxableAmount = trainingFees + gstAmount;
-                const tdsAmount = Math.round((taxableAmount * 0.1)); // Default 10% TDS
+                const tdsAmount = Math.round(taxableAmount * 0.1); // Default 10% TDS
                 const otherExpenses = (item.totalConveyance || 0) + (item.totalFood || 0) + (item.totalLodging || 0);
                 const netPayment = Math.round(taxableAmount - tdsAmount + otherExpenses);
                 return `₹${netPayment.toLocaleString('en-IN')}`;

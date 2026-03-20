@@ -2,6 +2,11 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { INDUSTRY_OPTIONS } from '../../../utils/constants';
 
+// export utilities
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+
 const FollowupDashboard = ({
   allLeads = [],
   allUsers = {},
@@ -17,7 +22,30 @@ const FollowupDashboard = ({
   const itemsPerPage = 50; // Show 50 follow-ups per page
   const [isLoading, setIsLoading] = useState(false);
   const [allFollowUpsData, setAllFollowUpsData] = useState([]); // Store full dataset for KPIs
-  const [filters, setFilters] = useState(() => {
+
+  const userId = user?.uid || 'anon';
+  const getStorageKey = (key) => `followupDashboard_${userId}_${key}`;
+
+  const loadStoredFilters = () => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const stored = window.localStorage.getItem(getStorageKey('filters'));
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const loadStoredDateField = () => {
+    if (typeof window === 'undefined') return null;
+    try {
+      return window.localStorage.getItem(getStorageKey('dateFilterField')) || null;
+    } catch {
+      return null;
+    }
+  };
+
+  const defaultFilters = () => {
     if (user && ['Manager', 'Assistant Manager', 'Executive'].includes(user.role)) {
       const userName = user.displayName || user.name;
       return {
@@ -28,16 +56,25 @@ const FollowupDashboard = ({
         industry: [],
         searchTerm: ''
       };
-    } else {
-      return {
-        status: [],
-        assignedTo: [],
-        dateRange: 'all',
-        template: [],
-        industry: [],
-        searchTerm: ''
-      };
     }
+    return {
+      status: [],
+      assignedTo: [],
+      dateRange: 'all',
+      template: [],
+      industry: [],
+      searchTerm: ''
+    };
+  };
+
+  const [filters, setFilters] = useState(() => {
+    const stored = loadStoredFilters();
+    return stored || defaultFilters();
+  });
+
+  const [dateFilterField, setDateFilterField] = useState(() => {
+    const stored = loadStoredDateField();
+    return stored || 'createdAt';
   });
   const [filterDropdowns, setFilterDropdowns] = useState({
     status: false,
@@ -47,7 +84,7 @@ const FollowupDashboard = ({
     industry: false
   });
   const [chartsVisible, setChartsVisible] = useState(true);
-  const [openDropdownId, setOpenDropdownId] = useState(null);
+  const [reportDropdownOpen, setReportDropdownOpen] = useState(false);
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [allUniqueTemplates, setAllUniqueTemplates] = useState([]);
   const [statusChangeModal, setStatusChangeModal] = useState({
@@ -57,16 +94,36 @@ const FollowupDashboard = ({
     selectedStatus: ''
   });
 
-  // Close dropdown on outside click
+  // Persist filter state between dashboard visits
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const keyBase = `followupDashboard_${userId}_`;
+      window.localStorage.setItem(`${keyBase}filters`, JSON.stringify(filters));
+      window.localStorage.setItem(`${keyBase}dateFilterField`, dateFilterField);
+    } catch {
+      // ignore storage failures (e.g., private mode)
+    }
+  }, [filters, dateFilterField, userId]);
+
+  // Close filter dropdowns when clicking outside the filters container
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (openDropdownId && !event.target.closest('.dropdown-menu')) {
-        setOpenDropdownId(null);
+      // if the click target is not inside the wrapper around filter buttons, close all dropdowns
+      if (!event.target.closest('.filter-container')) {
+        setFilterDropdowns({
+          status: false,
+          assignedTo: false,
+          dateRange: false,
+          template: false,
+          industry: false
+        });
+        setReportDropdownOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [openDropdownId]);
+  }, []);
 
   // Debounce search term
   useEffect(() => {
@@ -159,6 +216,13 @@ const FollowupDashboard = ({
     if (status === 'called' || status === 'dialed') return 'Called';
     return status ? status.charAt(0).toUpperCase() + status.slice(1) : status;
   };
+
+  const getDateFieldLabel = () => (dateFilterField === 'date' ? 'Action' : 'Created');
+
+  const getFilterDateValue = useCallback((followup) => {
+    return dateFilterField === 'date' ? followup.date : followup.createdAt;
+  }, [dateFilterField]);
+
   const uniqueAssignedUsers = (() => {
     if (['Manager', 'Assistant Manager', 'Executive'].includes(user?.role)) {
       return [user.displayName || user.name].filter(Boolean);
@@ -182,7 +246,8 @@ const FollowupDashboard = ({
       const industryMatch = filters.industry.length === 0 || filters.industry.includes(followup.industry);
       const dateMatch = (() => {
         if (filters.dateRange === 'all') return true;
-        const followupDate = new Date(followup.createdAt);
+        const dateValue = getFilterDateValue(followup);
+        const followupDate = new Date(dateValue);
         const now = new Date();
         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         switch (filters.dateRange) {
@@ -209,6 +274,13 @@ const FollowupDashboard = ({
             yearAgo.setFullYear(today.getFullYear() - 1);
             return followupDate >= yearAgo;
           }
+          case 'custom': {
+            if (!filters.startDate || !filters.endDate) return true;
+            const start = new Date(filters.startDate);
+            const end = new Date(filters.endDate);
+            end.setHours(23, 59, 59, 999);
+            return followupDate >= start && followupDate <= end;
+          }
           default:
             return true;
         }
@@ -217,7 +289,7 @@ const FollowupDashboard = ({
         followup.company?.toLowerCase().includes(debouncedSearchTerm.toLowerCase());
       return statusMatch && assignedMatch && templateMatch && industryMatch && dateMatch && searchMatch;
     });
-  }, [allFollowUpsData, filters.status, filters.assignedTo, filters.template, filters.industry, filters.dateRange, debouncedSearchTerm]);
+  }, [allFollowUpsData, filters.status, filters.assignedTo, filters.template, filters.industry, filters.dateRange, filters.startDate, filters.endDate, debouncedSearchTerm, getFilterDateValue]);
 
   // Get paginated data from filtered results
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -233,7 +305,8 @@ const FollowupDashboard = ({
       const industryMatch = filters.industry.length === 0 || filters.industry.includes(followup.industry);
       const dateMatch = (() => {
         if (filters.dateRange === 'all') return true;
-        const followupDate = new Date(followup.createdAt);
+        const dateValue = getFilterDateValue(followup);
+        const followupDate = new Date(dateValue);
         const now = new Date();
         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         switch (filters.dateRange) {
@@ -260,6 +333,13 @@ const FollowupDashboard = ({
             yearAgo.setFullYear(today.getFullYear() - 1);
             return followupDate >= yearAgo;
           }
+          case 'custom': {
+            if (!filters.startDate || !filters.endDate) return true;
+            const start = new Date(filters.startDate);
+            const end = new Date(filters.endDate);
+            end.setHours(23, 59, 59, 999);
+            return followupDate >= start && followupDate <= end;
+          }
           default:
             return true;
         }
@@ -268,11 +348,14 @@ const FollowupDashboard = ({
         followup.company?.toLowerCase().includes(debouncedSearchTerm.toLowerCase());
       return statusMatch && assignedMatch && templateMatch && industryMatch && dateMatch && searchMatch;
     });
-  }, [allFollowUpsData, filters.status, filters.assignedTo, filters.template, filters.industry, filters.dateRange, debouncedSearchTerm]);
+  }, [allFollowUpsData, filters.status, filters.assignedTo, filters.template, filters.industry, filters.dateRange, filters.startDate, filters.endDate, debouncedSearchTerm, getFilterDateValue]);
 
   // Calculate KPIs from filtered dataset
   const today = new Date().toDateString();
-  const todayFollowUpsCount = filteredFullData.filter(f => f.createdAt && new Date(f.createdAt).toDateString() === today).length;
+  const todayFollowUpsCount = filteredFullData.filter(f => {
+    const dateValue = getFilterDateValue(f);
+    return dateValue && new Date(dateValue).toDateString() === today;
+  }).length;
   const hotLeads = filteredFullData.filter(f => f.status === 'hot').length;
   const warmLeads = filteredFullData.filter(f => f.status === 'warm').length;
   const calledLeads = filteredFullData.filter(f => f.status === 'called' || f.status === 'dialed').length;
@@ -378,9 +461,67 @@ const FollowupDashboard = ({
         const yearEndStr = yearEnd.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
         return `${yearStartStr} to ${yearEndStr}`;
       }
+      case 'custom': {
+        if (filters.startDate && filters.endDate) {
+          return `${filters.startDate} to ${filters.endDate}`;
+        }
+        return 'Custom';
+      }
       default:
         return 'All';
     }
+  };
+
+  // utility for building export rows (used by both Excel & PDF)
+  const getExportRows = () => {
+    return filteredFollowUpsData.map(followup => {
+      // build row with date/time at the end
+      const row = {
+        Company: followup.company || '',
+        Contact: followup.contactPerson || '',
+        'Contact Phone': followup.contactPhone || '',
+        Template: followup.template || '',
+        Industry: followup.industry || '',
+        'Action Date': followup.date ? new Date(followup.date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '',
+        'Action Time': followup.time || '',
+        Status: getStatusDisplayLabel(followup.status),
+        'Assigned To': followup.assignedUserName || ''
+      };
+      // append created info at end
+      row['Created Date'] = followup.createdAt ? new Date(followup.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '';
+      row['Created Time'] = followup.createdAt ? new Date(followup.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '';
+      return row;
+    });
+  };
+
+  const exportToExcel = () => {
+    const rows = getExportRows();
+    if (rows.length === 0) return;
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Followups');
+    XLSX.writeFile(workbook, `followups_export_${new Date().toISOString().slice(0,10)}.xlsx`);
+  };
+
+  const exportToPDF = () => {
+    const rows = getExportRows();
+    if (rows.length === 0) return;
+    const pdf = new jsPDF('l', 'mm', 'a4');
+    // simple header styling matching table
+    // enforce column order matching row construction
+    const orderedKeys = ['Company','Contact','Contact Phone','Template','Industry','Action Date','Action Time','Status','Assigned To','Created Date','Created Time'];
+    const columns = orderedKeys.map(key => ({ header: key, dataKey: key }));
+    pdf.setFontSize(10);
+    autoTable(pdf, {
+      columns,
+      body: rows,
+      theme: 'grid',
+      headStyles: { fillColor: [219, 234, 254], textColor: 20, fontStyle: 'bold' },
+      styles: { fontSize: 8, cellPadding: 2, overflow: 'linebreak' },
+      startY: 20,
+      margin: { left: 10, right: 10 }
+    });
+    pdf.save(`followups_export_${new Date().toISOString().slice(0,10)}.pdf`);
   };
 
   // Handle filter changes
@@ -423,8 +564,8 @@ const FollowupDashboard = ({
     <div className="fixed inset-0 mt-18 bg-white z-50 overflow-auto">
       <div className="px-2 py-2 ">
         <div className="flex items-center justify-between">
-          <h3 className="text-xl font-semibold text-blue-900">Recent Follow-ups Dashboard</h3>
-          <div className="flex items-center space-x-2">
+          <h3 className="text-lg font-semibold text-blue-900">Recent Follow-ups Dashboard</h3>
+          <div className="flex items-center space-x-2 filter-container">
             {/* Global Search */}
             <div className="relative">
               <input
@@ -449,7 +590,7 @@ const FollowupDashboard = ({
             <div className="relative">
               <button
                 onClick={(e) => { e.stopPropagation(); toggleFilterDropdown('status'); }}
-                className="flex items-center px-3 py-1.5 bg-blue-100 hover:bg-blue-200 rounded-lg text-blue-900 text-xs font-medium transition-colors"
+                className="flex items-center px-2 py-1 bg-blue-100 hover:bg-blue-200 rounded-lg text-blue-900 text-[11px] font-medium transition-colors"
               >
                 <span>Status: {filters.status.length === 0 ? 'All' : filters.status.length === 1 ? getStatusDisplayLabel(filters.status[0]) : `${filters.status.length} selected`}</span>
                 <svg className="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -457,7 +598,7 @@ const FollowupDashboard = ({
                 </svg>
               </button>
               {filterDropdowns.status && (
-                <div className="absolute right-0 top-full mt-1 w-32 bg-white shadow-lg border border-gray-200 z-20">
+                <div className="absolute right-0 top-full mt-1 w-32 bg-white shadow-lg border border-gray-200 z-20 max-h-60 overflow-y-auto">
                   <div className="p-1">
                     <div 
                       className="flex items-center px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50 rounded cursor-pointer transition-colors"
@@ -495,7 +636,7 @@ const FollowupDashboard = ({
             <div className="relative">
               <button
                 onClick={(e) => { e.stopPropagation(); toggleFilterDropdown('assignedTo'); }}
-                className="flex items-center px-3 py-1.5 bg-blue-100 hover:bg-blue-200 rounded-lg text-blue-900 text-xs font-medium transition-colors"
+                className="flex items-center px-2 py-1 bg-blue-100 hover:bg-blue-200 rounded-lg text-blue-900 text-[11px] font-medium transition-colors"
               >
                 <span>Assigned: {filters.assignedTo.length === 0 ? 'All' : filters.assignedTo.length === 1 ? filters.assignedTo[0] : `${filters.assignedTo.length} selected`}</span>
                 <svg className="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -503,7 +644,7 @@ const FollowupDashboard = ({
                 </svg>
               </button>
               {filterDropdowns.assignedTo && (
-                <div className="absolute right-0 top-full mt-1 w-40 bg-white shadow-lg border border-gray-200 z-20">
+                <div className="absolute right-0 top-full mt-1 w-40 bg-white shadow-lg border border-gray-200 z-20 max-h-60 overflow-y-auto">
                   <div className="p-1">
                     {!['Manager', 'Assistant Manager', 'Executive'].includes(user?.role) && (
                     <div 
@@ -544,7 +685,7 @@ const FollowupDashboard = ({
             <div className="relative">
               <button
                 onClick={(e) => { e.stopPropagation(); toggleFilterDropdown('template'); }}
-                className="flex items-center px-3 py-1.5 bg-blue-100 hover:bg-blue-200 rounded-lg text-blue-900 text-xs font-medium transition-colors"
+                className="flex items-center px-2 py-1 bg-blue-100 hover:bg-blue-200 rounded-lg text-blue-900 text-[11px] font-medium transition-colors"
               >
                 <span>Template: {filters.template.length === 0 ? 'All' : filters.template.length === 1 ? filters.template[0] : `${filters.template.length} selected`}</span>
                 <svg className="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -552,7 +693,7 @@ const FollowupDashboard = ({
                 </svg>
               </button>
               {filterDropdowns.template && (
-                <div className="absolute right-0 top-full mt-1 w-40 bg-white shadow-lg border border-gray-200 z-20">
+                <div className="absolute right-0 top-full mt-1 w-40 bg-white shadow-lg border border-gray-200 z-20 max-h-60 overflow-y-auto">
                   <div className="p-1">
                     <div 
                       className="flex items-center px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50 rounded cursor-pointer transition-colors"
@@ -590,7 +731,7 @@ const FollowupDashboard = ({
             <div className="relative">
               <button
                 onClick={(e) => { e.stopPropagation(); toggleFilterDropdown('industry'); }}
-                className="flex items-center px-3 py-1.5 bg-blue-100 hover:bg-blue-200 rounded-lg text-blue-900 text-xs font-medium transition-colors"
+                className="flex items-center px-2 py-1 bg-blue-100 hover:bg-blue-200 rounded-lg text-blue-900 text-[11px] font-medium transition-colors"
               >
                 <span>Industry: {filters.industry.length === 0 ? 'All' : filters.industry.length === 1 ? filters.industry[0] : `${filters.industry.length} selected`}</span>
                 <svg className="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -598,7 +739,7 @@ const FollowupDashboard = ({
                 </svg>
               </button>
               {filterDropdowns.industry && (
-                <div className="absolute right-0 top-full mt-1 w-40 bg-white shadow-lg border border-gray-200 z-20">
+                <div className="absolute right-0 top-full mt-1 w-40 bg-white shadow-lg border border-gray-200 z-20 max-h-60 overflow-y-auto">
                   <div className="p-1">
                     <div 
                       className="flex items-center px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50 rounded cursor-pointer transition-colors"
@@ -632,61 +773,197 @@ const FollowupDashboard = ({
               )}
             </div>
 
-            {/* Date Range Filter */}
+            {/* Date Filter (Created vs Action) */}
             <div className="relative">
               <button
                 onClick={(e) => { e.stopPropagation(); toggleFilterDropdown('dateRange'); }}
-                className="flex items-center px-3 py-1.5 bg-blue-100 hover:bg-blue-200 rounded-lg text-blue-900 text-xs font-medium transition-colors"
+                className="flex items-center px-2 py-1 bg-blue-100 hover:bg-blue-200 rounded-lg text-blue-900 text-[11px] font-medium transition-colors"
               >
-                <span className={`${filters.dateRange === 'all' ? 'text-blue-900' : 'text-blue-700'} text-xs`}>Created: {getDateRangeDisplay()}</span>
+                <span className={`${filters.dateRange === 'all' ? 'text-blue-900' : 'text-blue-700'} text-[11px]`}>
+                  Date: {getDateFieldLabel()}{filters.dateRange === 'all' ? ' (All)' : ` - ${getDateRangeDisplay()}`}
+                </span>
                 <svg className="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               </button>
               {filterDropdowns.dateRange && (
-                <div className="absolute right-0 top-full mt-1 w-24 bg-white shadow-lg border border-gray-200 z-20">
-                  <div className="p-1">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleFilterChange('dateRange', 'all'); toggleFilterDropdown('dateRange'); }}
-                      className="w-full text-left px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50 rounded transition-colors"
-                    >
-                      All
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleFilterChange('dateRange', 'today'); toggleFilterDropdown('dateRange'); }}
-                      className="w-full text-left px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50 rounded transition-colors"
-                    >
-                      Today
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleFilterChange('dateRange', 'yesterday'); toggleFilterDropdown('dateRange'); }}
-                      className="w-full text-left px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50 rounded transition-colors"
-                    >
-                      Yesterday
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleFilterChange('dateRange', 'week'); toggleFilterDropdown('dateRange'); }}
-                      className="w-full text-left px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50 rounded transition-colors"
-                    >
-                      This Week
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleFilterChange('dateRange', 'month'); toggleFilterDropdown('dateRange'); }}
-                      className="w-full text-left px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50 rounded transition-colors"
-                    >
-                      This Month
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleFilterChange('dateRange', 'year'); toggleFilterDropdown('dateRange'); }}
-                      className="w-full text-left px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50 rounded transition-colors"
-                    >
-                      This Year
-                    </button>
+                <div className="absolute right-0 top-full mt-1 w-64 bg-white shadow-lg border border-gray-200 z-20 max-h-72 overflow-y-auto">
+                  <div className="p-2">
+                    <div className="mb-2">
+                      <div className="text-xs font-medium text-gray-600 mb-1">Date field</div>
+                      <div className="flex items-center space-x-3">
+                        <label className="flex items-center text-xs text-gray-700">
+                          <input
+                            type="radio"
+                            name="dateField"
+                            value="createdAt"
+                            checked={dateFilterField === 'createdAt'}
+                            onChange={() => setDateFilterField('createdAt')}
+                            className="mr-1"
+                          />
+                          Created
+                        </label>
+                        <label className="flex items-center text-xs text-gray-700">
+                          <input
+                            type="radio"
+                            name="dateField"
+                            value="date"
+                            checked={dateFilterField === 'date'}
+                            onChange={() => setDateFilterField('date')}
+                            className="mr-1"
+                          />
+                          Action
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="border-t border-gray-200 pt-2">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleFilterChange('dateRange', 'all'); toggleFilterDropdown('dateRange'); }}
+                        className="w-full text-left px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50 rounded transition-colors"
+                      >
+                        All
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleFilterChange('dateRange', 'today'); toggleFilterDropdown('dateRange'); }}
+                        className="w-full text-left px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50 rounded transition-colors"
+                      >
+                        Today
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleFilterChange('dateRange', 'yesterday'); toggleFilterDropdown('dateRange'); }}
+                        className="w-full text-left px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50 rounded transition-colors"
+                      >
+                        Yesterday
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleFilterChange('dateRange', 'week'); toggleFilterDropdown('dateRange'); }}
+                        className="w-full text-left px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50 rounded transition-colors"
+                      >
+                        This Week
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleFilterChange('dateRange', 'month'); toggleFilterDropdown('dateRange'); }}
+                        className="w-full text-left px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50 rounded transition-colors"
+                      >
+                        This Month
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleFilterChange('dateRange', 'year'); toggleFilterDropdown('dateRange'); }}
+                        className="w-full text-left px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50 rounded transition-colors"
+                      >
+                        This Year
+                      </button>
+                      <div className="mt-2 px-2">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-xs mb-1">From</label>
+                            <input
+                              type="date"
+                              value={filters.startDate}
+                              onChange={e => handleFilterChange('startDate', e.target.value)}
+                              className="w-full text-xs border border-gray-300 rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs mb-1">To</label>
+                            <input
+                              type="date"
+                              value={filters.endDate}
+                              onChange={e => handleFilterChange('endDate', e.target.value)}
+                              className="w-full text-xs border border-gray-300 rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            />
+                          </div>
+                        </div>
+                        {!filters.startDate || !filters.endDate ? (
+                          <div className="mt-2 text-xs text-red-600">Please select both start and end dates to apply.</div>
+                        ) : null}
+                        <div className="mt-2 grid grid-cols-2 gap-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleFilterChange('dateRange', 'custom');
+                              toggleFilterDropdown('dateRange');
+                            }}
+                            disabled={!filters.startDate || !filters.endDate}
+                            className="w-full text-center px-2 py-1.5 text-xs font-medium text-white rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-blue-600 hover:bg-blue-700"
+                          >
+                            Apply
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleFilterChange('startDate', '');
+                              handleFilterChange('endDate', '');
+                              handleFilterChange('dateRange', 'all');
+                            }}
+                            className="w-full text-center px-2 py-1.5 text-xs font-medium text-blue-700 rounded border border-blue-200 hover:bg-blue-50"
+                          >
+                            Reset
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
             </div>
 
+            {/* Reports dropdown */}
+            <div className="relative">
+              <button
+                onClick={(e) => { e.stopPropagation(); setReportDropdownOpen(prev => !prev); }}
+                disabled={filteredFollowUpsData.length === 0}
+                className="bg-transparent border-2 border-blue-100 border- px-1.5 py-1.5 rounded-xl flex items-center cursor-pointer text-xs mr-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Reports
+                <svg className="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {reportDropdownOpen && (
+                <div className="absolute right-0 top-full mt-1 w-24 bg-white shadow-lg border border-gray-200 z-20">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); exportToExcel(); setReportDropdownOpen(false); }}
+                    disabled={filteredFollowUpsData.length === 0}
+                    className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <span className="flex items-center justify-between w-full">
+                      <span className="flex items-center">
+                        <svg className="w-3 h-3 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Excel
+                      </span>
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 10l5 5 5-5" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15V3" />
+                      </svg>
+                    </span>
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); exportToPDF(); setReportDropdownOpen(false); }}
+                    disabled={filteredFollowUpsData.length === 0}
+                    className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <span className="flex items-center justify-between w-full">
+                      <span className="flex items-center">
+                        <svg className="w-3 h-3 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" />
+                        </svg>
+                        PDF
+                      </span>
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 10l5 5 5-5" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15V3" />
+                      </svg>
+                    </span>
+                  </button>
+                </div>
+              )}
+            </div>
             <div
               onClick={() => {
                 if (onRefresh) {
