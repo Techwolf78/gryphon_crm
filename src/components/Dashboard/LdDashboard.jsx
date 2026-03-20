@@ -2311,7 +2311,7 @@ const LdDashboard = ({ filters }) => {
             style={{ maxHeight: "600px" }}
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-white via-gray-50 to-indigo-50">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-linear-to-r from-white via-gray-50 to-indigo-50">
               <div className="flex items-center gap-3">
                 <div className="bg-indigo-100 text-indigo-600 rounded-full w-10 h-10 flex items-center justify-center font-bold text-lg shadow-sm">
                   {modalTrainer?.name?.[0] || "?"}
@@ -2392,7 +2392,7 @@ const LdDashboard = ({ filters }) => {
             </div>
 
             {/* Footer */}
-            <div className="px-6 py-3 bg-gradient-to-r from-white via-gray-50 to-indigo-50 border-t border-gray-100 flex justify-end">
+            <div className="px-6 py-3 bg-linear-to-r from-white via-gray-50 to-indigo-50 border-t border-gray-100 flex justify-end">
               <button
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 text-white font-semibold shadow hover:bg-indigo-700 transition focus:outline-none focus:ring-2 focus:ring-indigo-400"
                 onClick={() => setIsModalOpen(false)}
