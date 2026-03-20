@@ -11,7 +11,7 @@ import {
 import { useDroppable } from "@dnd-kit/core";
 import { useDraggable } from "@dnd-kit/core";
 import ImageCompressor from "image-compressor.js";
-import { FiPaperclip, FiImage, FiX, FiChevronLeft, FiChevronRight, FiEdit2, FiRefreshCw, FiAlertCircle, FiFileText } from "react-icons/fi";
+import { FiPaperclip, FiImage, FiX, FiChevronLeft, FiChevronRight, FiEdit2, FiRefreshCw, FiAlertCircle, FiFileText, FiCopy } from "react-icons/fi";
 import { Hourglass, CheckCircle, Clock, Users, FileText, XCircle, Circle, TrendingUp } from "lucide-react";
 
 const flipStyles = `
@@ -239,9 +239,19 @@ const TableSkeleton = () => (
   </div>
 );
 
-const TaskCard = ({ task, getRoleDisplay, getRoleColor, handleDelete, moveTask, onImageDelete, onEditTask, isDraggable = true, user }) => {
+const TaskCard = ({ task, getRoleDisplay, getRoleColor, handleDelete, moveTask, onImageDelete, onEditTask, onDuplicateTask, isDraggable = true, user }) => {
   const [showImageModal, setShowImageModal] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  const roleColors = {
+    "Video Editor": "bg-purple-50 text-purple-700 border-purple-100",
+    "Graphic Designer": "bg-orange-50 text-orange-700 border-orange-100",
+    Manager: "bg-blue-50 text-blue-700 border-blue-100",
+    Developer: "bg-teal-50 text-teal-700 border-teal-100",
+    "Content Writer": "bg-pink-50 text-pink-700 border-pink-100",
+  };
+
+  const currentRoleStyle = roleColors[task.role] || "bg-gray-50 text-gray-700 border-gray-100";
 
   // Keyboard navigation for modal
   useEffect(() => {
@@ -310,104 +320,117 @@ const TaskCard = ({ task, getRoleDisplay, getRoleColor, handleDelete, moveTask, 
     }
   };
 
-  const getActionButtons = (status, task, onEditTask, user) => {
+  const getActionButtons = (status, task, onEditTask, user, onDuplicateTask) => {
     const editButton = (
       <button
-        onClick={() => onEditTask(task)}
-        className="px-2 py-1 text-xs text-gray-800 rounded-full hover:opacity-80 transition-colors font-medium shadow-sm"
-        style={{ backgroundColor: "#E6E6FA" }}
+        onClick={(e) => { e.stopPropagation(); onEditTask(task); }}
+        className="px-1.5 py-0.5 text-[10px] text-gray-800 rounded-md hover:opacity-80 transition-colors font-medium shadow-sm bg-[#E6E6FA]"
       >
         Edit
+      </button>
+    );
+
+    const duplicateButton = (
+      <button
+        onClick={(e) => { e.stopPropagation(); onDuplicateTask(task); }}
+        className="p-1 text-gray-500 hover:text-blue-600 transition-colors"
+        title="Duplicate Task"
+      >
+        <FiCopy className="w-3 h-3" />
       </button>
     );
 
     switch (status) {
       case "not_started":
         return (
-          <div className="flex gap-2">
+          <div className="flex gap-1 items-center">
             { (task.assignedTo === user?.displayName || ["Director", "Head", "Admin"].includes(user?.role)) && (
               <button
-                onClick={() => moveTask(task.id, "in_progress")}
-                className="px-2 py-1 text-xs bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-colors font-medium shadow-sm"
+                onClick={(e) => { e.stopPropagation(); moveTask(task.id, "in_progress"); }}
+                className="px-1.5 py-0.5 text-[10px] bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors font-medium shadow-sm"
               >
                 Start
               </button>
             ) }
             { (task.assignedTo === user?.displayName || ["Director", "Head", "Admin"].includes(user?.role)) && (
               <button
-                onClick={() => moveTask(task.id, "cancelled")}
-                className="px-2 py-1 text-xs bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors font-medium shadow-sm"
+                onClick={(e) => { e.stopPropagation(); moveTask(task.id, "cancelled"); }}
+                className="px-1.5 py-0.5 text-[10px] bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors font-medium shadow-sm"
               >
                 Cancel
               </button>
             ) }
             { (task.assignedTo === user?.displayName || ["Director", "Head", "Admin"].includes(user?.role)) && editButton }
+            { duplicateButton }
           </div>
         );
       case "in_progress":
         return (
-          <div className="flex gap-2">
+          <div className="flex gap-1 items-center">
             { (task.assignedTo === user?.displayName || ["Director", "Head", "Admin"].includes(user?.role)) && (
               <button
-                onClick={() => moveTask(task.id, "completed")}
-                className="px-2 py-1 text-xs bg-green-500 text-white rounded-full hover:bg-green-600 transition-colors font-medium shadow-sm"
+                onClick={(e) => { e.stopPropagation(); moveTask(task.id, "completed"); }}
+                className="px-1.5 py-0.5 text-[10px] bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors font-medium shadow-sm"
               >
                 Complete
               </button>
             ) }
             { (task.assignedTo === user?.displayName || ["Director", "Head", "Admin"].includes(user?.role)) && (
               <button
-                onClick={() => moveTask(task.id, "not_started")}
-                className="px-2 py-1 text-xs bg-gray-500 text-white rounded-full hover:bg-gray-600 transition-colors font-medium shadow-sm"
+                onClick={(e) => { e.stopPropagation(); moveTask(task.id, "not_started"); }}
+                className="px-1.5 py-0.5 text-[10px] bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors font-medium shadow-sm"
               >
                 Back
               </button>
             ) }
             { (task.assignedTo === user?.displayName || ["Director", "Head", "Admin"].includes(user?.role)) && editButton }
+            { duplicateButton }
           </div>
         );
       case "completed":
         return (
-          <div className="flex gap-2">
+          <div className="flex gap-1 items-center">
             { (task.assignedTo === user?.displayName || ["Director", "Head", "Admin"].includes(user?.role)) && (
               <button
-                onClick={() => moveTask(task.id, "in_progress")}
-                className="px-2 py-1 text-xs bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-colors font-medium shadow-sm"
+                onClick={(e) => { e.stopPropagation(); moveTask(task.id, "in_progress"); }}
+                className="px-1.5 py-0.5 text-[10px] bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors font-medium shadow-sm"
               >
                 Reopen
               </button>
             ) }
             { (task.assignedTo === user?.displayName || ["Director", "Head", "Admin"].includes(user?.role)) && (
               <button
-                onClick={() => handleDelete(task.id)}
-                className="px-2 py-1 text-xs bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors font-medium shadow-sm"
+                onClick={(e) => { e.stopPropagation(); handleDelete(task.id); }}
+                className="px-1.5 py-0.5 text-[10px] bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors font-medium shadow-sm"
               >
                 Delete
               </button>
             ) }
             { (task.assignedTo === user?.displayName || ["Director", "Head", "Admin"].includes(user?.role)) && editButton }
+            { duplicateButton }
           </div>
         );
       case "cancelled":
         return (
-          <div className="flex gap-2">
+          <div className="flex gap-1 items-center">
             { (task.assignedTo === user?.displayName || ["Director", "Head", "Admin"].includes(user?.role)) && (
               <button
-                onClick={() => moveTask(task.id, "not_started")}
-                className="px-2 py-1 text-xs bg-gray-500 text-white rounded-full hover:bg-gray-600 transition-colors font-medium shadow-sm"
+                onClick={(e) => { e.stopPropagation(); moveTask(task.id, "not_started"); }}
+                className="px-1.5 py-0.5 text-[10px] bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors font-medium shadow-sm"
               >
                 Restore
               </button>
             ) }
             { (task.assignedTo === user?.displayName || ["Director", "Head", "Admin"].includes(user?.role)) && (
               <button
-                onClick={() => handleDelete(task.id)}
-                className="px-2 py-1 text-xs bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors font-medium shadow-sm"
+                onClick={(e) => { e.stopPropagation(); handleDelete(task.id); }}
+                className="px-1.5 py-0.5 text-[10px] bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors font-medium shadow-sm"
               >
                 Delete
               </button>
             ) }
             { (task.assignedTo === user?.displayName || ["Director", "Head", "Admin"].includes(user?.role)) && editButton }
+            { duplicateButton }
           </div>
         );
       default:
@@ -540,36 +563,42 @@ const TaskCard = ({ task, getRoleDisplay, getRoleColor, handleDelete, moveTask, 
         </div>
       )}
       <h4
-        className="font-medium text-gray-900 mb-0.5 pr-6 text-xs"
+        className="font-semibold text-gray-900 mb-1 pr-6 text-xs leading-tight line-clamp-2 select-text cursor-text"
         style={getStatusStyles(task.status)}
       >
         {task.title || task.description}
       </h4>
-      <p
-        className={`text-xs mb-0.5 ${task.status === "cancelled" ? "text-gray-500" : "text-gray-600"}`}
-      >
-        {task.assignedTo || "Unassigned"}
-      </p>
-      <div className="flex justify-between mb-0.5">
-        <div className="flex gap-1">
-          {task.role && (
-            <div
-              className={`inline-flex items-center px-1 py-0 rounded-full text-xs font-medium ${getRoleColor(task.role)}`}
-            >
-              👤 {getRoleDisplay(task.role)}
-            </div>
-          )}
+
+      <div className="flex flex-wrap gap-1 mb-1.5 select-text cursor-text">
+        <div className="flex items-center text-[9px] text-gray-500 font-medium bg-gray-50 px-1 py-0.5 rounded border border-gray-100">
+          <Users size={9} className="mr-0.5" />
+          {task.assignedTo || "Unassigned"}
         </div>
-        <div className="flex gap-1">
-          {task.account && (
-            <div className="inline-flex items-center px-1 py-0 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-              🏢 {task.account}
-            </div>
-          )}
-        </div>
+        
+        {task.role && (
+          <div className={`inline-flex items-center px-1 py-0.5 rounded text-[9px] font-semibold border ${currentRoleStyle}`}>
+            {getRoleDisplay(task.role)}
+          </div>
+        )}
+
+        {task.account && (
+          <div className="inline-flex items-center px-1 py-0.5 rounded text-[9px] font-semibold bg-purple-50 text-purple-700 border border-purple-100">
+            {task.account}
+          </div>
+        )}
+
+        {task.task && (
+          <div className="inline-flex items-center px-1 py-0.5 rounded bg-indigo-50 text-indigo-700 text-[9px] font-semibold border border-indigo-100">
+            {task.task}
+          </div>
+        )}
       </div>
-      <div className="flex items-center justify-between mt-1">
-        {getActionButtons(task.status, task, onEditTask, user)}
+
+      <div className="flex items-center justify-between mt-auto pt-1 border-t border-gray-50 gap-1">
+        <div className="flex flex-wrap gap-1 items-center">
+          {getActionButtons(task.status, task, onEditTask, user, onDuplicateTask)}
+        </div>
+        
         {task.dueDate && task.status !== "completed" && (() => {
           const due = parseDate(task.dueDate);
           if (!due) return null;
@@ -580,21 +609,22 @@ const TaskCard = ({ task, getRoleDisplay, getRoleColor, handleDelete, moveTask, 
           const days = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
           
           let colorClass = "text-green-600";
-          let text = `${days} days left`;
+          let text = `${days}d`;
           
           if (days < 0) {
             colorClass = "text-red-500";
-            text = `Overdue by ${Math.abs(days)} days`;
+            text = `${Math.abs(days)}d Overdue`;
           } else if (days === 0) {
             colorClass = "text-orange-500";
-            text = "Due Today";
+            text = "Today";
           } else if (days <= 3) {
             colorClass = "text-orange-500";
+            text = `${days}d`;
           }
-  
+
           return (
-            <div className={`text-xs font-medium ${colorClass} flex items-center gap-1`}>
-              <span><Hourglass size={12}/></span> {text}
+            <div className={`text-[9px] font-bold ${colorClass} flex items-center gap-0.5 shrink-0`}>
+              <Hourglass size={9}/> {text}
             </div>
           );
         })()}
@@ -663,6 +693,7 @@ const CalendarView = ({
   moveTask,
   onImageDelete,
   onEditTask,
+  onDuplicateTask,
   currentDate,
   onDateChange,
   user,
@@ -829,6 +860,7 @@ const CalendarView = ({
                 moveTask={moveTask}
                 onImageDelete={onImageDelete}
                 onEditTask={onEditTask}
+                onDuplicateTask={onDuplicateTask}
                 isDraggable={false}
                 user={user}
               />
@@ -850,6 +882,7 @@ const TableView = ({
   handleDelete,
   moveTask,
   onEditTask,
+  onDuplicateTask,
   user,
 }) => {
   const getStatusBadge = (status) => {
@@ -946,6 +979,11 @@ const TableView = ({
                           +{task.images.length - 1} more images
                         </div>
                       )}
+                      {task.task && (
+                        <div className="mt-1 inline-flex items-center px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 text-[10px] font-bold border border-indigo-100 uppercase tracking-tighter">
+                          📌 {task.task}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </td>
@@ -978,6 +1016,15 @@ const TableView = ({
                         Edit
                       </button>
                     ) }
+
+                    <button
+                      onClick={() => onDuplicateTask(task)}
+                      className="p-1 px-1.5 text-xs text-gray-600 bg-gray-50 rounded-full hover:bg-gray-100 transition-colors font-semibold shadow-sm flex items-center gap-1"
+                      title="Duplicate Task"
+                    >
+                      <FiCopy className="w-3 h-3" />
+                      Copy
+                    </button>
 
                     {/* Status change buttons */}
                     {task.status === "not_started" && (task.assignedTo === user?.displayName || ["Director", "Head", "Admin"].includes(user?.role)) && (
@@ -2204,6 +2251,42 @@ const TaskManager = ({ onBack }) => {
     setShowEditModal(true);
   };
 
+  const handleDuplicateTask = async (task) => {
+    try {
+      const taskId = await getNextTaskId();
+      const taskData = {
+        title: task.title,
+        description: task.description,
+        assignedTo: task.assignedTo,
+        role: task.role || null,
+        account: task.account || null,
+        rolePlay: task.rolePlay || null,
+        task: task.task || null,
+        dueDate: task.dueDate || null,
+        startDate: task.startDate || getTodayIST(),
+        status: "not_started",
+        images: task.images || [],
+        userId: user.uid,
+        originalUserId: user.uid,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+
+      const docRef = doc(db, "marketing_tasks", taskId);
+      const newTask = { ...taskData, id: taskId };
+      
+      setTasks((prev) => [newTask, ...prev]);
+      await setDoc(docRef, { ...taskData, id: taskId });
+      
+      setToastMessage("Task duplicated successfully!");
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+    } catch (error) {
+      console.error("Error duplicating task:", error);
+      alert("Failed to duplicate task.");
+    }
+  };
+
   const handleSaveTaskDates = async (taskId, taskData) => {
     const task = tasks.find(t => t.id === taskId);
     if (!task || (task.assignedTo !== user?.displayName && !["Director", "Head", "Admin"].includes(user?.role))) {
@@ -2834,7 +2917,7 @@ const TaskManager = ({ onBack }) => {
                             value={startDate}
                             onChange={(e) => setStartDate(e.target.value)}
                             className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-gray-50"
-                            placeholder="Start Date"
+                            placeholder="dd-mm-yyyy"
                           />
                         </div>
                         {canEditDueDate && (
@@ -2845,11 +2928,11 @@ const TaskManager = ({ onBack }) => {
                               value={dueDate}
                               onChange={(e) => setDueDate(e.target.value)}
                               className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-gray-50"
-                              placeholder="Due Date"
+                              placeholder="dd-mm-yyyy"
                             />
                           </div>
                         )}
-                        <div className="sm:col-span-2 lg:col-span-4">
+                        <div className="sm:col-span-2 lg:col-span-4 select-text">
                           <textarea
                             value={title}
                             onChange={(e) => {
@@ -2858,7 +2941,7 @@ const TaskManager = ({ onBack }) => {
                               }
                             }}
                             placeholder={placeholderText}
-                            className="w-full px-2 py-2 text-xs border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-gray-50 resize-none"
+                            className="w-full px-2 py-2 text-xs border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-gray-50 resize-none select-text cursor-text"
                             rows="3"
                             required
                           />
@@ -2912,11 +2995,18 @@ const TaskManager = ({ onBack }) => {
                               setStartDate(getTodayIST());
                               setDueDate("");
                               clearImage();
-                              setShowForm(false);
+                              setFormError("");
                             }}
                             className="px-3 py-1.5 bg-gray-500 text-white rounded-full hover:bg-gray-600 transition-colors font-medium text-xs shadow-sm"
                           >
                             Reset
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setShowForm(false)}
+                            className="px-3 py-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors font-medium text-xs shadow-sm"
+                          >
+                            Close
                           </button>
                           {imagePreview && (
                              isPDF(imagePreview) ? (
@@ -2959,6 +3049,7 @@ const TaskManager = ({ onBack }) => {
                           moveTask={moveTask}
                           onImageDelete={handleImageDelete}
                           onEditTask={handleEditTask}
+                          onDuplicateTask={handleDuplicateTask}
                           user={user}
                         />
                       ))}
@@ -2981,6 +3072,7 @@ const TaskManager = ({ onBack }) => {
                           moveTask={moveTask}
                           onImageDelete={handleImageDelete}
                           onEditTask={handleEditTask}
+                          onDuplicateTask={handleDuplicateTask}
                           user={user}
                         />
                       ))}
@@ -3003,6 +3095,7 @@ const TaskManager = ({ onBack }) => {
                           moveTask={moveTask}
                           onImageDelete={handleImageDelete}
                           onEditTask={handleEditTask}
+                          onDuplicateTask={handleDuplicateTask}
                           user={user}
                         />
                       ))}
@@ -3025,6 +3118,7 @@ const TaskManager = ({ onBack }) => {
                           moveTask={moveTask}
                           onImageDelete={handleImageDelete}
                           onEditTask={handleEditTask}
+                          onDuplicateTask={handleDuplicateTask}
                           user={user}
                         />
                       ))}
@@ -3040,6 +3134,7 @@ const TaskManager = ({ onBack }) => {
                   moveTask={moveTask}
                   onImageDelete={handleImageDelete}
                   onEditTask={handleEditTask}
+                  onDuplicateTask={handleDuplicateTask}
                   currentDate={calendarCurrentDate}
                   onDateChange={(direction) => {
                     if (direction === 1) goToNextMonth();
@@ -3068,6 +3163,7 @@ const TaskManager = ({ onBack }) => {
                         handleDelete={handleDelete}
                         moveTask={moveTask}
                         onEditTask={handleEditTask}
+                        onDuplicateTask={handleDuplicateTask}
                         user={user}
                       />
                     </div>

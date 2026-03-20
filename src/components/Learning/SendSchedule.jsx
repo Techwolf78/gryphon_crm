@@ -82,6 +82,39 @@ function SendSchedule({
     return { conveyance, food, lodging };
   };
 
+  // Utility: calculate training fees using per-session rate when available
+  const calculateTrainingFees = (assignments, fallbackRate) => {
+    return assignments.reduce((sum, assignment) => {
+      const hours = Number(assignment.assignedHours) || 0;
+      const rate = Number(assignment.rate) || Number(fallbackRate) || 0;
+      return sum + hours * rate;
+    }, 0);
+  };
+
+  // Utility: build a human-readable rate breakdown (e.g. "1h × ₹750/hr + 1h × ₹1000/hr")
+  const buildRateBreakdownLabel = (assignments, fallbackRate) => {
+    const grouped = assignments.reduce((acc, assignment) => {
+      const rate = Number(assignment.rate) || Number(fallbackRate) || 0;
+      const hours = Number(assignment.assignedHours) || 0;
+      acc[rate] = (acc[rate] || 0) + hours;
+      return acc;
+    }, {});
+
+    const entries = Object.entries(grouped)
+      .map(([rate, hours]) => ({ rate: Number(rate), hours }))
+      .filter(({ rate, hours }) => hours > 0)
+      .sort((a, b) => a.rate - b.rate);
+
+    if (entries.length === 0) {
+      const fallback = Number(fallbackRate) || 0;
+      return `0h × ₹${fallback.toLocaleString('en-IN')}/hr`;
+    }
+
+    return entries
+      .map((entry) => `${entry.hours.toFixed(1)}h × ₹${entry.rate.toLocaleString('en-IN')}/hr`)
+      .join(' + ');
+  };
+
   // Utility: format date
 const formatDate = (dateStr) => {
   if (!dateStr) return "";
@@ -473,7 +506,9 @@ const formatDate = (dateStr) => {
       // FIXED: Use new calculation logic (matching InvoiceModal)
       const roundToNearestWhole = (num) => Math.round(num);
       
-      const trainingFees = roundToNearestWhole(totalHours * feePerHour);
+      const trainingFees = roundToNearestWhole(
+        calculateTrainingFees(selectedAssignmentsData, feePerHour)
+      );
       
       // Calculate expenses the same way as InitiationTrainingDetails
       // Conveyance is one-time, food and lodging are already totals from assignments
@@ -837,7 +872,11 @@ const formatDate = (dateStr) => {
                 // Round to nearest whole number (matching InvoiceModal)
                 const roundToNearestWhole = (num) => Math.round(num);
 
-                const trainingFees = roundToNearestWhole(totalHours * feePerHour);
+                const trainingFees = roundToNearestWhole(
+                  calculateTrainingFees(selectedAssignmentsData, feePerHour)
+                );
+
+                const rateBreakdownLabel = buildRateBreakdownLabel(selectedAssignmentsData, feePerHour);
 
                 // Calculate expenses the same way as InitiationTrainingDetails
                 // Conveyance is one-time, food and lodging are already totals from assignments
@@ -905,7 +944,7 @@ const formatDate = (dateStr) => {
                             <span className="text-sm font-semibold text-gray-900">₹{trainingFees.toLocaleString('en-IN')}</span>
                           </div>
                           <div className="ml-3 text-xs text-gray-500">
-                            {totalHours.toFixed(1)}h × ₹{feePerHour.toLocaleString('en-IN')}/hr
+                            {rateBreakdownLabel}
                           </div>
                         </div>
 
@@ -1154,7 +1193,7 @@ const formatDate = (dateStr) => {
                           ₹{(() => {
                             const selectedData = trainerAssignments.filter(a => selectedAssignments.includes(a.id));
                             const totalHours = selectedData.reduce((acc, a) => acc + (a.assignedHours || 0), 0);
-                            const trainingFees = Math.round(totalHours * feePerHour);
+                            const trainingFees = Math.round(calculateTrainingFees(selectedData, feePerHour));
                             const { conveyance, food, lodging } = calculateExpensesForSelected(selectedData);
                             const expenses = Math.round(conveyance + food + lodging);
                             const total = trainingFees + expenses;

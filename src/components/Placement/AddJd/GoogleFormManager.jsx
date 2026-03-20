@@ -44,12 +44,16 @@ const logSecurityEvent = async (eventType, details) => {
   try {
     if (!auth.currentUser) return;
     
+    // Firestore rejects undefined fields; strip them out
+    const sanitize = obj => JSON.parse(JSON.stringify(obj || {}));
+    const cleanDetails = sanitize(details);
+
     const logRef = doc(db, "SecurityLogs", `${auth.currentUser.uid}_${Date.now()}`);
     await setDoc(logRef, {
       userId: auth.currentUser.uid,
       userEmail: auth.currentUser.email,
       eventType: eventType,
-      details: details,
+      details: cleanDetails,
       timestamp: Timestamp.now(),
       userAgent: navigator.userAgent
     });
