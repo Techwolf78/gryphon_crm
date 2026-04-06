@@ -368,15 +368,258 @@ const InvoiceExcelExporter = ({ db, filteredData, exporting, setExporting }) => 
     }
   };
 
+  const formatDateForExport = (rawDate) => {
+    if (!rawDate) return "";
+    const date = new Date(rawDate);
+    if (Number.isNaN(date.getTime())) return "";
+    return date.toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  const formatInvoiceMonth = (rawDate) => {
+    if (!rawDate) return "";
+    const date = new Date(rawDate);
+    if (Number.isNaN(date.getTime())) return "";
+    return date.toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+    });
+  };
+
+  const handleExportLimitedExcel = async () => {
+    setExporting(true);
+    try {
+      if (!filteredData || typeof filteredData !== "object" || Object.keys(filteredData).length === 0) {
+        alert("⚠️ No data available for export. Please ensure you have trainer data loaded.");
+        setExporting(false);
+        return;
+      }
+
+      const limitedExportRows = [];
+      limitedExportRows.push([
+        "Training Month:",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+      ]);
+      limitedExportRows.push([
+        "Invoice Month:",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+      ]);
+      limitedExportRows.push([]);
+      limitedExportRows.push([
+        "S. N.",
+        "Project Code",
+        "Bill No.",
+        "Trainer Name",
+        "Description",
+        "Domain",
+        "Amount",
+        "Status",
+        "Date of payment",
+        "Payment Status",
+        "Remark*",
+      ]);
+
+      let rowIndex = 0;
+      let totalCount = 0;
+      let totalAmount = 0;
+      let firstTrainer = null;
+
+      Object.keys(filteredData).forEach((college) => {
+        Object.keys(filteredData[college]).forEach((phase) => {
+          filteredData[college][phase].forEach((trainer) => {
+            const invoice = trainer.invoiceData || {};
+            if (!firstTrainer) firstTrainer = trainer;
+
+            const trainingDateRange = trainer.earliestStartDate && trainer.latestEndDate
+              ? `${formatDateForExport(trainer.earliestStartDate)} - ${formatDateForExport(trainer.latestEndDate)}`
+              : invoice.startDate && invoice.endDate
+              ? `${formatDateForExport(invoice.startDate)} - ${formatDateForExport(invoice.endDate)}`
+              : invoice.topics || invoice.domain || trainer.domain || "";
+
+            const paymentDate =
+              invoice.paymentDate || invoice.billingDate || trainer.latestEndDate || "";
+            const paymentStatus =
+              invoice.paymentStatus || invoice.status || "Not available";
+            const remark =
+              invoice.remarks?.text || invoice.remarks || "";
+            const amountValue = invoice.netPayment || invoice.totalAmount || 0;
+
+            limitedExportRows.push([
+              rowIndex + 1,
+              trainer.projectCode || invoice.projectCode || "",
+              invoice.billNumber || "",
+              invoice.trainerName || trainer.trainerName || "",
+              trainingDateRange,
+              invoice.domain || trainer.domain || "",
+              amountValue,
+              invoice.status || trainer.status || "",
+              formatDateForExport(paymentDate),
+              paymentStatus,
+              remark,
+            ]);
+            rowIndex += 1;
+            totalCount += 1;
+            totalAmount += Number(amountValue) || 0;
+          });
+        });
+      });
+
+      if (totalCount === 0) {
+        alert("⚠️ No trainers found in the current view.");
+        setExporting(false);
+        return;
+      }
+
+      limitedExportRows.push([]);
+      limitedExportRows.push([
+        "",
+        "",
+        "",
+        "",
+        "",
+        "Total",
+        totalAmount,
+        "",
+        "",
+        "",
+        "",
+      ]);
+
+      const trainingMonthHeader = firstTrainer
+        ? `${formatDateForExport(firstTrainer.earliestStartDate)} - ${formatDateForExport(
+            firstTrainer.latestEndDate
+          )}`
+        : "";
+      const invoiceMonthHeader = firstTrainer
+        ? formatInvoiceMonth(firstTrainer.invoiceData?.billingDate || firstTrainer.invoiceData?.paymentDate)
+        : "";
+
+      limitedExportRows[0][1] = trainingMonthHeader;
+      limitedExportRows[1][1] = invoiceMonthHeader;
+
+      const ws = XLSX.utils.aoa_to_sheet(limitedExportRows);
+      ws["!cols"] = [
+        { wch: 6 },
+        { wch: 20 },
+        { wch: 20 },
+        { wch: 22 },
+        { wch: 30 },
+        { wch: 16 },
+        { wch: 14 },
+        { wch: 14 },
+        { wch: 16 },
+        { wch: 16 },
+        { wch: 32 },
+      ];
+
+      const headerRow = 3;
+      for (let c = 0; c <= 10; c++) {
+        const cell = ws[XLSX.utils.encode_cell({ r: headerRow, c })];
+        if (cell) {
+          cell.s = {
+            fill: { fgColor: { rgb: "4CAF50" } },
+            font: { bold: true, color: { rgb: "FFFFFF" }, sz: 12 },
+            alignment: { horizontal: "center", vertical: "center" },
+            border: {
+              top: { style: "thin", color: { rgb: "000000" } },
+              bottom: { style: "thin", color: { rgb: "000000" } },
+              left: { style: "thin", color: { rgb: "000000" } },
+              right: { style: "thin", color: { rgb: "000000" } },
+            },
+          };
+        }
+      }
+
+      const dataStartRow = 4;
+      for (let r = dataStartRow; r < dataStartRow + rowIndex; r++) {
+        if (r % 2 === 0) {
+          for (let c = 0; c <= 10; c++) {
+            const cell = ws[XLSX.utils.encode_cell({ r, c })];
+            if (cell) {
+              cell.s = {
+                ...(cell.s || {}),
+                fill: { fgColor: { rgb: "F9F9F9" } },
+              };
+            }
+          }
+        }
+      }
+
+      const totalRowIndex = limitedExportRows.length - 1;
+      for (let c = 0; c <= 10; c++) {
+        const cell = ws[XLSX.utils.encode_cell({ r: totalRowIndex, c })];
+        if (cell) {
+          cell.s = {
+            fill: { fgColor: { rgb: "FFF3CD" } },
+            font: { bold: true, color: { rgb: "000000" }, sz: 12 },
+            alignment: { horizontal: "center", vertical: "center" },
+            border: {
+              top: { style: "thin", color: { rgb: "000000" } },
+              bottom: { style: "thin", color: { rgb: "000000" } },
+              left: { style: "thin", color: { rgb: "000000" } },
+              right: { style: "thin", color: { rgb: "000000" } },
+            },
+          };
+        }
+      }
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Trainer Invoice Summary");
+
+      const date = new Date();
+      const fileName = `trainer_invoices_limited_${date.getFullYear()}-${(
+        date.getMonth() + 1
+      )
+        .toString()
+        .padStart(2, "0")}-${date.getDate().toString().padStart(2, "0")}.xlsx`;
+
+      XLSX.writeFile(wb, fileName);
+    } catch (error) {
+      console.error("Limited export failed:", error);
+      alert("Failed to export limited columns. Please try again.");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
-    <button
-      onClick={handleExportToExcel}
-      disabled={exporting}
-      className="inline-flex items-center px-3 py-1.5 bg-green-600 text-white border border-green-700 rounded-lg text-xs font-medium hover:bg-green-700 hover:border-green-800 focus:outline-none focus:ring-2 focus:ring-green-500/20 transition-all disabled:opacity-50"
-    >
-      <FiFile className="w-4 h-4 mr-1" />
-      {exporting ? "Exporting..." : "Export to Excel"}
-    </button>
+    <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+      <button
+        onClick={handleExportToExcel}
+        disabled={exporting}
+        className="inline-flex items-center px-3 py-1.5 bg-green-600 text-white border border-green-700 rounded-lg text-xs font-medium hover:bg-green-700 hover:border-green-800 focus:outline-none focus:ring-2 focus:ring-green-500/20 transition-all disabled:opacity-50"
+      >
+        <FiFile className="w-4 h-4 mr-1" />
+        {exporting ? "Exporting..." : "Export to Excel"}
+      </button>
+      <button
+        onClick={handleExportLimitedExcel}
+        disabled={exporting}
+        className="inline-flex items-center px-3 py-1.5 bg-blue-600 text-white border border-blue-700 rounded-lg text-xs font-medium hover:bg-blue-700 hover:border-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all disabled:opacity-50"
+      >
+        <FiFile className="w-4 h-4 mr-1" />
+        {exporting ? "Exporting..." : "Export limited columns"}
+      </button>
+    </div>
   );
 };
 

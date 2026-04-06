@@ -1148,6 +1148,9 @@ function GenerateTrainerInvoice() {
                 .includes(searchTerm.toLowerCase()) ||
               trainer.projectCode
                 .toLowerCase()
+                .includes(searchTerm.toLowerCase()) ||
+              trainer.invoiceData?.billNumber
+                ?.toLowerCase()
                 .includes(searchTerm.toLowerCase());
 
             // Date range filter
@@ -1235,7 +1238,10 @@ function GenerateTrainerInvoice() {
         trainer.trainerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         trainer.trainerId.toLowerCase().includes(searchTerm.toLowerCase()) ||
         trainer.businessName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        trainer.projectCode.toLowerCase().includes(searchTerm.toLowerCase()),
+        trainer.projectCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        trainer.invoiceData?.billNumber
+          ?.toLowerCase()
+          .includes(searchTerm.toLowerCase()),
     );
 
     if (matchingTrainers.length === 0) return null;
