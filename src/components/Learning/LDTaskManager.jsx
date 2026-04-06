@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   DndContext,
   DragOverlay,
@@ -32,22 +33,24 @@ import {
 import { Hourglass, CheckCircle, Clock, Users, FileText, XCircle, Circle, TrendingUp, Layout, Calendar as CalendarIcon, List } from "lucide-react";
 import {
   collection,
-  addDoc,
+  setDoc,
   updateDoc,
   deleteDoc,
   doc,
   onSnapshot,
   query,
   orderBy,
+  where,
   serverTimestamp,
   runTransaction,
   getDocs
 } from "firebase/firestore";
 import { db } from "../../firebase";
 import { useAuth } from "../../context/AuthContext";
-import { ldTaskCategories } from "./ldTaskData";
+import TaskDataManager from "../Admin/TaskDataManager";
 
 // --- Helper Functions ---
+
 
 const parseDate = (dateStr) => {
   if (!dateStr) return null;
@@ -68,30 +71,9 @@ const parseDate = (dateStr) => {
   return null;
 };
 
-// Predefined task descriptions
-const taskDescriptions = [
-  "Coordinate and schedule training batches for optimal resource utilization",
-  "Allocate trainers to sessions based on expertise and availability",
-  "Prepare and organize course materials for upcoming sessions",
-  "Track and maintain student attendance records",
-  "Manage certification process and documentation",
-  "Collect and analyze feedback from training sessions",
-  "Monitor live sessions for quality and engagement",
-  "Conduct comprehensive quality audits of training programs",
-  "Review and evaluate trainer performance metrics",
-  "Design curriculum structure and learning objectives",
-  "Create assessments and evaluation criteria",
-  "Update Learning Management System with new content",
-  "Map and organize educational resources",
-  "Generate daily operational reports",
-  "Prepare weekly status updates for stakeholders",
-  "Facilitate communication with internal stakeholders",
-  "Maintain comprehensive documentation and records"
-];
-
-// Flatten all tasks for title dropdown
-const allTasks = ldTaskCategories.flatMap(category => category.tasks);
 import { toast } from "react-toastify";
+
+
 
 // --- UI Components ---
 
@@ -246,16 +228,39 @@ const TaskCard = ({
         {task.title}
       </h4>
 
+      {task.projectCode && (
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <div className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded text-[9px] font-black text-slate-600 uppercase">
+            {task.projectCode}
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-1 mb-1.5">
         <div className="flex items-center text-[9px] text-gray-500 font-medium bg-gray-50 px-1 py-0.5 rounded border border-gray-100">
           <Users size={9} className="mr-0.5" />
           {task.assignedTo || "Unassigned"}
         </div>
+        {(task.category || task.classification) && (
+          <div className="flex gap-1">
+            {task.category && (
+              <span className="text-[9px] font-bold px-1 py-0.5 bg-indigo-50 text-indigo-600 rounded">
+                {task.category}
+              </span>
+            )}
+            {task.classification && (
+              <span className="text-[9px] font-bold px-1 py-0.5 bg-purple-50 text-purple-600 rounded">
+                {task.classification}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       <p className="text-[10px] text-gray-400 line-clamp-3 mb-2">
         {task.description}
       </p>
+
 
       <div className="flex items-center justify-between mt-auto pt-2 border-t border-gray-50 gap-1">
         <div className="flex flex-wrap gap-1 items-center">
@@ -581,15 +586,33 @@ const CalendarView = ({
 
 const LDTaskManager = ({ onBack }) => {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
-  const [currentView, setCurrentView] = useState("kanban");
+  const [currentView, setCurrentView] = useState(searchParams.get("tab") === "admin" ? "admin" : "kanban");
   const [assignees, setAssignees] = useState([]);  
+  const [projectCodes, setProjectCodes] = useState([]);
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [showTitleDropdown, setShowTitleDropdown] = useState(false);
+  const [showDescriptionDropdown, setShowDescriptionDropdown] = useState(false);
+  const [showProjectCodeDropdown, setShowProjectCodeDropdown] = useState(false);
+
+  const [taskNames, setTaskNames] = useState([]);
+  const [taskDescriptions, setTaskDescriptions] = useState([]);
+
   // Filters
   const [filterUser, setFilterUser] = useState("all");
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab === "admin") {
+      setCurrentView("admin");
+    } else if (tab === "kanban" || tab === "calendar" || tab === "table" || tab === "logs") {
+      setCurrentView(tab);
+    }
+  }, [searchParams]);
+
   const [dateRange, setDateRange] = useState({ start: "", end: "" });
 
   const resetFilters = () => {
@@ -612,13 +635,28 @@ const LDTaskManager = ({ onBack }) => {
   });
   // Form states
   const [formData, setFormData] = useState({
-    title: allTasks[0] || "",
-    description: taskDescriptions[0] || "",
+    title: "",
+    description: "",
+    category: "",
+    classification: "",
+    projectCode: "",
     assignedTo: "",
     startDate: new Date().toISOString().split("T")[0],
     dueDate: "",
     status: "not_started"
   });
+
+  const filteredTitleOptions = taskNames.filter(task =>
+    (task || "").toLowerCase().includes((formData.title || "").toLowerCase())
+  );
+
+  const filteredDescriptionOptions = taskDescriptions.filter(item =>
+    (item.description || "").toLowerCase().includes((formData.description || "").toLowerCase())
+  );
+
+  const filteredProjectCodeOptions = projectCodes.filter(code =>
+    (code || "").toLowerCase().includes((formData.projectCode || "").toLowerCase())
+  );
 
   useEffect(() => {
     const q = query(collection(db, "learning_tasks"), orderBy("createdAt", "desc"));
@@ -631,6 +669,21 @@ const LDTaskManager = ({ onBack }) => {
       setLoading(false);
     });
 
+    const fetchProjectCodes = async () => {
+      try {
+        const qForms = query(collection(db, "trainingForms"));
+        const snapshot = await getDocs(qForms);
+        const codes = snapshot.docs
+          .map(d => d.data().projectCode)
+          .filter(code => code && code.trim() !== "");
+        // Remove duplicates
+        const uniqueCodes = [...new Set(codes)].sort();
+        setProjectCodes(uniqueCodes);
+      } catch (error) {
+        console.error("Error fetching project codes:", error);
+      }
+    };
+
     const fetchUsers = async () => {
       const qUsers = query(collection(db, "users"));
       const snapshot = await getDocs(qUsers);
@@ -640,9 +693,38 @@ const LDTaskManager = ({ onBack }) => {
       setAssignees(ldUsers || []);
     };
     fetchUsers();
+    fetchProjectCodes();
 
     return unsubscribe;
   }, []);
+
+  useEffect(() => {
+    const unsubscribeTaskNames = onSnapshot(
+      query(collection(db, 'task_names'), where('active', '==', true)),
+      (snapshot) => {
+        const names = snapshot.docs.map(doc => doc.data().name);
+        setTaskNames(names);
+      }
+    );
+
+    const unsubscribeTaskDescriptions = onSnapshot(
+      query(collection(db, 'task_descriptions'), where('active', '==', true)),
+      (snapshot) => {
+        const descriptions = snapshot.docs.map(doc => ({
+          description: doc.data().description,
+          category: doc.data().category,
+          classification: doc.data().classification
+        }));
+        setTaskDescriptions(descriptions);
+      }
+    );
+
+    return () => {
+      unsubscribeTaskNames();
+      unsubscribeTaskDescriptions();
+    };
+  }, []);
+
 
   const getNextTaskId = async () => {
     const counterRef = doc(db, "counters", "ldtask_counter");
@@ -656,7 +738,7 @@ const LDTaskManager = ({ onBack }) => {
 
   const handleSaveTask = async (e) => {
     e.preventDefault();
-    if (!formData.title || !formData.assignedTo || !formData.dueDate) {
+    if (!formData.title || !formData.assignedTo || !formData.dueDate || !formData.projectCode) {
        toast.error("MISSING DATA");
        return;
     }
@@ -669,7 +751,7 @@ const LDTaskManager = ({ onBack }) => {
         toast.success("Task Updated");
       } else {
         const taskId = await getNextTaskId();
-        await addDoc(collection(db, "learning_tasks"), {
+        await setDoc(doc(db, "learning_tasks", taskId), {
           ...formData,
           customId: taskId,
           createdBy: user.displayName,
@@ -684,6 +766,26 @@ const LDTaskManager = ({ onBack }) => {
       toast.error("Operation Failed");
     }
   };
+
+  const handleDescriptionChange = (desc) => {
+    const mapping = taskDescriptions.find(d => d.description === desc);
+    if (mapping) {
+      setFormData({
+        ...formData,
+        description: desc,
+        category: mapping.category,
+        classification: mapping.classification
+      });
+    } else {
+      setFormData({
+        ...formData,
+        description: desc,
+        category: "",
+        classification: ""
+      });
+    }
+  };
+
 
   const handleDeleteTask = async (id) => {
     if (window.confirm("Purge this task forever?")) {
@@ -723,15 +825,22 @@ const LDTaskManager = ({ onBack }) => {
 
   const resetForm = () => {
     setFormData({
-      title: allTasks[0] || "",
-      description: taskDescriptions[0] || "",
+      title: "",
+      description: "",
+      category: "",
+      classification: "",
+      projectCode: "",
       assignedTo: "",
       startDate: new Date().toISOString().split("T")[0],
       dueDate: "",
       status: "not_started"
     });
+    setShowTitleDropdown(false);
+    setShowDescriptionDropdown(false);
+    setShowProjectCodeDropdown(false);
     setEditingTask(null);
   };
+
 
   const getTasksByStatus = (status) => filteredTasks.filter(t => t.status === status);
 
@@ -765,6 +874,9 @@ const LDTaskManager = ({ onBack }) => {
                 <button onClick={() => setCurrentView("calendar")} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all duration-200 font-bold text-[10px] uppercase ${currentView === "calendar" ? "bg-indigo-600 text-white shadow-sm" : "text-gray-500 hover:text-gray-900"}`}><CalendarIcon size={14} /> Calendar</button>
                 <button onClick={() => setCurrentView("table")} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all duration-200 font-bold text-[10px] uppercase ${currentView === "table" ? "bg-indigo-600 text-white shadow-sm" : "text-gray-500 hover:text-gray-900"}`}><List size={14} /> Table</button>
                 <button onClick={() => setCurrentView("logs")} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all duration-200 font-bold text-[10px] uppercase ${currentView === "logs" ? "bg-indigo-600 text-white shadow-sm" : "text-gray-500 hover:text-gray-900"}`}><FiFileText size={14} /> Logs</button>
+                {["Admin", "Director", "Direc2", "Head"].includes(user?.role) && (
+                  <button onClick={() => setCurrentView("admin")} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all duration-200 font-bold text-[10px] uppercase ${currentView === "admin" ? "bg-indigo-600 text-white shadow-sm" : "text-gray-500 hover:text-gray-900"}`}><FiUser size={14} /> Admin</button>
+                )}
              </div>
              
              <button onClick={() => window.location.reload()} className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-all font-semibold text-[10px]">
@@ -872,55 +984,163 @@ const LDTaskManager = ({ onBack }) => {
                 setCurrentDate(newDate);
               }} 
             />}
+            {currentView === "admin" && <TaskDataManager />}
           </div>
         )}
 
         {/* Modal */}
         {showAddModal && (
-          <div className="fixed inset-0 z-100 flex items-center justify-center bg-gray-900/40 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden border border-gray-200">
-              <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-                <h3 className="font-bold text-gray-900">{editingTask ? "Edit Task" : "New Task"}</h3>
-                <button onClick={() => setShowAddModal(false)} className="p-2 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-lg transition-all"><FiX size={18} /></button>
+          <div className="fixed inset-0 z-100 flex items-center justify-center bg-gray-900/40 backdrop-blur-sm p-2">
+            <div className="bg-white rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden border border-gray-200 max-h-[80vh]">
+              <div className="px-3 py-2 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                <h3 className="font-bold text-gray-900 text-sm">{editingTask ? "Edit Task" : "New Task"}</h3>
+                <button onClick={() => setShowAddModal(false)} className="p-1 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-lg transition-all"><FiX size={18} /></button>
               </div>
-              <form onSubmit={handleSaveTask} className="p-6 space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="col-span-2">
-                    <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Title *</label>
-                    <select required value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:border-indigo-500 outline-none transition-all font-semibold text-gray-900 text-sm">
-                      {allTasks.map(task => <option key={task} value={task}>{task}</option>)}
-                    </select>
+              <form onSubmit={handleSaveTask} className="p-3 space-y-2 max-h-[75vh] overflow-y-auto">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="col-span-2 relative" tabIndex={-1} onBlur={() => setTimeout(() => setShowTitleDropdown(false), 150)}>
+                    <label className="block text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">Task Name *</label>
+                    <input
+                      required
+                      autoComplete="off"
+                      value={formData.title}
+                      onChange={e => {
+                        setFormData({...formData, title: e.target.value});
+                        setShowTitleDropdown(true);
+                      }}
+                      onFocus={() => setShowTitleDropdown(true)}
+                      className="w-full px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg focus:border-indigo-500 outline-none transition-all font-semibold text-gray-900 text-sm"
+                      placeholder="Search Task Name"
+                    />
+                    {showTitleDropdown && (
+                      <div className="absolute z-20 left-0 right-0 mt-1 max-h-44 overflow-y-auto bg-white border border-gray-200 rounded-2xl shadow-xl">
+                        {filteredTitleOptions.length > 0 ? (
+                          filteredTitleOptions.map(task => (
+                            <button
+                              type="button"
+                              key={task}
+                              onMouseDown={() => {
+                                setFormData({...formData, title: task});
+                                setShowTitleDropdown(false);
+                              }}
+                              className="w-full text-left px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
+                            >
+                              {task}
+                            </button>
+                          ))
+                        ) : (
+                          <div className="px-4 py-3 text-sm text-slate-500">No matching task</div>
+                        )}
+                      </div>
+                    )}
                   </div>
                   
+                  <div className="col-span-2 relative" tabIndex={-1} onBlur={() => setTimeout(() => setShowDescriptionDropdown(false), 150)}>
+                    <label className="block text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">Task Description *</label>
+                    <input
+                      required
+                      autoComplete="off"
+                      value={formData.description}
+                      onChange={e => {
+                        handleDescriptionChange(e.target.value);
+                        setShowDescriptionDropdown(true);
+                      }}
+                      onFocus={() => setShowDescriptionDropdown(true)}
+                      className="w-full px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg focus:border-indigo-500 outline-none transition-all text-gray-700 text-sm"
+                      placeholder="Search Description"
+                    />
+                    {showDescriptionDropdown && (
+                      <div className="absolute z-20 left-0 right-0 mt-1 max-h-44 overflow-y-auto bg-white border border-gray-200 rounded-2xl shadow-xl">
+                        {filteredDescriptionOptions.length > 0 ? (
+                          filteredDescriptionOptions.map(item => (
+                            <button
+                              type="button"
+                              key={item.description}
+                              onMouseDown={() => {
+                                handleDescriptionChange(item.description);
+                                setShowDescriptionDropdown(false);
+                              }}
+                              className="w-full text-left px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
+                            >
+                              {item.description}
+                            </button>
+                          ))
+                        ) : (
+                          <div className="px-4 py-3 text-sm text-slate-500">No matching description</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">Category</label>
+                    <input readOnly value={formData.category} className="w-full px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-lg font-semibold text-gray-600 text-sm cursor-not-allowed" placeholder="Auto-filled" />
+                  </div>
+
+                  <div>
+                    <label className="block text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">Classification</label>
+                    <input readOnly value={formData.classification} className="w-full px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-lg font-semibold text-gray-600 text-sm cursor-not-allowed" placeholder="Auto-filled" />
+                  </div>
+
+                  <div className="col-span-2 relative" tabIndex={-1} onBlur={() => setTimeout(() => setShowProjectCodeDropdown(false), 150)}>
+                    <label className="block text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">Project Code *</label>
+                    <input
+                      required
+                      autoComplete="off"
+                      value={formData.projectCode}
+                      onChange={e => {
+                        setFormData({...formData, projectCode: e.target.value});
+                        setShowProjectCodeDropdown(true);
+                      }}
+                      onFocus={() => setShowProjectCodeDropdown(true)}
+                      className="w-full px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg focus:border-indigo-500 outline-none transition-all font-semibold text-gray-900 text-sm"
+                      placeholder="Search Project Code"
+                    />
+                    {showProjectCodeDropdown && (
+                      <div className="absolute z-20 left-0 right-0 mt-1 max-h-44 overflow-y-auto bg-white border border-gray-200 rounded-2xl shadow-xl">
+                        {filteredProjectCodeOptions.length > 0 ? (
+                          filteredProjectCodeOptions.map(code => (
+                            <button
+                              key={code}
+                              type="button"
+                              onMouseDown={() => {
+                                setFormData({...formData, projectCode: code});
+                                setShowProjectCodeDropdown(false);
+                              }}
+                              className="w-full text-left px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
+                            >
+                              {code}
+                            </button>
+                          ))
+                        ) : (
+                          <div className="px-4 py-3 text-sm text-slate-500">No matching project code</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
                   <div className="col-span-2">
-                    <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Assigned To *</label>
-                    <select required value={formData.assignedTo} onChange={e => setFormData({...formData, assignedTo: e.target.value})} className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:border-indigo-500 outline-none transition-all font-semibold text-gray-900 text-sm">
+                    <label className="block text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">Assigned To *</label>
+                    <select required value={formData.assignedTo} onChange={e => setFormData({...formData, assignedTo: e.target.value})} className="w-full px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg focus:border-indigo-500 outline-none transition-all font-semibold text-gray-900 text-sm">
                       <option value="">Resource Selection</option>
                       {assignees.map(a => <option key={a} value={a}>{a.toUpperCase()}</option>)}
                     </select>
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Start Date *</label>
-                    <input required type="date" value={formData.startDate} onChange={e => setFormData({...formData, startDate: e.target.value})} className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:border-indigo-500 outline-none transition-all font-semibold text-gray-900 text-sm" />
+                    <label className="block text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">Start Date *</label>
+                    <input required type="date" value={formData.startDate} onChange={e => setFormData({...formData, startDate: e.target.value})} className="w-full px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg focus:border-indigo-500 outline-none transition-all font-semibold text-gray-900 text-sm" />
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Due Date *</label>
-                    <input required type="date" value={formData.dueDate} onChange={e => setFormData({...formData, dueDate: e.target.value})} className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:border-indigo-500 outline-none transition-all font-semibold text-gray-900 text-sm" />
-                  </div>
-
-                  <div className="col-span-2">
-                    <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Description *</label>
-                    <select required value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:border-indigo-500 outline-none transition-all text-gray-700 text-sm">
-                      {taskDescriptions.map(desc => <option key={desc} value={desc}>{desc}</option>)}
-                    </select>
+                    <label className="block text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">Due Date *</label>
+                    <input required type="date" value={formData.dueDate} onChange={e => setFormData({...formData, dueDate: e.target.value})} className="w-full px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg focus:border-indigo-500 outline-none transition-all font-semibold text-gray-900 text-sm" />
                   </div>
                 </div>
 
-                <div className="pt-4 flex gap-3">
-                  <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 px-6 py-2 bg-gray-100 text-gray-500 hover:bg-gray-200 rounded-lg transition-all font-bold text-xs uppercase">Cancel</button>
-                  <button type="submit" className="flex-1 px-6 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-all font-bold text-xs uppercase shadow-sm">Save Task</button>
+                <div className="pt-2 flex gap-2">
+                  <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 px-3 py-1.5 bg-gray-100 text-gray-500 hover:bg-gray-200 rounded-lg transition-all font-bold text-xs uppercase">Cancel</button>
+                  <button type="submit" className="flex-1 px-3 py-1.5 bg-black text-white rounded-lg hover:bg-gray-800 transition-all font-bold text-xs uppercase shadow-sm">Save Task</button>
                 </div>
               </form>
             </div>
