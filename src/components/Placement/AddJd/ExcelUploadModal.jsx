@@ -217,10 +217,10 @@ const ExcelUploadModal = ({ show, onClose, college, companyName }) => {
 
   return (
     <div className="fixed inset-0 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-white w-full max-w-2xl rounded-xl shadow-2xl z-[10000] transform transition-all duration-300 scale-100 max-h-[90vh] flex flex-col">
+      <div className="bg-white w-full max-w-2xl rounded-xl shadow-2xl z-10000 transform transition-all duration-300 scale-100 max-h-[90vh] flex flex-col">
         
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-4 flex justify-between items-center rounded-t-xl flex-shrink-0">
+        <div className="bg-linear-to-r from-blue-600 to-indigo-700 px-6 py-4 flex justify-between items-center rounded-t-xl shrink-0">
           <h2 className="text-xl font-semibold text-white">
             Upload Student Data
           </h2>
@@ -233,7 +233,7 @@ const ExcelUploadModal = ({ show, onClose, college, companyName }) => {
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto flex-grow">
+        <div className="p-6 overflow-y-auto grow">
           {/* Storage Info - UPDATED */}
           <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
             <h4 className="font-semibold text-blue-800 mb-2">📁 Storage Information</h4>
@@ -320,7 +320,7 @@ const ExcelUploadModal = ({ show, onClose, college, companyName }) => {
         </div>
 
         {/* Footer */}
-        <div className="bg-gray-50 px-6 py-4 flex justify-end space-x-3 flex-shrink-0">
+        <div className="bg-gray-50 px-6 py-4 flex justify-end space-x-3 shrink-0">
           <button
             onClick={onClose}
             className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-100"

@@ -29,25 +29,30 @@ import {
   Trash2,
   TriangleAlert,
 } from "lucide-react";
+import {
+  budgetComponents,
+  componentColors,
+} from "../components/Budget/config/department";
+import { DepartmentService } from "../components/Budget/services/DepartmentService";
 
 // Lazy load components
-const BudgetUpdateForm = lazy(() =>
-  import("../components/Budget/BudgetUpdateForm")
+const BudgetUpdateForm = lazy(
+  () => import("../components/Budget/BudgetUpdateForm"),
 );
-const PurchaseOrderModal = lazy(() =>
-  import("../components/Budget/PurchaseOrderModal")
+const PurchaseOrderModal = lazy(
+  () => import("../components/Budget/PurchaseOrderModal"),
 );
-const BudgetOverview = lazy(() =>
-  import("../components/Budget/BudgetOverview")
+const BudgetOverview = lazy(
+  () => import("../components/Budget/BudgetOverview"),
 );
-const PurchaseIntentsList = lazy(() =>
-  import("../components/Budget/PurchaseIntentsList")
+const PurchaseIntentsList = lazy(
+  () => import("../components/Budget/PurchaseIntentsList"),
 );
-const PurchaseOrdersList = lazy(() =>
-  import("../components/Budget/PurchaseOrdersList")
+const PurchaseOrdersList = lazy(
+  () => import("../components/Budget/PurchaseOrdersList"),
 );
-const VendorManagement = lazy(() =>
-  import("../components/Budget/VendorManagement")
+const VendorManagement = lazy(
+  () => import("../components/Budget/VendorManagement"),
 );
 const ExpensesPanel = lazy(() => import("../components/Budget/ExpensesPanel"));
 
@@ -58,142 +63,14 @@ const ComponentLoader = () => (
   </div>
 );
 
-// Budget component types organized by department
-const budgetComponents = {
-  sales: {
-    emails: "Email Subscriptions",
-    laptops: "Laptops",
-    tshirts: "T-shirts",
-    printmedia: "Print Media",
-    diwaligifts: "Diwali Gifts",
-  },
-  cr: {
-    emails: "Email Subscriptions",
-    laptops: "Laptops",
-    tshirts: "T-shirts",
-    printmedia: "Print Media",
-    gifts: "Diwali & Other Gifts",
-  },
-  lnd: {
-    laptops: "Laptops",
-    printmedia: "Print Media",
-    trainertshirts: "Trainer T-shirts",
-    tshirts: "T-shirts",
-  },
-  hr: {
-    tshirts: "T-shirts",
-    email: "Email Subscriptions",
-    laptops: "Laptops",
-    ca: "CA Consultancy",
-  },
-  dm: {
-    laptops: "Laptops",
-    email: "Email Subscriptions",
-    printmedia: "Print Media",
-    tshirts: "T-shirts",
-    trademarks: "Trademarks / Domains",
-    adobe: "Adobe Creative Cloud",
-    envato: "Envato Subscription",
-    canva: "Canva Pro",
-    softwareinstallation: "Software Installation",
-    simcard: "SIM Card / Network Tools",
-    elevenlabs: "Eleven Labs Subscription",
-    performancemarketing: "Performance Marketing",
-  },
-  admin: {
-    emails: "Email Subscriptions",
-    pt: "Promotional Tools",
-    laptops: "Laptops",
-    tshirts: "T-shirts",
-    printmedia: "Print Media",
-    diwaligifts: "Diwali Gifts",
-  },
-  purchase: {
-    emails: "Email Subscriptions",
-    pt: "Promotional Tools",
-    laptops: "Laptops",
-    tshirts: "T-shirts",
-    printmedia: "Print Media",
-    diwaligifts: "Diwali Gifts",
-  },
-  placement: {
-    emails: "Email Subscriptions",
-    laptops: "Laptops",
-    tshirts: "T-shirts",
-    printmedia: "Print Media",
-    training_materials: "Training Materials",
-    placement_events: "Placement Events",
-    corporate_gifts: "Corporate Gifts",
-    travel_expenses: "Travel Expenses",
-  },
-  management: {
-    emails: "Email Subscriptions",
-  },
-};
-
-// Component colors mapping
-const componentColors = {
-  emails: "bg-blue-100 text-blue-800 border-blue-200",
-  pt: "bg-purple-100 text-purple-800 border-purple-200",
-  laptops: "bg-sky-100 text-sky-800 border-sky-200",
-  tshirts: "bg-indigo-100 text-indigo-800 border-indigo-200",
-  printmedia: "bg-cyan-100 text-cyan-800 border-cyan-200",
-  diwaligifts: "bg-pink-100 text-pink-800 border-pink-200",
-  gifts: "bg-orange-100 text-orange-800 border-orange-200",
-  trainertshirts: "bg-green-100 text-green-800 border-green-200",
-  esic: "bg-red-100 text-red-800 border-red-200",
-  email: "bg-blue-100 text-blue-800 border-blue-200",
-  ca: "bg-gray-100 text-gray-800 border-gray-200",
-  trademarks: "bg-yellow-100 text-yellow-800 border-yellow-200",
-  adobe: "bg-red-100 text-red-800 border-red-200",
-  envato: "bg-green-100 text-green-800 border-green-200",
-  canva: "bg-blue-100 text-blue-800 border-blue-200",
-  softwareinstallation: "bg-purple-100 text-purple-800 border-purple-200",
-  simcard: "bg-indigo-100 text-indigo-800 border-indigo-200",
-  elevenlabs: "bg-amber-100 text-amber-800 border-amber-200",
-  performancemarketing: "bg-pink-100 text-pink-800 border-pink-200",
-  training_materials: "bg-teal-100 text-teal-800 border-teal-200",
-  placement_events: "bg-violet-100 text-violet-800 border-violet-200",
-  corporate_gifts: "bg-rose-100 text-rose-800 border-rose-200",
-  travel_expenses: "bg-lime-100 text-lime-800 border-lime-200",
-};
-
-// Indian Fiscal Year → April 1 to March 31
-const getCurrentFiscalYear = () => {
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = today.getMonth(); // 0 = Jan, 3 = April
-
-  // If month < 3, we are before April → fiscal year belongs to previous year
-  const fyStartYear = month >= 3 ? year : year - 1;
-  const fyEndYear = fyStartYear + 1;
-
-  // Return in "YY-YY" format
-  return `${fyStartYear.toString().slice(-2)}-${fyEndYear
-    .toString()
-    .slice(-2)
-    .padStart(2, "0")}`;
-};
-
 // Helper function to get department components
 const getDepartmentComponents = (department) => {
   if (!department) {
     console.warn("❌ No department specified, falling back to admin");
     return budgetComponents.admin || {};
   }
-
-  // Convert department to lowercase and handle variations
   const deptKey = department.toLowerCase().trim();
-  const components = budgetComponents[deptKey];
-
-  if (!components) {
-    console.warn(
-      `❌ No components found for department: ${department}, falling back to admin`
-    );
-    return budgetComponents.admin || {};
-  }
-
-  return components;
+  return budgetComponents[deptKey] || budgetComponents.admin || {};
 };
 
 // Action Dropdown Component (Updated from BudgetDashboard)
@@ -293,55 +170,6 @@ const ActionDropdown = ({ budget, onEdit, onDelete, onView, onSelect }) => {
   );
 };
 
-// Department code mapping for PO generation
-const getDepartmentCode = (department) => {
-  const map = {
-    lnd: "T",
-    dm: "DM",
-    sales: "Sales",
-    cr: "CR",
-    hr: "HR&Admin",
-    admin: "MAN",
-    management: "MAN",
-    placement: "CR", // Placement falls under CR
-    purchase: "PUR",
-  };
-
-  return map[department?.toLowerCase()] || department?.toUpperCase();
-};
-
-// PO Number generation function
-const generatePurchaseOrderNumber = async (
-  department,
-  fiscalYear,
-  budgetId
-) => {
-  const deptCode = getDepartmentCode(department);
-  const prefix = department?.toLowerCase() === "dm" ? "ICEM" : "GA";
-
-  const budgetRef = doc(db, "department_budgets", budgetId);
-
-  // Run a transaction to safely increment the counter
-  const nextNumber = await runTransaction(db, async (transaction) => {
-    const budgetDoc = await transaction.get(budgetRef);
-
-    if (!budgetDoc.exists()) {
-      throw new Error("Budget document not found!");
-    }
-
-    const currentCount = budgetDoc.data().poCounter || 0;
-    const newCount = currentCount + 1;
-
-    transaction.update(budgetRef, { poCounter: increment(1) });
-
-    return newCount;
-  });
-
-  return `${prefix}/${fiscalYear}/${deptCode}/${nextNumber
-    .toString()
-    .padStart(2, "0")}`;
-};
-
 function Purchase() {
   // State management
   const [activeTab, setActiveTab] = useState(() => {
@@ -384,7 +212,7 @@ function Purchase() {
     dateRange: { start: "", end: "" },
   });
 
-  const currentFiscalYear = getCurrentFiscalYear();
+  const currentFiscalYear = DepartmentService.getCurrentFiscalYear();
 
   // Add this helper function to query users by email
   const getUserByEmail = useCallback(async (email) => {
@@ -419,7 +247,7 @@ function Purchase() {
   }, [currentUserData]);
 
   const currentUserDepartmentComponents = getDepartmentComponents(
-    currentUserDepartment
+    currentUserDepartment,
   );
 
   // Find active budget
@@ -443,7 +271,7 @@ function Purchase() {
       }
       return currentUserDepartmentComponents;
     },
-    [currentUserDepartmentComponents]
+    [currentUserDepartmentComponents],
   );
 
   // Effect to load user data by email
@@ -487,37 +315,14 @@ function Purchase() {
   useEffect(() => {
     if (!currentUser) return;
 
-    // Users data - this is critical for department info
-    const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
-      const userData = {};
-
-      snapshot.forEach((doc) => {
-        userData[doc.id] = { id: doc.id, ...doc.data() };
-      });
-
-      setUsersLoaded(true);
-
-      // Debug: Check if we can find current user by email
-      if (currentUser?.email) {
-        let foundUser = null;
-        Object.values(userData).forEach((user) => {
-          if (user.email === currentUser.email) {
-            foundUser = user;
-          }
-        });
-
-        if (foundUser) {
-          setCurrentUserData(foundUser);
-        }
-      }
-
-      setLoading(false);
-    });
+    // Mark users as ready immediately - no need to listen to the entire users collection
+    setUsersLoaded(true);
+    setLoading(false);
 
     // Budget query for ALL departments (purchase can see all)
     const budgetQuery = query(
       collection(db, "department_budgets"),
-      orderBy("fiscalYear", "desc")
+      orderBy("fiscalYear", "desc"),
     );
 
     const unsubBudget = onSnapshot(budgetQuery, (snapshot) => {
@@ -535,7 +340,7 @@ function Purchase() {
     const intentsQuery = query(
       collection(db, "purchase_intents"),
       where("fiscalYear", "==", currentFiscalYear),
-      orderBy("createdAt", "desc")
+      orderBy("createdAt", "desc"),
     );
 
     const unsubIntents = onSnapshot(intentsQuery, (snapshot) => {
@@ -550,7 +355,7 @@ function Purchase() {
     const ordersQuery = query(
       collection(db, "purchase_orders"),
       where("fiscalYear", "==", currentFiscalYear),
-      orderBy("createdAt", "desc")
+      orderBy("createdAt", "desc"),
     );
 
     const unsubOrders = onSnapshot(ordersQuery, (snapshot) => {
@@ -570,7 +375,6 @@ function Purchase() {
     });
 
     return () => {
-      unsubUsers();
       unsubBudget();
       unsubIntents();
       unsubOrders();
@@ -688,7 +492,7 @@ function Purchase() {
         if (budgetData.status === "active") {
           const budgetsQuery = query(
             collection(db, "department_budgets"),
-            where("department", "==", existingBudget.department)
+            where("department", "==", existingBudget.department),
           );
           const snapshot = await getDocs(budgetsQuery);
 
@@ -698,14 +502,14 @@ function Purchase() {
               const otherBudgetRef = doc(
                 db,
                 "department_budgets",
-                docSnapshot.id
+                docSnapshot.id,
               );
               archivePromises.push(
                 updateDoc(otherBudgetRef, {
                   status: "archived",
                   lastUpdatedAt: serverTimestamp(),
                   updatedBy: currentUser.uid,
-                })
+                }),
               );
             }
           });
@@ -741,7 +545,7 @@ function Purchase() {
         throw error;
       }
     },
-    [currentUser, selectedBudgetForOverview]
+    [currentUser, selectedBudgetForOverview],
   );
 
   const handleDeleteBudget = useCallback(async () => {
@@ -750,7 +554,7 @@ function Purchase() {
     setDeletingBudget(true);
     try {
       await deleteDoc(
-        doc(db, "department_budgets", selectedBudgetForDelete.id)
+        doc(db, "department_budgets", selectedBudgetForDelete.id),
       );
 
       // If the deleted budget was the selected overview, clear it
@@ -771,11 +575,52 @@ function Purchase() {
   const handleCreatePurchaseOrder = useCallback(
     async (orderData) => {
       try {
-        // Ensure we have an intent with department
         const intentId = orderData.intentId;
         if (!intentId) throw new Error("No intent ID provided");
 
-        // Use transaction to ensure all operations succeed or fail together
+        // Check if this is a CSDD intent
+        const isCsdd =
+          selectedIntent?.intentType === "csdd" ||
+          orderData.intentType === "csdd";
+
+        if (isCsdd) {
+          // CSDD PO: delegate to DepartmentService for atomic subcollection update
+          // Find the active budget for the intent's department
+          const intentDept = selectedIntent?.department || orderData.department;
+          const budgetsQuery = query(
+            collection(db, "department_budgets"),
+            where("department", "==", intentDept),
+            where("status", "==", "active"),
+          );
+          const budgetsSnapshot = await getDocs(budgetsQuery);
+          if (budgetsSnapshot.empty) {
+            throw new Error(
+              `No active budget found for ${intentDept} department`,
+            );
+          }
+          const targetBudget = {
+            id: budgetsSnapshot.docs[0].id,
+            ...budgetsSnapshot.docs[0].data(),
+          };
+
+          await DepartmentService.createCsddPurchaseOrder(
+            {
+              ...orderData,
+              clientKey: selectedIntent?.clientKey,
+              csddComponent: selectedIntent?.csddComponent,
+            },
+            currentFiscalYear,
+            targetBudget,
+            currentUser,
+          );
+
+          setShowPurchaseOrderModal(false);
+          setSelectedIntent(null);
+          toast.success("CSDD Purchase Order created!");
+          return;
+        }
+
+        // Standard PO: Use transaction to ensure all operations succeed or fail together
         await runTransaction(db, async (transaction) => {
           // 1️⃣ Get the intent to know which department it belongs to
           const intentRef = doc(db, "purchase_intents", intentId);
@@ -796,13 +641,13 @@ function Purchase() {
           const budgetsQuery = query(
             collection(db, "department_budgets"),
             where("department", "==", intentDepartment),
-            where("status", "==", "active")
+            where("status", "==", "active"),
           );
 
           const budgetsSnapshot = await getDocs(budgetsQuery);
           if (budgetsSnapshot.empty) {
             throw new Error(
-              `No active budget found for ${intentDepartment} department`
+              `No active budget found for ${intentDepartment} department`,
             );
           }
 
@@ -810,15 +655,19 @@ function Purchase() {
           const targetBudgetRef = doc(
             db,
             "department_budgets",
-            targetBudget.id
+            targetBudget.id,
           );
 
-          // 3️⃣ Generate PO Number
-          const poNumber = await generatePurchaseOrderNumber(
-            intentDepartment,
-            currentFiscalYear,
-            targetBudget.id
-          );
+          // 3️⃣ Generate PO Number (inline — avoids a separate transaction)
+          const deptCode =
+            DepartmentService.getDepartmentCode(intentDepartment);
+          const prefix =
+            intentDepartment?.toLowerCase() === "dm" ? "ICEM" : "GA";
+          const currentCount = targetBudget.data().poCounter || 0;
+          const newCount = currentCount + 1;
+          const poNumber = `${prefix}/${currentFiscalYear}/${deptCode}/${newCount
+            .toString()
+            .padStart(2, "0")}`;
 
           // Get total amount including GST
           const totalAmount = orderData.finalAmount;
@@ -856,6 +705,7 @@ function Purchase() {
             orderData.budgetComponent || intent.budgetComponent;
 
           const updatePayload = {
+            poCounter: increment(1),
             "summary.totalSpent": increment(totalAmount),
             lastUpdatedAt: serverTimestamp(),
             updatedBy: currentUser.uid,
@@ -866,17 +716,17 @@ function Purchase() {
           const section = budgetData.departmentExpenses?.[budgetComponent]
             ? "departmentExpenses"
             : budgetData.fixedCosts?.[budgetComponent]
-            ? "fixedCosts"
-            : budgetData.csddExpenses?.[budgetComponent]
-            ? "csddExpenses"
-            : null;
+              ? "fixedCosts"
+              : budgetData.csddExpenses?.[budgetComponent]
+                ? "csddExpenses"
+                : null;
 
           if (section) {
             updatePayload[`${section}.${budgetComponent}.spent`] =
               increment(totalAmount);
           } else {
             console.warn(
-              `⚠️ Budget component "${budgetComponent}" not found in any section.`
+              `⚠️ Budget component "${budgetComponent}" not found in any section.`,
             );
           }
 
@@ -888,7 +738,7 @@ function Purchase() {
         setSelectedIntent(null);
 
         // ✅ Success message
-        toast.success("Purchase Order created successfully!");
+        toast.success("Purchase Order created and Budget updated!");
       } catch (error) {
         console.error("❌ Error creating purchase order:", error);
 
@@ -910,13 +760,20 @@ function Purchase() {
         throw error;
       }
     },
-    [currentUser, currentFiscalYear]
+    [currentUser, currentFiscalYear, selectedIntent],
   );
 
   const handleUpdatePurchaseOrder = async (updatedOrder) => {
     try {
       if (!updatedOrder?.id) throw new Error("Missing order ID");
 
+      // Permission check — only specific departments can update POs
+      const userDept = currentUserDepartment || "unknown";
+      const allowedDepartments = ["hr", "admin", "purchase", "dm"];
+      if (!allowedDepartments.includes(userDept.toLowerCase())) {
+        toast.warning("Only HR, Admin, Purchase or DM users can update POs");
+        return;
+      }
       const orderRef = doc(db, "purchase_orders", updatedOrder.id);
 
       const updatedData = {
@@ -929,7 +786,7 @@ function Purchase() {
 
       // Optional: Update local state instantly for better UX
       setPurchaseOrders((prev) =>
-        prev.map((o) => (o.id === updatedOrder.id ? updatedOrder : o))
+        prev.map((o) => (o.id === updatedOrder.id ? updatedOrder : o)),
       );
 
       toast.success("Purchase Order updated successfully!");
@@ -953,7 +810,7 @@ function Purchase() {
         throw error;
       }
     },
-    [currentUser]
+    [currentUser],
   );
 
   const handleApproveOrder = async (order) => {
@@ -1000,7 +857,7 @@ function Purchase() {
     if (!selectedBudgetForOverview || budgetHistory.length === 0) return;
 
     const updatedVersion = budgetHistory.find(
-      (b) => b.id === selectedBudgetForOverview.id
+      (b) => b.id === selectedBudgetForOverview.id,
     );
 
     // Only update if something changed
@@ -1059,7 +916,7 @@ function Purchase() {
       toast.success("Expense deducted successfully across all departments!");
     } catch (error) {
       console.error("❌ Error applying expense:", error);
-      toast.success("Failed to record expense. Please try again.");
+      toast.error("Failed to record expense. Please try again.");
       throw error;
     }
   };
@@ -1103,13 +960,13 @@ function Purchase() {
                       exportPurchaseIntents(
                         "all", // Export all departments for purchase
                         currentFiscalYear,
-                        purchaseIntents
+                        purchaseIntents,
                       );
                     } else if (activeTab === "orders") {
                       exportPurchaseOrders(
                         "all", // Export all departments for purchase
                         currentFiscalYear,
-                        purchaseOrders
+                        purchaseOrders,
                       );
                     }
                   }}
@@ -1205,10 +1062,10 @@ function Purchase() {
 
                               // If both have same status, sort by fiscal year (newest first)
                               const yearA = parseInt(
-                                a.fiscalYear.split("-")[0]
+                                a.fiscalYear.split("-")[0],
                               );
                               const yearB = parseInt(
-                                b.fiscalYear.split("-")[0]
+                                b.fiscalYear.split("-")[0],
                               );
                               return yearB - yearA;
                             })
@@ -1219,9 +1076,9 @@ function Purchase() {
                                   budget.status === "active"
                                     ? "bg-green-50 shadow-[inset_0_1px_3px_rgba(255,255,255,0.6),0_1px_3px_rgba(0,0,0,0.2)]"
                                     : budget.id ===
-                                      selectedBudgetForOverview?.id
-                                    ? "bg-blue-50"
-                                    : ""
+                                        selectedBudgetForOverview?.id
+                                      ? "bg-blue-50"
+                                      : ""
                                 }`}
                               >
                                 <td className="py-2 px-3">
@@ -1251,7 +1108,7 @@ function Purchase() {
                                   <span className="font-semibold text-gray-900">
                                     ₹
                                     {budget.summary?.totalBudget?.toLocaleString(
-                                      "en-IN"
+                                      "en-IN",
                                     ) || "0"}
                                   </span>
                                 </td>
@@ -1259,7 +1116,7 @@ function Purchase() {
                                   <span className="text-gray-700">
                                     ₹
                                     {budget.summary?.totalSpent?.toLocaleString(
-                                      "en-IN"
+                                      "en-IN",
                                     ) || "0"}
                                   </span>
                                 </td>
@@ -1286,8 +1143,8 @@ function Purchase() {
                                       budget.status === "active"
                                         ? "bg-green-100 text-green-800"
                                         : budget.status === "draft"
-                                        ? "bg-yellow-100 text-yellow-800"
-                                        : "bg-gray-100 text-gray-800"
+                                          ? "bg-yellow-100 text-yellow-800"
+                                          : "bg-gray-100 text-gray-800"
                                     }`}
                                   >
                                     {budget.status}
@@ -1296,7 +1153,7 @@ function Purchase() {
                                 <td className="py-2 px-3 text-gray-600">
                                   {budget.lastUpdatedAt
                                     ? new Date(
-                                        budget.lastUpdatedAt.seconds * 1000
+                                        budget.lastUpdatedAt.seconds * 1000,
                                       ).toLocaleDateString("en-IN")
                                     : "N/A"}
                                 </td>
@@ -1362,7 +1219,7 @@ function Purchase() {
                         departmentBudget={selectedBudgetForOverview}
                         budgetUtilization={budgetUtilization}
                         budgetComponents={getDepartmentComponents(
-                          selectedBudgetForOverview.department
+                          selectedBudgetForOverview.department,
                         )}
                         componentColors={componentColors}
                         purchaseIntents={purchaseIntents}
@@ -1519,10 +1376,10 @@ function Purchase() {
 
                               // If both have same status, sort by fiscal year (newest first)
                               const yearA = parseInt(
-                                a.fiscalYear.split("-")[0]
+                                a.fiscalYear.split("-")[0],
                               );
                               const yearB = parseInt(
-                                b.fiscalYear.split("-")[0]
+                                b.fiscalYear.split("-")[0],
                               );
                               return yearB - yearA;
                             })
@@ -1573,7 +1430,7 @@ function Purchase() {
                                     <div className="flex items-center gap-3">
                                       <div
                                         className={`w-8 h-8 bg-linear-to-br ${getDepartmentColor(
-                                          budget.department
+                                          budget.department,
                                         )} rounded-lg flex items-center justify-center shadow-sm`}
                                       >
                                         <span className="text-white font-bold text-xs uppercase">
@@ -1598,7 +1455,7 @@ function Purchase() {
                                     <span className="font-bold text-gray-900">
                                       ₹
                                       {budget.summary?.totalBudget?.toLocaleString(
-                                        "en-IN"
+                                        "en-IN",
                                       ) || "0"}
                                     </span>
                                   </td>
@@ -1608,7 +1465,7 @@ function Purchase() {
                                     <span className="text-gray-700">
                                       ₹
                                       {budget.summary?.totalSpent?.toLocaleString(
-                                        "en-IN"
+                                        "en-IN",
                                       ) || "0"}
                                     </span>
                                   </td>
@@ -1639,12 +1496,12 @@ function Purchase() {
                                         <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
                                           <div
                                             className={`h-2 rounded-full ${getUtilizationColor(
-                                              utilizationRate
+                                              utilizationRate,
                                             )} transition-all duration-500`}
                                             style={{
                                               width: `${Math.min(
                                                 utilizationRate,
-                                                100
+                                                100,
                                               )}%`,
                                             }}
                                           ></div>
@@ -1663,8 +1520,8 @@ function Purchase() {
                                         budget.status === "active"
                                           ? "bg-emerald-100 text-emerald-800 border-emerald-200"
                                           : budget.status === "draft"
-                                          ? "bg-amber-100 text-amber-800 border-amber-200"
-                                          : "bg-gray-100 text-gray-800 border-gray-200"
+                                            ? "bg-amber-100 text-amber-800 border-amber-200"
+                                            : "bg-gray-100 text-gray-800 border-gray-200"
                                       }`}
                                     >
                                       {budget.status}
@@ -1711,7 +1568,7 @@ function Purchase() {
               <ExpensesPanel
                 allDepartments={Object.keys(budgetComponents)}
                 activeBudgets={budgetHistory.filter(
-                  (b) => b.status === "active"
+                  (b) => b.status === "active",
                 )}
                 getDepartmentComponents={getDepartmentComponents}
                 currentUser={currentUser}
@@ -1754,7 +1611,7 @@ function Purchase() {
             intent={selectedIntent}
             vendors={vendors}
             budgetComponents={getDepartmentComponents(
-              selectedIntent.department
+              selectedIntent.department,
             )}
             fiscalYear={currentFiscalYear}
             currentUser={currentUser}

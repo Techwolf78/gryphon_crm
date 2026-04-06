@@ -42,6 +42,7 @@ export const DepartmentService = {
       admin: "MAN",
       management: "MAN",
       placement: "CR",
+      purchase: "PUR",
     };
     return map[department?.toLowerCase()] || department?.toUpperCase();
   },
@@ -57,7 +58,7 @@ export const DepartmentService = {
     const q = query(
       collection(db, "department_budgets"),
       where("department", "==", department),
-      orderBy("fiscalYear", "desc")
+      orderBy("fiscalYear", "desc"),
     );
     return onSnapshot(q, (snapshot) => {
       const budgets = snapshot.docs.map((doc) => ({
@@ -73,7 +74,7 @@ export const DepartmentService = {
       collection(db, "purchase_intents"),
       where("department", "==", department),
       where("fiscalYear", "==", fiscalYear),
-      orderBy("createdAt", "desc")
+      orderBy("createdAt", "desc"),
     );
     return onSnapshot(q, (snapshot) => {
       const intents = snapshot.docs.map((doc) => ({
@@ -89,7 +90,7 @@ export const DepartmentService = {
       collection(db, "purchase_orders"),
       where("department", "==", department),
       where("fiscalYear", "==", fiscalYear),
-      orderBy("createdAt", "desc")
+      orderBy("createdAt", "desc"),
     );
     return onSnapshot(q, (snapshot) => {
       const orders = snapshot.docs.map((doc) => ({
@@ -140,7 +141,7 @@ export const DepartmentService = {
     if (budgetData.status === "active") {
       const budgetsQuery = query(
         collection(db, "department_budgets"),
-        where("department", "==", existingBudget.department)
+        where("department", "==", existingBudget.department),
       );
       const snapshot = await getDocs(budgetsQuery);
 
@@ -151,7 +152,7 @@ export const DepartmentService = {
             status: "archived",
             lastUpdatedAt: serverTimestamp(),
             updatedBy: user.uid,
-          })
+          }),
         );
 
       await Promise.all(archivePromises);
@@ -173,7 +174,7 @@ export const DepartmentService = {
     // This handles the batch archiving of other budgets
     const budgetsQuery = query(
       collection(db, "department_budgets"),
-      where("department", "==", budgetToActivate.department)
+      where("department", "==", budgetToActivate.department),
     );
     const snapshot = await getDocs(budgetsQuery);
 
@@ -187,7 +188,7 @@ export const DepartmentService = {
             status: "active",
             lastUpdatedAt: serverTimestamp(),
             updatedBy: user.uid,
-          })
+          }),
         );
       } else if (docSnapshot.data().status === "active") {
         batchPromises.push(
@@ -195,7 +196,7 @@ export const DepartmentService = {
             status: "archived",
             lastUpdatedAt: serverTimestamp(),
             updatedBy: user.uid,
-          })
+          }),
         );
       }
     });
@@ -233,7 +234,7 @@ export const DepartmentService = {
     department,
     fiscalYear,
     activeBudget,
-    user
+    user,
   ) {
     if (!activeBudget?.id) throw new Error("No active budget found");
 
@@ -249,10 +250,10 @@ export const DepartmentService = {
     const section = activeBudget.departmentExpenses?.[budgetComponent]
       ? "departmentExpenses"
       : activeBudget.fixedCosts?.[budgetComponent]
-      ? "fixedCosts"
-      : activeBudget.csddExpenses?.[budgetComponent]
-      ? "csddExpenses"
-      : null;
+        ? "fixedCosts"
+        : activeBudget.csddExpenses?.[budgetComponent]
+          ? "csddExpenses"
+          : null;
 
     if (!section)
       throw new Error(`Budget component "${budgetComponent}" not found.`);
@@ -310,6 +311,96 @@ export const DepartmentService = {
     });
   },
 
+  // ==========================================
+  // 5b. CSDD PURCHASE ORDERS (DM DEPARTMENT)
+  // Atomic transaction: main doc + subcollection
+  // ==========================================
+
+  async createCsddPurchaseOrder(orderData, fiscalYear, activeBudget, user) {
+    if (!activeBudget?.id) throw new Error("No active budget found");
+
+    const { clientKey, csddComponent } = orderData;
+    if (!clientKey || !csddComponent) {
+      throw new Error("Missing clientKey or csddComponent for CSDD PO");
+    }
+
+    const totalAmount = orderData.finalAmount;
+    const intentId = orderData.intentId;
+
+    await runTransaction(db, async (transaction) => {
+      // 1. Read: Main budget doc
+      const budgetRef = doc(db, "department_budgets", activeBudget.id);
+      const budgetDoc = await transaction.get(budgetRef);
+      if (!budgetDoc.exists()) throw new Error("Budget document not found!");
+
+      // 2. Read: Client subcollection doc
+      const clientRef = doc(budgetRef, "csdd_clients", clientKey);
+      const clientDoc = await transaction.get(clientRef);
+      if (!clientDoc.exists()) {
+        throw new Error(
+          `Client document "${clientKey}" not found in subcollection`,
+        );
+      }
+
+      // 3. Generate CSDD PO Number (counter from subcollection doc)
+      const clientData = clientDoc.data();
+      const currentCount = clientData?.poCounter || 0;
+      const newCount = currentCount + 1;
+      const clientName = (clientData?.client_name || clientKey)
+        .replace(/\s+/g, "_")
+        .toUpperCase();
+      const poNumber = `GA/${fiscalYear}/DM/${clientName}/${newCount
+        .toString()
+        .padStart(2, "0")}`;
+
+      // 4. Write: PO record
+      const poRef = doc(collection(db, "purchase_orders"));
+      const orderPayload = {
+        ...orderData,
+        department: "dm",
+        fiscalYear,
+        poNumber,
+        status: "approved",
+        intentType: "csdd",
+        createdBy: user.uid,
+        createdAt: serverTimestamp(),
+        purchaseDeptApproved: true,
+        approvedAt: serverTimestamp(),
+        approvedBy: user.displayName || user.uid,
+        totalCost: totalAmount,
+      };
+      transaction.set(poRef, orderPayload);
+
+      // 5. Write: Update intent status
+      if (intentId) {
+        const intentRef = doc(db, "purchase_intents", intentId);
+        transaction.update(intentRef, {
+          status: "approved",
+          approvedAt: serverTimestamp(),
+          approvedBy: user.uid,
+          poCreated: true,
+          poNumber,
+          updatedAt: serverTimestamp(),
+        });
+      }
+
+      // 6. Write: Main doc — client spent + totalSpent
+      transaction.update(budgetRef, {
+        [`csddExpenses.${clientKey}.spent`]: increment(totalAmount),
+        "summary.totalSpent": increment(totalAmount),
+        lastUpdatedAt: serverTimestamp(),
+        updatedBy: user.uid,
+      });
+
+      // 7. Write: Subcollection doc — component spent + poCounter
+      transaction.update(clientRef, {
+        [`client_components.${csddComponent}.spent`]: increment(totalAmount),
+        poCounter: increment(1),
+        lastUpdatedAt: serverTimestamp(),
+      });
+    });
+  },
+
   async updatePurchaseOrder(updatedOrder, user) {
     // Permission check logic can be done here or in component
     const orderRef = doc(db, "purchase_orders", updatedOrder.id);
@@ -330,7 +421,7 @@ export const DepartmentService = {
   subscribeToAllBudgets(onUpdate) {
     const q = query(
       collection(db, "department_budgets"),
-      orderBy("fiscalYear", "desc")
+      orderBy("fiscalYear", "desc"),
     );
     return onSnapshot(q, (snapshot) => {
       const budgets = snapshot.docs.map((doc) => ({
@@ -345,7 +436,7 @@ export const DepartmentService = {
     const q = query(
       collection(db, "purchase_intents"),
       where("fiscalYear", "==", fiscalYear),
-      orderBy("createdAt", "desc")
+      orderBy("createdAt", "desc"),
     );
     return onSnapshot(q, (snapshot) => {
       const intents = snapshot.docs.map((doc) => ({
@@ -360,7 +451,7 @@ export const DepartmentService = {
     const q = query(
       collection(db, "purchase_orders"),
       where("fiscalYear", "==", fiscalYear),
-      orderBy("createdAt", "desc")
+      orderBy("createdAt", "desc"),
     );
     return onSnapshot(q, (snapshot) => {
       const orders = snapshot.docs.map((doc) => ({
@@ -411,7 +502,7 @@ export const DepartmentService = {
       const budgetsQuery = query(
         collection(db, "department_budgets"),
         where("department", "==", department),
-        where("status", "==", "active")
+        where("status", "==", "active"),
       );
       const budgetsSnapshot = await getDocs(budgetsQuery);
       if (budgetsSnapshot.empty)
@@ -466,10 +557,10 @@ export const DepartmentService = {
       const section = budgetData.departmentExpenses?.[budgetComponent]
         ? "departmentExpenses"
         : budgetData.fixedCosts?.[budgetComponent]
-        ? "fixedCosts"
-        : budgetData.csddExpenses?.[budgetComponent]
-        ? "csddExpenses"
-        : null;
+          ? "fixedCosts"
+          : budgetData.csddExpenses?.[budgetComponent]
+            ? "csddExpenses"
+            : null;
 
       const updatePayload = {
         poCounter: increment(1),

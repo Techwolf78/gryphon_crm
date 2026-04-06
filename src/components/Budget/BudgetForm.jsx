@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { addDoc, collection, getDocs, query, where } from "firebase/firestore";
+import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "../../firebase";
 import { Trash2, Package, AlertCircle, X } from "lucide-react";
 
@@ -14,7 +14,6 @@ const BudgetForm = ({
   show,
   onClose,
   onSubmit,
-  budgetComponents,
   allBudgetComponents,
   currentUser,
   department,
@@ -128,7 +127,7 @@ const BudgetForm = ({
     if (formError) {
       setFormError("");
     }
-  }, [formData]);
+  }, [formData, formError]);
 
   const calculateTotalAllocated = () => {
     try {
@@ -265,16 +264,7 @@ const BudgetForm = ({
     }));
   };
 
-  const removeCsddComponent = (componentId) => {
-    setFormData((prev) => {
-      const updatedComponents = { ...prev.csddComponents };
-      delete updatedComponents[componentId];
-      return {
-        ...prev,
-        csddComponents: updatedComponents,
-      };
-    });
-  };
+
 
   // Add CSDD input handler
   const handleInputChange = (e) => {
@@ -376,7 +366,7 @@ const BudgetForm = ({
     setFormError(""); // Clear error on success
   };
 
-  const removeComponent = (componentId) => {
+  const _removeComponent = (componentId) => {
     setFormData((prev) => {
       const updatedComponents = { ...prev.components };
       delete updatedComponents[componentId];
@@ -436,7 +426,7 @@ const BudgetForm = ({
             `A budget for FY-${formData.fiscalYear} already exists for this department`,
           );
         }
-      } catch (error) {
+      } catch (e) { // eslint-disable-line no-unused-vars
         newErrors.fiscalYear = "Error checking fiscal year availability";
       }
     }
@@ -521,7 +511,7 @@ const BudgetForm = ({
         // 🧩 Include non-zero custom CSDD components
         ...Object.fromEntries(
           Object.entries(formData.csddComponents || {})
-            .filter(([_, comp]) => safeNumber(comp?.allocated) > 0) // ✅ filter out 0
+            .filter(([, comp]) => safeNumber(comp?.allocated) > 0) // ✅ filter out 0
             .map(([key, comp]) => [
               key,
               {
@@ -598,21 +588,6 @@ const BudgetForm = ({
   }, []);
 
   if (!show) return null;
-
-  useEffect(() => {
-    const preventScrollChange = (e) => {
-      if (
-        document.activeElement.type === "number" &&
-        document.activeElement.contains(e.target)
-      ) {
-        e.preventDefault(); // stop value change
-      }
-    };
-
-    window.addEventListener("wheel", preventScrollChange, { passive: false });
-
-    return () => window.removeEventListener("wheel", preventScrollChange);
-  }, []);
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-1000">
@@ -703,7 +678,7 @@ const BudgetForm = ({
                     <option value="">Select Department</option>
                     <option value="dm">DM</option>
                     <option value="placement">Placement</option>
-                    <option value="lnd">LND</option>
+                    <option value="lnd">L&D</option>
                     <option value="hr">HR</option>
                     <option value="sales">Sales</option>
                     <option value="management">Management</option>
@@ -1029,7 +1004,7 @@ const BudgetForm = ({
                 <div className="space-y-2">
                   {Object.entries(formData.csddExpenses || {})
                     .filter(
-                      ([_, val]) =>
+                      ([, val]) =>
                         typeof val === "object" && val.type === "client",
                     )
                     .map(([key, client]) => (

@@ -24,6 +24,8 @@ const InterviewSchedulerTab = () => {
   const [positionDropdownOpen, setPositionDropdownOpen] = useState(false);
   const [positionSuggestions, setPositionSuggestions] = useState([]);
   const [showDeleted, setShowDeleted] = useState(false);
+  const [showActivitiesModal, setShowActivitiesModal] = useState(false);
+  const [selectedInterviewForActivities, setSelectedInterviewForActivities] = useState(null);
   const [formData, setFormData] = useState({
     candidateName: '',
     positionApplied: '',
@@ -33,6 +35,21 @@ const InterviewSchedulerTab = () => {
   });
   const refreshClickCountRef = useRef(0);
   const [isRefreshDisabled, setIsRefreshDisabled] = useState(false);
+
+  // Status order for cycling through statuses
+  const statusOrder = [
+    'Scheduled',
+    'In Progress',
+    'Shortlisted',
+    'Final Round',
+    'Completed',
+    'Offered',
+    'Hired',
+    'Rejected',
+    'No Show',
+    'On Hold',
+    'Withdrawn'
+  ];
 
   // Position suggestions list
   const positionOptions = [
@@ -71,6 +88,54 @@ const InterviewSchedulerTab = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Get next status in the cycle
+  const getNextStatus = (currentStatus) => {
+    const currentIndex = statusOrder.indexOf(currentStatus);
+    if (currentIndex === -1 || currentIndex === statusOrder.length - 1) {
+      return statusOrder[0]; // Loop back to first status
+    }
+    return statusOrder[currentIndex + 1];
+  };
+
+  // Update status by clicking on the status badge
+  const updateStatusByClick = async (interview) => {
+    try {
+      const nextStatus = getNextStatus(interview.status);
+      const interviewRef = doc(db, 'interviews', interview.id);
+      const timestamp = new Date();
+      
+      // Add to status history
+      const statusHistory = interview.statusHistory || [];
+      statusHistory.push({
+        status: nextStatus,
+        changedAt: timestamp
+      });
+      
+      await updateDoc(interviewRef, {
+        status: nextStatus,
+        updatedAt: timestamp,
+        statusHistory: statusHistory
+      });
+      
+      // Update local state instead of refreshing entire list
+      setInterviews(interviews.map(int =>
+        int.id === interview.id
+          ? { ...int, status: nextStatus, updatedAt: timestamp, statusHistory: statusHistory }
+          : int
+      ));
+    } catch (error) {
+      console.error('Error updating interview status:', error);
+      alert('Error updating interview status. Please try again.');
+    }
+  };
+
+  // Open activities modal
+  const openActivitiesModal = (interview) => {
+    setSelectedInterviewForActivities(interview);
+    setShowActivitiesModal(true);
+    setDropdownOpen(null);
   };
 
   // Load data from Firestore on mount
@@ -115,10 +180,17 @@ const InterviewSchedulerTab = () => {
   // Save new interview
   const saveNewInterview = async () => {
     try {
+      const timestamp = new Date();
       const interviewData = {
         ...formData,
-        createdAt: new Date(),
-        updatedAt: new Date()
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        statusHistory: [
+          {
+            status: formData.status,
+            changedAt: timestamp
+          }
+        ]
       };
 
       await addDoc(collection(db, 'interviews'), interviewData);
@@ -136,9 +208,21 @@ const InterviewSchedulerTab = () => {
   const saveEditedInterview = async () => {
     try {
       const interviewRef = doc(db, 'interviews', editingInterview.id);
+      const timestamp = new Date();
+      
+      // If status changed, add to history
+      const statusHistory = editingInterview.statusHistory || [];
+      if (formData.status !== editingInterview.status) {
+        statusHistory.push({
+          status: formData.status,
+          changedAt: timestamp
+        });
+      }
+      
       await updateDoc(interviewRef, {
         ...formData,
-        updatedAt: new Date()
+        updatedAt: timestamp,
+        statusHistory: statusHistory
       });
       setShowEditModal(false);
       setEditingInterview(null);
@@ -516,7 +600,9 @@ const InterviewSchedulerTab = () => {
                   <td className="px-3 py-2 text-sm text-gray-500 max-w-32 truncate" title={interview.positionApplied}>{interview.positionApplied}</td>
                   <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500">{new Date(interview.interviewDate).toLocaleDateString()}</td>
                   <td className="px-3 py-2 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                    <span
+                      onClick={() => updateStatusByClick(interview)}
+                      className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity ${
                       interview.status === 'Scheduled' ? 'bg-blue-100 text-blue-800' :
                       interview.status === 'In Progress' ? 'bg-yellow-100 text-yellow-800' :
                       interview.status === 'Shortlisted' ? 'bg-purple-100 text-purple-800' :
@@ -529,7 +615,9 @@ const InterviewSchedulerTab = () => {
                       interview.status === 'On Hold' ? 'bg-amber-100 text-amber-800' :
                       interview.status === 'Withdrawn' ? 'bg-slate-100 text-slate-800' :
                       'bg-gray-100 text-gray-800'
-                    }`}>
+                    }`}
+                      title={`Click to change to ${getNextStatus(interview.status)}`}
+                    >
                       {interview.status}
                     </span>
                   </td>
@@ -546,7 +634,15 @@ const InterviewSchedulerTab = () => {
                         ⋮
                       </button>
                       {dropdownOpen === interview.id && (
-                        <div className="absolute right-0 mt-1 w-32 bg-white border border-gray-200 rounded-md shadow-lg z-50">
+                        <div className="absolute right-0 mt-1 w-40 bg-white border border-gray-200 rounded-md shadow-lg z-50">
+                          <button
+                            onClick={() => {
+                              openActivitiesModal(interview);
+                            }}
+                            className="block w-full text-left px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+                          >
+                            View Activities
+                          </button>
                           <button
                             onClick={() => {
                               editInterview(interview);
@@ -807,6 +903,139 @@ const InterviewSchedulerTab = () => {
                 className="px-3 py-1.5 bg-[#1C398E] text-white rounded-md hover:bg-[#0f2a5c] transition-colors font-medium text-sm"
               >
                 Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Activities Modal - iOS Style */}
+      {showActivitiesModal && selectedInterviewForActivities && (
+        <div className="fixed inset-0 backdrop-blur-md bg-transparent bg-opacity-25 flex items-center justify-center z-54 p-4">
+          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl animate-in slide-in-from-bottom-5 max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="px-6 py-3 border-b border-gray-100 flex justify-between items-center shrink-0">
+              <h3 className="text-base font-semibold text-gray-900">Activity Timeline</h3>
+              <button
+                onClick={() => {
+                  setShowActivitiesModal(false);
+                  setSelectedInterviewForActivities(null);
+                }}
+                className="text-gray-400 hover:text-gray-600 text-2xl font-light transition-colors"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="px-6 py-3 overflow-y-auto flex-1">
+              <div className="space-y-2">
+                {/* Interview Details */}
+                <div className="bg-gray-50 rounded-2xl p-3 mb-3">
+                  <h4 className="font-semibold text-gray-900 mb-2 text-sm">Interview Details</h4>
+                  <div className="space-y-1 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Candidate:</span>
+                      <span className="text-gray-900 font-medium">{selectedInterviewForActivities.candidateName}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Position:</span>
+                      <span className="text-gray-900 font-medium">{selectedInterviewForActivities.positionApplied}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Date:</span>
+                      <span className="text-gray-900 font-medium">{new Date(selectedInterviewForActivities.interviewDate).toLocaleDateString()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Status:</span>
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                        selectedInterviewForActivities.status === 'Scheduled' ? 'bg-blue-100 text-blue-800' :
+                        selectedInterviewForActivities.status === 'In Progress' ? 'bg-yellow-100 text-yellow-800' :
+                        selectedInterviewForActivities.status === 'Shortlisted' ? 'bg-purple-100 text-purple-800' :
+                        selectedInterviewForActivities.status === 'Final Round' ? 'bg-orange-100 text-orange-800' :
+                        selectedInterviewForActivities.status === 'Completed' ? 'bg-green-100 text-green-800' :
+                        selectedInterviewForActivities.status === 'Offered' ? 'bg-teal-100 text-teal-800' :
+                        selectedInterviewForActivities.status === 'Hired' ? 'bg-emerald-100 text-emerald-800' :
+                        selectedInterviewForActivities.status === 'Rejected' ? 'bg-red-100 text-red-800' :
+                        selectedInterviewForActivities.status === 'No Show' ? 'bg-gray-100 text-gray-800' :
+                        selectedInterviewForActivities.status === 'On Hold' ? 'bg-amber-100 text-amber-800' :
+                        selectedInterviewForActivities.status === 'Withdrawn' ? 'bg-slate-100 text-slate-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {selectedInterviewForActivities.status}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Timeline Events */}
+                <div>
+                  <h4 className="font-semibold text-gray-900 mb-2 text-sm">Timeline</h4>
+                  <div className="relative space-y-2">
+                    {/* Display status history */}
+                    {selectedInterviewForActivities.statusHistory && selectedInterviewForActivities.statusHistory.length > 0 ? (
+                      selectedInterviewForActivities.statusHistory.map((historyItem, index) => (
+                        <div key={index} className="flex gap-2">
+                          <div className="flex flex-col items-center">
+                            <div className="w-2 h-2 rounded-full bg-[#1C398E] mt-1.5"></div>
+                            {index < selectedInterviewForActivities.statusHistory.length - 1 && (
+                              <div className="w-0.5 h-8 bg-gray-200"></div>
+                            )}
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-xs font-semibold text-gray-900">Status Changed to <span className="text-[#1C398E]">{historyItem.status}</span></p>
+                            <p className="text-xs text-gray-500">
+                              {new Date(
+                                historyItem.changedAt.toDate
+                                  ? historyItem.changedAt.toDate()
+                                  : historyItem.changedAt
+                              ).toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="flex gap-2">
+                        <div className="flex flex-col items-center">
+                          <div className="w-2 h-2 rounded-full bg-[#1C398E] mt-1.5"></div>
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-xs font-semibold text-gray-900">Interview Created</p>
+                          <p className="text-xs text-gray-500">
+                            {selectedInterviewForActivities.createdAt
+                              ? new Date(
+                                  selectedInterviewForActivities.createdAt.toDate
+                                    ? selectedInterviewForActivities.createdAt.toDate()
+                                    : selectedInterviewForActivities.createdAt
+                                ).toLocaleString()
+                              : 'N/A'}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Notes Section */}
+                {selectedInterviewForActivities.notes && (
+                  <div className="bg-gray-50 rounded-2xl p-3 mt-3">
+                    <h4 className="font-semibold text-gray-900 mb-1 text-sm">Notes</h4>
+                    <p className="text-xs text-gray-700 whitespace-pre-wrap">{selectedInterviewForActivities.notes}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-3 border-t border-gray-100 bg-gray-50 rounded-b-3xl shrink-0">
+              <button
+                onClick={() => {
+                  setShowActivitiesModal(false);
+                  setSelectedInterviewForActivities(null);
+                }}
+                className="w-full px-4 py-2 bg-[#1C398E] text-white font-semibold rounded-xl hover:bg-[#0f2a5c] transition-colors text-sm"
+              >
+                Close
               </button>
             </div>
           </div>

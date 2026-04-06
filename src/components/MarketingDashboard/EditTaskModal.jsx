@@ -1,6 +1,16 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useAuth } from "../../context/AuthContext";
 import ImageCompressor from 'image-compressor.js';
+import { FiX, FiFileText } from 'react-icons/fi';
+
+const isPDF = (url) => {
+  if (!url) return false;
+  const urlStr = typeof url === 'string' ? url : '';
+  return urlStr.toLowerCase().split('?')[0].endsWith('.pdf') || 
+         urlStr.includes('/raw/upload/') || 
+         urlStr.includes('/pdf/upload/') ||
+         urlStr.startsWith('data:application/pdf');
+};
 
 const EditTaskModal = ({ task, isOpen, onClose, onSave, assignees, tasksData }) => {
   const [title, setTitle] = useState('');
@@ -18,16 +28,26 @@ const EditTaskModal = ({ task, isOpen, onClose, onSave, assignees, tasksData }) 
   const fileInputRef = useRef(null);
   const { user } = useAuth();
 
-  const canEditDueDate = ["Director"].includes(user?.role);
+  const canEditDueDate = ["Admin", "Director", "Head"].includes(user?.role);
+  const canAssignOthers = ["Admin", "Director", "Head"].includes(user?.role);
 
-  const uniqueAccounts = useMemo(() => [...new Set(tasksData?.map((item) => item.account) || [])], [tasksData]);
+  const uniqueAccounts = useMemo(() => {
+    if (!tasksData) return [];
+    return [...new Set(tasksData.map((item) => item.account))];
+  }, [tasksData]);
+
   const rolesForAccount = useMemo(() => {
-    if (!selectedAccount) return [];
-    return [...new Set(tasksData?.filter((item) => item.account === selectedAccount).map((item) => item.role) || [])];
+    if (!selectedAccount || !tasksData) return [];
+    const accountData = tasksData.find((item) => item.account === selectedAccount);
+    return accountData ? accountData.roles.map((r) => r.name) : [];
   }, [selectedAccount, tasksData]);
+
   const tasksForRole = useMemo(() => {
-    if (!selectedAccount || !selectedRole) return [];
-    return [...new Set(tasksData?.filter((item) => item.account === selectedAccount && item.role === selectedRole).map((item) => item.task) || [])];
+    if (!selectedAccount || !selectedRole || !tasksData) return [];
+    const accountData = tasksData.find((item) => item.account === selectedAccount);
+    if (!accountData) return [];
+    const roleData = accountData.roles.find((r) => r.name === selectedRole);
+    return roleData ? roleData.tasks : [];
   }, [selectedAccount, selectedRole, tasksData]);
 
   const parseDate = (dateStr) => {
@@ -49,11 +69,11 @@ const EditTaskModal = ({ task, isOpen, onClose, onSave, assignees, tasksData }) 
     return null;
   };
 
-  const formatDateForInput = (dateValue) => {
+  const formatDateForInput = useCallback((dateValue) => {
     const date = parseDate(dateValue);
     if (!date || isNaN(date.getTime())) return '';
     return date.toISOString().split('T')[0];
-  };
+  }, []);
 
   useEffect(() => {
     if (task) {
@@ -67,7 +87,7 @@ const EditTaskModal = ({ task, isOpen, onClose, onSave, assignees, tasksData }) 
       setSelectedTask(task.task || '');
       setImages(task.images || []);
     }
-  }, [task]);
+  }, [task, formatDateForInput]);
 
   const uploadImage = async (file) => {
     if (!file) return null;
@@ -75,20 +95,24 @@ const EditTaskModal = ({ task, isOpen, onClose, onSave, assignees, tasksData }) 
     try {
       setUploadingImage(true);
 
-      // Compress the image
-      const compressedFile = await new Promise((resolve, reject) => {
-        new ImageCompressor(file, {
-          quality: 0.8,
-          maxWidth: 1200,
-          maxHeight: 1200,
-          success: resolve,
-          error: reject,
+      let fileToUpload = file;
+
+      // Compress if it's an image
+      if (file.type.startsWith('image/')) {
+        fileToUpload = await new Promise((resolve, reject) => {
+          new ImageCompressor(file, {
+            quality: 0.8,
+            maxWidth: 1200,
+            maxHeight: 1200,
+            success: resolve,
+            error: reject,
+          });
         });
-      });
+      }
 
       // Create FormData for Cloudinary upload
       const formData = new FormData();
-      formData.append('file', compressedFile);
+      formData.append('file', fileToUpload);
       formData.append('upload_preset', 'react_profile_upload');
       formData.append('cloud_name', 'da0ypp61n');
 
@@ -116,7 +140,7 @@ const EditTaskModal = ({ task, isOpen, onClose, onSave, assignees, tasksData }) 
   };
 
   const handleNewImageChange = (e) => {
-    const files = Array.from(e.target.files).filter(file => file.type.startsWith('image/'));
+    const files = Array.from(e.target.files).filter(file => file.type.startsWith('image/') || file.type === 'application/pdf');
     if (files.length > 0) {
       const validFiles = files.filter(file => file.size <= 10 * 1024 * 1024); // 10MB
       const skippedSize = files.length - validFiles.length;
@@ -130,7 +154,7 @@ const EditTaskModal = ({ task, isOpen, onClose, onSave, assignees, tasksData }) 
           message += `${skippedSize} file${skippedSize > 1 ? 's' : ''} exceed${skippedSize > 1 ? '' : 's'} 10MB limit and were ignored. `;
         }
         if (skippedTotal > 0) {
-          message += `${skippedTotal} file${skippedTotal > 1 ? 's' : ''} exceed${skippedTotal > 1 ? '' : 's'} the total limit of 20 images and were ignored. `;
+          message += `${skippedTotal} file${skippedTotal > 1 ? 's' : ''} exceed${skippedTotal > 1 ? '' : 's'} the total limit of 20 items and were ignored. `;
         }
         message += `${finalValidFiles.length} file${finalValidFiles.length > 1 ? 's' : ''} accepted.`;
         alert(message);
@@ -188,6 +212,7 @@ const EditTaskModal = ({ task, isOpen, onClose, onSave, assignees, tasksData }) 
     if (task) {
       const taskData = {
         description: title || null,
+        title: title || null,
         startDate: startDate ? parseDate(startDate) : null,
         dueDate: dueDate ? parseDate(dueDate) : null,
         assignedTo: assignedTo || null,
@@ -196,6 +221,7 @@ const EditTaskModal = ({ task, isOpen, onClose, onSave, assignees, tasksData }) 
         rolePlay: selectedRole || null,
         task: selectedTask || null,
         images: images,
+        updatedAt: new Date()
       };
       onSave(task.id, taskData);
       onClose();
@@ -226,7 +252,7 @@ const EditTaskModal = ({ task, isOpen, onClose, onSave, assignees, tasksData }) 
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white select-text cursor-text"
               placeholder="Enter task title"
             />
           </div>
@@ -245,20 +271,22 @@ const EditTaskModal = ({ task, isOpen, onClose, onSave, assignees, tasksData }) 
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Due Date
-              </label>
-              <input
-                type="date"
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-                placeholder="dd-mm-yyyy"
-                className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white ${!canEditDueDate ? 'bg-gray-100 cursor-not-allowed text-gray-500' : ''}`}
-                disabled={!canEditDueDate}
-                title={!canEditDueDate ? "Only Managers and Admins can update due date" : ""}
-              />
-            </div>
+            {canEditDueDate && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Due Date
+                </label>
+                <input
+                  type="date"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                  placeholder="dd-mm-yyyy"
+                  className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white ${!canEditDueDate ? 'bg-gray-100 cursor-not-allowed text-gray-500' : ''}`}
+                  disabled={!canEditDueDate}
+                  title={!canEditDueDate ? "Only Managers and Admins can update due date" : ""}
+                />
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -269,7 +297,8 @@ const EditTaskModal = ({ task, isOpen, onClose, onSave, assignees, tasksData }) 
               <select
                 value={assignedTo}
                 onChange={(e) => setAssignedTo(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                disabled={!canAssignOthers}
+                className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white ${!canAssignOthers ? 'bg-gray-100 cursor-not-allowed text-gray-500' : ''}`}
               >
                 <option value="">Select assignee...</option>
                 {assignees.map(assignee => (
@@ -347,31 +376,41 @@ const EditTaskModal = ({ task, isOpen, onClose, onSave, assignees, tasksData }) 
                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
               >
                 <option value="">Select task (opt)</option>
-                {tasksForRole.map((task) => (
-                  <option key={task} value={task}>{task}</option>
+                {tasksForRole.map((taskItem) => (
+                  <option key={taskItem} value={taskItem}>{taskItem}</option>
                 ))}
               </select>
             </div>
           </div>
 
-          {/* Images Section */}
+          {/* Attachments Section */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Images
+              Attachments (Images/PDFs)
             </label>
 
-            {/* Existing Images */}
+            {/* Existing Attachments */}
             {images.length > 0 && (
               <div className="mb-2">
-                <p className="text-sm text-gray-600 mb-1">Current images:</p>
+                <p className="text-sm text-gray-600 mb-1">Current attachments:</p>
                 <div className="grid grid-cols-4 gap-1 px-1">
                   {images.map((image, index) => (
                     <div key={index} className="relative">
-                      <img
-                        src={image}
-                        alt={`Task image ${index + 1}`}
-                        className="w-full h-12 object-cover rounded-lg border border-gray-200"
-                      />
+                      {isPDF(image) ? (
+                        <div 
+                          onClick={() => window.open(image, '_blank')}
+                          className="w-full h-12 flex flex-col items-center justify-center bg-gray-50 rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors"
+                        >
+                          <FiFileText className="text-red-500 w-6 h-6" />
+                          <span className="text-[8px] text-gray-500 font-medium uppercase">PDF</span>
+                        </div>
+                      ) : (
+                        <img
+                          src={image}
+                          alt={`Task attachment ${index + 1}`}
+                          className="w-full h-12 object-cover rounded-lg border border-gray-200"
+                        />
+                      )}
                       <button
                         onClick={() => removeImage(index)}
                         className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full text-xs hover:bg-red-600 transition-colors flex items-center justify-center shadow-md"
@@ -384,13 +423,13 @@ const EditTaskModal = ({ task, isOpen, onClose, onSave, assignees, tasksData }) 
               </div>
             )}
 
-            {/* Add New Image */}
+            {/* Add New Attachments */}
             <div className="space-y-1">
               <div className="flex items-center gap-1">
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/*"
+                  accept="image/*,application/pdf"
                   multiple
                   onChange={handleNewImageChange}
                   className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 file:mr-1 file:py-0.5 file:px-2 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 bg-white"
@@ -409,12 +448,19 @@ const EditTaskModal = ({ task, isOpen, onClose, onSave, assignees, tasksData }) 
               {newImagePreviews.length > 0 && (
                 <div className="flex flex-wrap gap-1">
                   {newImagePreviews.map((preview, index) => (
-                    <img
-                      key={index}
-                      src={preview}
-                      alt={`New image ${index + 1}`}
-                      className="w-12 h-12 object-cover rounded-lg border border-gray-200"
-                    />
+                    isPDF(preview) ? (
+                      <div key={index} className="w-12 h-12 flex flex-col items-center justify-center bg-gray-50 rounded-lg border border-gray-200">
+                        <FiFileText className="text-red-500 w-5 h-5" />
+                        <span className="text-[8px] text-gray-500 font-medium uppercase">PDF</span>
+                      </div>
+                    ) : (
+                      <img
+                        key={index}
+                        src={preview}
+                        alt={`New item ${index + 1}`}
+                        className="w-12 h-12 object-cover rounded-lg border border-gray-200"
+                      />
+                    )
                   ))}
                   <button
                     onClick={addNewImage}
@@ -427,7 +473,7 @@ const EditTaskModal = ({ task, isOpen, onClose, onSave, assignees, tasksData }) 
                         Uploading...
                       </div>
                     ) : (
-                      `Add ${newImagePreviews.length} image${newImagePreviews.length > 1 ? 's' : ''}`
+                      `Add ${newImagePreviews.length} item${newImagePreviews.length > 1 ? 's' : ''}`
                     )}
                   </button>
                 </div>

@@ -31,8 +31,10 @@ import {
   Calendar,
   PlayCircle,
   DollarSign,
+  ClipboardList,
 } from "lucide-react";
 import BudgetDashboard from "../components/Budget/BudgetDashboard";
+import LDTaskManager from "../components/Learning/LDTaskManager";
 
 function LearningDevelopment() {
   const [trainings, setTrainings] = useState([]);
@@ -45,11 +47,40 @@ function LearningDevelopment() {
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState(() => {
     try {
+      // 1) URL parameter takes precedence, then localStorage fallback
+      const params = new URLSearchParams(window.location.search);
+      const urlTab = params.get("tab");
+      if (urlTab) return urlTab;
       return localStorage.getItem("ld_activeTab") || "newContact";
     } catch {
       return "newContact";
     }
   });
+
+  const updateTabUrl = (tab) => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (tab && tab !== "newContact") {
+        params.set("tab", tab);
+      } else {
+        params.delete("tab");
+      }
+      const newUrl = `${window.location.pathname}?${params.toString()}`;
+      window.history.replaceState(null, "", newUrl);
+    } catch {
+      // ignore URL update errors
+    }
+  };
+
+  const setActiveTabAndPersist = (newTab) => {
+    setActiveTab(newTab);
+    try {
+      localStorage.setItem("ld_activeTab", newTab);
+    } catch {
+      // ignore storage errors
+    }
+    updateTabUrl(newTab);
+  };
   const [selectedInitiationTraining, setSelectedInitiationTraining] =
     useState(null);
   const [showInitiationModal, setShowInitiationModal] = useState(false);
@@ -410,13 +441,8 @@ function LearningDevelopment() {
     }
   }, [activeTab]);
 
-  // Persist active tab so it survives reloads
   useEffect(() => {
-    try {
-      localStorage.setItem("ld_activeTab", activeTab);
-    } catch {
-      // ignore storage errors
-    }
+    updateTabUrl(activeTab);
   }, [activeTab]);
 
   const handleViewStudentData = (item) => {
@@ -479,10 +505,16 @@ function LearningDevelopment() {
 
   // Handle operations configuration
   const handleOperationsConfigured = (config) => {
-    setOperationsConfig(config);
-    setExistingJDConfig((prev) =>
-      prev ? { ...prev, operationsConfig: config } : null
-    );
+    // Check if configuration actually changed to avoid unnecessary resets
+    const configChanged = !operationsConfig || JSON.stringify(operationsConfig) !== JSON.stringify(config);
+    
+    if (configChanged) {
+      setOperationsConfig({ ...config, hasChanges: true });
+      setExistingJDConfig((prev) =>
+        prev ? { ...prev, operationsConfig: { ...config, hasChanges: true } } : null
+      );
+    }
+    
     setShowOperationsConfigModal(false);
     setShowJDInitiationModal(true);
   };
@@ -576,6 +608,14 @@ function LearningDevelopment() {
     );
   }
 
+  if (activeTab === "ldTasks") {
+    return (
+      <div className="bg-gray-50 min-h-screen">
+        <LDTaskManager onBack={() => setActiveTabAndPersist("newContact")} />
+      </div>
+    );
+  }
+
   return (
     <>
       <LearningDevelopmentTour userId={user?.uid} />
@@ -592,25 +632,36 @@ function LearningDevelopment() {
         theme="light"
       />
       <div className="bg-gray-50 min-h-screen pt-0 -mt-2">
-        <div
-          className="flex justify-between items-center mb-1"
-          data-tour="ld-header"
-        >
-          <h1 className="text-2xl font-bold text-blue-800">
-            Training Dashboard
-          </h1>
-          <button
-            onClick={handleViewTrainers}
-            className="px-2 py-0.5 bg-blue-600 text-white font-medium rounded-full shadow-md hover:bg-blue-700 hover:shadow-lg transform hover:scale-105 transition-all duration-200 border border-gray-300 text-sm"
-            data-tour="view-trainers-button"
-          >
-            View Trainers
-          </button>
-        </div>
+        {activeTab !== "ldTasks" && (
+          <>
+            <div
+              className="flex justify-between items-center mb-1"
+              data-tour="ld-header"
+            >
+              <h1 className="text-2xl font-bold text-blue-800">
+                Training Dashboard
+              </h1>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setActiveTabAndPersist("ldTasks")}
+                  className="px-2 py-0.5 bg-indigo-600 text-white font-medium rounded-full shadow-md hover:bg-indigo-700 hover:shadow-lg transform hover:scale-105 transition-all duration-200 border border-indigo-300 text-sm flex items-center gap-1"
+                >
+                  <ClipboardList size={14} />
+                  Task Module
+                </button>
+                <button
+                  onClick={handleViewTrainers}
+                  className="px-2 py-0.5 bg-blue-600 text-white font-medium rounded-full shadow-md hover:bg-blue-700 hover:shadow-lg transform hover:scale-105 transition-all duration-200 border border-gray-300 text-sm"
+                  data-tour="view-trainers-button"
+                >
+                  View Trainers
+                </button>
+              </div>
+            </div>
 
-        {/* Enhanced Tab Navigation with Sliding Indicator */}
-        <div className="relative mb-0.5">
-          <div className="flex border-b border-gray-200">
+            {/* Enhanced Tab Navigation with Sliding Indicator */}
+            <div className="relative mb-0.5">
+              <div className="flex border-b border-gray-200">
             <button
               className={`flex-1 px-6 py-2 font-medium text-sm transition-all duration-150 ${
                 activeTab === "newContact"
@@ -687,6 +738,8 @@ function LearningDevelopment() {
             }}
           ></div>
         </div>
+      </>
+    )}
 
         {error && (
           <div className="mb-2 p-3 bg-red-100 border-l-4 border-red-500 text-red-700">

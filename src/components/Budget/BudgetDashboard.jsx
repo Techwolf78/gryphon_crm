@@ -38,7 +38,9 @@ const PurchaseIntentsList = lazy(() => import("./PurchaseIntentsList"));
 const PurchaseOrdersList = lazy(() => import("./PurchaseOrdersList"));
 const VendorManagement = lazy(() => import("./VendorManagement"));
 const ViewBudgetModal = lazy(() => import("./ViewBudgetModal"));
-const ManageCSDD = lazy(()=> import("./ManageCSDD"))
+const ManageCSDD = lazy(() => import("./ManageCSDD"));
+const CsddPurchaseIntentModal = lazy(() => import("./CsddPurchaseIntentModal"));
+const BudgetHistory = lazy(() => import("./BudgetHistory"));
 
 // Loading component
 const ComponentLoader = () => (
@@ -260,6 +262,7 @@ function BudgetDashboard({
   const [showBudgetUpdateForm, setShowBudgetUpdateForm] = useState(false);
   const [showPurchaseIntentModal, setShowPurchaseIntentModal] = useState(false);
   const [showPurchaseOrderModal, setShowPurchaseOrderModal] = useState(false);
+  const [showCsddIntentModal, setShowCsddIntentModal] = useState(false);
   const [selectedIntent, setSelectedIntent] = useState(null);
   const [editingBudget, setEditingBudget] = useState(null);
 
@@ -318,7 +321,7 @@ function BudgetDashboard({
   // Subscribe to Users Collection (For ready state)
   useEffect(() => {
     if (!currentUser) return;
-    const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
+    const unsubUsers = onSnapshot(collection(db, "users"), () => {
       setUsersLoaded(true);
       setLoading(false);
     });
@@ -338,7 +341,7 @@ function BudgetDashboard({
   }, [currentUserData, department]);
 
   const currentUserDepartmentComponents = getDepartmentComponents(
-    currentUserDepartment
+    currentUserDepartment,
   );
 
   // ==========================================
@@ -354,7 +357,7 @@ function BudgetDashboard({
       (data) => {
         setDepartmentBudget(data[0] || null); // Most recent
         setBudgetHistory(data);
-      }
+      },
     );
 
     // 2. Intents
@@ -363,7 +366,7 @@ function BudgetDashboard({
       currentFiscalYear,
       (data) => {
         setPurchaseIntents(data);
-      }
+      },
     );
 
     // 3. Orders
@@ -372,7 +375,7 @@ function BudgetDashboard({
       currentFiscalYear,
       (data) => {
         setPurchaseOrders(data);
-      }
+      },
     );
 
     // 4. Vendors
@@ -403,7 +406,7 @@ function BudgetDashboard({
       }
       return currentUserDepartmentComponents;
     },
-    [currentUserDepartmentComponents]
+    [currentUserDepartmentComponents],
   );
 
   const budgetUtilization = useMemo(() => {
@@ -496,7 +499,7 @@ function BudgetDashboard({
         await DepartmentService.createBudget(
           department,
           budgetData,
-          currentUser
+          currentUser,
         );
         setShowBudgetForm(false);
         toast.success("Budget created successfully");
@@ -505,7 +508,7 @@ function BudgetDashboard({
         toast.error("Failed to create budget.");
       }
     },
-    [currentUser, department]
+    [currentUser, department],
   );
 
   const handleUpdateBudget = useCallback(
@@ -514,7 +517,7 @@ function BudgetDashboard({
         await DepartmentService.updateBudget(
           budgetData,
           existingBudget,
-          currentUser
+          currentUser,
         );
         setShowBudgetUpdateForm(false);
         setEditingBudget(null);
@@ -529,7 +532,7 @@ function BudgetDashboard({
         toast.error("Failed to update budget.");
       }
     },
-    [currentUser]
+    [currentUser],
   );
 
   const handleDeleteBudget = useCallback(async () => {
@@ -573,7 +576,7 @@ function BudgetDashboard({
           intentData,
           department,
           currentFiscalYear,
-          currentUser
+          currentUser,
         );
         setShowPurchaseIntentModal(false);
         toast.success("Intent submitted successfully");
@@ -582,7 +585,26 @@ function BudgetDashboard({
         toast.error("Failed to create intent");
       }
     },
-    [currentUser, department, currentFiscalYear]
+    [currentUser, department, currentFiscalYear],
+  );
+
+  const handleCreateCsddIntent = useCallback(
+    async (intentData) => {
+      try {
+        await DepartmentService.createIntent(
+          intentData,
+          department,
+          currentFiscalYear,
+          currentUser,
+        );
+        setShowCsddIntentModal(false);
+        toast.success("CSDD Intent submitted successfully");
+      } catch (error) {
+        console.error("Error creating CSDD intent:", error);
+        toast.error("Failed to create CSDD intent");
+      }
+    },
+    [currentUser, department, currentFiscalYear],
   );
 
   const handleDeleteIntent = useCallback(async (intentId) => {
@@ -598,31 +620,60 @@ function BudgetDashboard({
   const handleCreatePurchaseOrder = useCallback(
     async (orderData) => {
       try {
-        // All the complexity (PO Numbers, Transactions) is now inside this Service call
-        await DepartmentService.createPurchaseOrder(
-          orderData,
-          department,
-          currentFiscalYear,
-          activeBudget || departmentBudget,
-          currentUser
-        );
+        const isCsdd =
+          selectedIntent?.intentType === "csdd" ||
+          orderData.intentType === "csdd";
+
+        if (isCsdd) {
+          // CSDD PO: atomic update to main doc + subcollection
+          await DepartmentService.createCsddPurchaseOrder(
+            {
+              ...orderData,
+              clientKey: selectedIntent?.clientKey,
+              csddComponent: selectedIntent?.csddComponent,
+            },
+            currentFiscalYear,
+            activeBudget || departmentBudget,
+            currentUser,
+          );
+        } else {
+          // Standard PO
+          await DepartmentService.createPurchaseOrder(
+            orderData,
+            department,
+            currentFiscalYear,
+            activeBudget || departmentBudget,
+            currentUser,
+          );
+        }
 
         setShowPurchaseOrderModal(false);
         setSelectedIntent(null);
-        toast.success("Purchase Order created and Budget updated!");
+        toast.success(
+          isCsdd
+            ? "CSDD Purchase Order created!"
+            : "Purchase Order created and Budget updated!",
+        );
       } catch (error) {
         console.error(error);
         toast.error(error.message || "Failed to create Purchase Order");
       }
     },
-    [currentUser, department, currentFiscalYear, activeBudget, departmentBudget]
+    [
+      currentUser,
+      department,
+      currentFiscalYear,
+      activeBudget,
+      departmentBudget,
+      selectedIntent,
+    ],
   );
 
   const handleUpdatePurchaseOrder = async (updatedOrder) => {
     try {
       // Permission Check (Relies on local User Data, so kept here)
       const userDept = currentUserDepartment || "unknown";
-      const allowedDepartments = ["hr", "admin", "purchase"];
+      const allowedDepartments = ["hr", "admin", "purchase", "dm"];
       if (!allowedDepartments.includes(userDept.toLowerCase())) {
         toast.warning("Only HR, Admin, or Purchase users can update POs");
         return;
@@ -632,7 +683,7 @@ function BudgetDashboard({
 
       // Optimistic update
       setPurchaseOrders((prev) =>
-        prev.map((o) => (o.id === updatedOrder.id ? updatedOrder : o))
+        prev.map((o) => (o.id === updatedOrder.id ? updatedOrder : o)),
       );
       toast.success("Purchase order updated");
     } catch (error) {
@@ -713,7 +764,10 @@ function BudgetDashboard({
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
               <h1 className="text-xl font-bold text-gray-900">
-                {department.charAt(0).toUpperCase() + department.slice(1)}{" "}
+                {department.toLowerCase() === "lnd"
+                  ? "L&D"
+                  : department.charAt(0).toUpperCase() +
+                    department.slice(1)}{" "}
                 Budget Dashboard
               </h1>
               <p className="text-gray-600 mt-1">FY_{currentFiscalYear}</p>
@@ -734,6 +788,14 @@ function BudgetDashboard({
               >
                 <PlusIcon className="w-3.5 h-3.5" /> Create Purchase Intent
               </button>
+              {department?.toLowerCase() === "dm" && activeTab === "csdd" && (
+                <button
+                  onClick={() => setShowCsddIntentModal(true)}
+                  className="bg-amber-600 text-white px-3 py-2 rounded-lg font-semibold hover:opacity-90 transition-all shadow-[inset_0_1px_3px_rgba(255,255,255,0.3),0_3px_5px_rgba(0,0,0,0.4)] active:shadow-[inset_0_3px_5px_rgba(0,0,0,0.4)] active:translate-y-0.5 flex items-center gap-1.5 text-xs"
+                >
+                  <PlusIcon className="w-3.5 h-3.5" /> CSDD Purchase Intent
+                </button>
+              )}
               {(activeTab === "intents" || activeTab === "orders") && (
                 <button
                   onClick={() =>
@@ -741,12 +803,12 @@ function BudgetDashboard({
                       ? exportPurchaseIntents(
                           department,
                           currentFiscalYear,
-                          purchaseIntents
+                          purchaseIntents,
                         )
                       : exportPurchaseOrders(
                           department,
                           currentFiscalYear,
-                          purchaseOrders
+                          purchaseOrders,
                         )
                   }
                   className="bg-emerald-600 text-white px-3 py-2 rounded-lg font-semibold hover:opacity-90 transition-all shadow-[inset_0_1px_3px_rgba(255,255,255,0.3),0_3px_5px_rgba(0,0,0,0.4)] active:shadow-[inset_0_3px_5px_rgba(0,0,0,0.4)] active:translate-y-0.5 flex items-center text-xs"
@@ -861,7 +923,7 @@ function BudgetDashboard({
                                   <span className="font-semibold text-gray-900">
                                     ₹
                                     {budget.summary?.totalBudget?.toLocaleString(
-                                      "en-IN"
+                                      "en-IN",
                                     ) || "0"}
                                   </span>
                                 </td>
@@ -869,7 +931,7 @@ function BudgetDashboard({
                                   <span className="text-gray-700">
                                     ₹
                                     {budget.summary?.totalSpent?.toLocaleString(
-                                      "en-IN"
+                                      "en-IN",
                                     ) || "0"}
                                   </span>
                                 </td>
@@ -896,8 +958,8 @@ function BudgetDashboard({
                                       budget.status === "active"
                                         ? "bg-green-100 text-green-800"
                                         : budget.status === "draft"
-                                        ? "bg-yellow-100 text-yellow-800"
-                                        : "bg-gray-100 text-gray-800"
+                                          ? "bg-yellow-100 text-yellow-800"
+                                          : "bg-gray-100 text-gray-800"
                                     }`}
                                   >
                                     {budget.status}
@@ -906,7 +968,7 @@ function BudgetDashboard({
                                 <td className="py-2 px-3 text-gray-600">
                                   {budget.lastUpdatedAt
                                     ? new Date(
-                                        budget.lastUpdatedAt.seconds * 1000
+                                        budget.lastUpdatedAt.seconds * 1000,
                                       ).toLocaleDateString("en-IN", {
                                         day: "2-digit",
                                         month: "short",
@@ -1044,73 +1106,7 @@ function BudgetDashboard({
             )}
 
             {activeTab === "history" && (
-              <div className="space-y-3">
-                <h3 className="text-lg font-bold text-gray-900 mb-3">
-                  Budget Analytics - FY{currentFiscalYear}
-                </h3>
-                {budgetHistory.length > 0 ? (
-                  <div className="grid gap-3">
-                    {budgetHistory.map((budget) => (
-                      <div
-                        key={budget.id}
-                        className="border border-gray-200 rounded-lg p-3 hover:bg-gray-50 transition-colors text-sm"
-                      >
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h4 className="font-semibold text-gray-900">
-                              FY{budget.fiscalYear} Budget
-                            </h4>
-                            <p className="text-gray-600">
-                              {budget.department} • {budget.status}
-                            </p>
-                            <p className="text-gray-600">
-                              Total: ₹
-                              {budget.summary?.totalBudget?.toLocaleString(
-                                "en-IN"
-                              )}{" "}
-                              • Spent: ₹
-                              {budget.summary?.totalSpent?.toLocaleString(
-                                "en-IN"
-                              )}
-                            </p>
-                            <p className="text-gray-600">
-                              Utilization:{" "}
-                              {budget.summary?.totalBudget
-                                ? (
-                                    (budget.summary.totalSpent /
-                                      budget.summary.totalBudget) *
-                                    100
-                                  ).toFixed(1)
-                                : 0}
-                              %
-                            </p>
-                          </div>
-                          <span
-                            className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              budget.status === "active"
-                                ? "bg-green-100 text-green-800"
-                                : budget.status === "draft"
-                                ? "bg-yellow-100 text-yellow-800"
-                                : "bg-gray-100 text-gray-800"
-                            }`}
-                          >
-                            {budget.status}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <p className="text-gray-500 text-base">
-                      No budget history found
-                    </p>
-                    <p className="text-gray-400 mt-1.5 text-sm">
-                      Create a budget to get started
-                    </p>
-                  </div>
-                )}
-              </div>
+              <BudgetHistory department={department} />
             )}
           </Suspense>
         </div>
@@ -1182,6 +1178,17 @@ function BudgetDashboard({
             budgetComponents={currentUserDepartmentComponents}
             fiscalYear={currentFiscalYear}
             currentUser={currentUser}
+          />
+        )}
+        {showCsddIntentModal && (
+          <CsddPurchaseIntentModal
+            show={showCsddIntentModal}
+            onClose={() => setShowCsddIntentModal(false)}
+            onSubmit={handleCreateCsddIntent}
+            currentBudget={activeBudget || departmentBudget}
+            currentUser={currentUser}
+            department={department}
+            fiscalYear={currentFiscalYear}
           />
         )}
       </Suspense>

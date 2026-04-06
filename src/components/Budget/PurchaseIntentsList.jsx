@@ -48,7 +48,7 @@ const PurchaseIntentsList = ({
       try {
         const deptComponents = getComponentsForItem(intentOrKey);
         if (deptComponents?.[componentKey]) return deptComponents[componentKey];
-      } catch (error) {
+      } catch (e) { // eslint-disable-line no-unused-vars
         // ignore
       }
     }
@@ -140,11 +140,19 @@ const PurchaseIntentsList = ({
 
   // Check if current user is from purchase department
   const isPurchaseDepartment = ["purchase", "admin", "hr"].includes(
-    userDepartment?.toLowerCase()
+    userDepartment?.toLowerCase(),
   );
 
+  // DM can also approve CSDD intents
+  const isDmDepartment = userDepartment?.toLowerCase() === "dm";
+
   const canCreatePO = (intent) => {
-    return intent.status === "submitted" && isPurchaseDepartment && currentUser;
+    if (!currentUser || intent.status !== "submitted") return false;
+    // Purchase/admin/hr can approve any intent
+    if (isPurchaseDepartment) return true;
+    // DM can approve CSDD intents only
+    if (isDmDepartment && intent.intentType === "csdd") return true;
+    return false;
   };
 
   const canDelete = (intent) => {
@@ -191,7 +199,7 @@ const PurchaseIntentsList = ({
       const totalItems = intent.requestedItems.length;
       const totalQty = intent.requestedItems.reduce(
         (sum, item) => sum + (item.quantity || 0),
-        0
+        0,
       );
       return `${totalItems} item${
         totalItems !== 1 ? "s" : ""
@@ -300,9 +308,11 @@ const PurchaseIntentsList = ({
           Showing {sortedIntents.length} purchase intent
           {sortedIntents.length !== 1 ? "s" : ""}
         </p>
-        {isPurchaseDepartment && (
+        {(isPurchaseDepartment || isDmDepartment) && (
           <p className="text-xs text-blue-600 font-medium">
-            Purchase Department - Can Create Purchase Orders
+            {isPurchaseDepartment
+              ? "Purchase Department - Can Create Purchase Orders"
+              : "DM Department - Can Create CSDD Purchase Orders"}
           </p>
         )}
       </div>
@@ -397,7 +407,7 @@ const PurchaseIntentsList = ({
                   <td className="px-4 py-3 whitespace-nowrap">
                     <span
                       className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getComponentColor(
-                        intent
+                        intent,
                       )}`}
                     >
                       {getComponentName(intent)}
@@ -420,7 +430,7 @@ const PurchaseIntentsList = ({
                   <td className="px-4 py-3 whitespace-nowrap">
                     <span
                       className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
-                        intent.status
+                        intent.status,
                       )}`}
                     >
                       {intent.status.replace(/_/g, " ")}
@@ -583,7 +593,7 @@ const PurchaseIntentsList = ({
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-3 z-1000 text-sm">
           <div className="bg-white/95 backdrop-blur-md rounded-xl shadow-[0_8px_24px_rgba(0,0,0,0.15)] w-full max-w-4xl max-h-[90vh] overflow-hidden border border-gray-100">
             {/* Header */}
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex justify-between items-center px-4 py-3 shadow-sm">
+            <div className="bg-linear-to-r from-blue-600 to-indigo-600 text-white flex justify-between items-center px-4 py-3 shadow-sm">
               <h2 className="text-lg font-bold tracking-wide">
                 Purchase Intent Details
               </h2>
@@ -687,7 +697,7 @@ const PurchaseIntentsList = ({
                       <dd>
                         <span
                           className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold shadow-sm ${getStatusColor(
-                            viewModal.status
+                            viewModal.status,
                           )}`}
                         >
                           {viewModal.status.replace(/_/g, " ")}
@@ -783,21 +793,23 @@ const PurchaseIntentsList = ({
               </div>
 
               {/* Purchase Department Action */}
-              {isPurchaseDepartment && viewModal.status === "submitted" && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <h3 className="text-base font-semibold text-blue-900 mb-1.5">
-                    Purchase Department Action
-                  </h3>
-                  <p className="text-blue-700 mb-3 text-xs">
-                    You can create a Purchase Order for this intent. This will
-                    automatically approve the intent.
-                  </p>
-                  <button
-                    onClick={() => {
-                      handleCreatePO(viewModal);
-                      setViewModal(null);
-                    }}
-                    className="
+              {(isPurchaseDepartment ||
+                (isDmDepartment && viewModal.intentType === "csdd")) &&
+                viewModal.status === "submitted" && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <h3 className="text-base font-semibold text-blue-900 mb-1.5">
+                      Purchase Department Action
+                    </h3>
+                    <p className="text-blue-700 mb-3 text-xs">
+                      You can create a Purchase Order for this intent. This will
+                      automatically approve the intent.
+                    </p>
+                    <button
+                      onClick={() => {
+                        handleCreatePO(viewModal);
+                        setViewModal(null);
+                      }}
+                      className="
                 px-4 py-1.5 bg-emerald-600 text-white rounded-lg font-semibold text-xs
                 shadow-[inset_0_1px_2px_rgba(255,255,255,0.3),0_2px_4px_rgba(0,0,0,0.2)]
                 hover:bg-emerald-700
@@ -805,11 +817,11 @@ const PurchaseIntentsList = ({
                 active:translate-y-[0.5px]
                 transition-all duration-150 ease-in-out
               "
-                  >
-                    Create Purchase Order
-                  </button>
-                </div>
-              )}
+                    >
+                      Create Purchase Order
+                    </button>
+                  </div>
+                )}
             </div>
 
             {/* Footer */}

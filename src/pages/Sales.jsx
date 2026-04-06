@@ -25,6 +25,7 @@ const LeadFilters = lazy(() => import("../components/Sales/LeadFilters"));
 const SalesTour = lazy(() => import("../components/tours/SalesTour"));
 const BudgetDashboard = lazy(() => import("../components/Budget/BudgetDashboard"));
 const LeadTransferModal = lazy(() => import("../components/Sales/LeadTransferModal"));
+const TransferClosedLeadsModal = lazy(() => import("../components/Sales/TransferClosedLeadsModal"));
 
 // Loading component for lazy loaded components
 const ComponentLoader = () => (
@@ -98,6 +99,7 @@ function Sales() {
   const [closedLeadsCount, setClosedLeadsCount] = useState(0); // Add this state
   const [showBudget, setShowBudget] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
+  const [showTransferClosedLeadsModal, setShowTransferClosedLeadsModal] = useState(false);
 
   // Persist view mode to localStorage
   useEffect(() => {
@@ -344,10 +346,20 @@ function Sales() {
   };
 
   useEffect(() => {
-    // TCV display logic for Admin Director users
+    // TCV display logic for Admin Director users (no longer restricted here)
+    // kept for potential future side effects but currently unused
   }, [userData, totalTCV]);
 
-  const showTCV = userData?.department === "Admin" && userData?.role === "Director";
+  const showTCV = Boolean(
+    userData &&
+    (
+      // existing Admin Director condition
+      (userData.department === "Admin" && userData.role === "Director") ||
+      // sales users should also see TCV info
+      userData.department === "Sales" ||
+      (Array.isArray(userData.departments) && userData.departments.includes("Sales"))
+    )
+  );
 
   const filteredLeads = useMemo(() => {
     return Object.entries(leads).filter(([, lead]) => {
@@ -757,20 +769,38 @@ function Sales() {
                   (u) => u.uid === currentUser?.uid
                 );
                 return userData?.department === "Admin" ? (
-                  <button
-                    onClick={() => setShowTransferModal(true)}
-                    className="bg-white text-purple-600 border border-purple-300 px-3 py-1.5 rounded-lg font-medium hover:bg-purple-50 transition-colors shadow-sm flex items-center"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-4 w-4 mr-2"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setShowTransferModal(true)}
+                      className="bg-white text-purple-600 border border-purple-300 p-2 rounded-lg hover:bg-purple-50 transition-colors shadow-sm"
+                      title="Transfer Leads"
                     >
-                      <path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zM16 7a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1V7z" />
-                    </svg>
-                    Transfer Leads
-                  </button>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-5 w-5"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                      >
+                        <path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zM16 7a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1V7z" />
+                      </svg>
+                      <span className="sr-only">Transfer Leads</span>
+                    </button>
+                    <button
+                      onClick={() => setShowTransferClosedLeadsModal(true)}
+                      className="bg-white text-red-600 border border-red-300 p-2 rounded-lg hover:bg-red-50 transition-colors shadow-sm"
+                      title="Transfer Closed Leads"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-5 w-5"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                      >
+                        <path d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8m0 8l-6-4m6 4l6-4" />
+                      </svg>
+                      <span className="sr-only">Transfer Closed Leads</span>
+                    </button>
+                  </div>
                 ) : null;
               })()}
             </div>
@@ -992,6 +1022,15 @@ function Sales() {
         <LeadTransferModal
           show={showTransferModal}
           onClose={() => setShowTransferModal(false)}
+          users={users}
+          leads={leads}
+        />
+      </Suspense>
+
+      <Suspense fallback={<ComponentLoader />}>
+        <TransferClosedLeadsModal
+          show={showTransferClosedLeadsModal}
+          onClose={() => setShowTransferClosedLeadsModal(false)}
           users={users}
           leads={leads}
         />

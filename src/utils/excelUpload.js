@@ -60,10 +60,8 @@ const getNextBatchInfo = async (chunkSize = 1000) => {
       lastBatchData: shouldCreateNewBatch ? null : lastBatchData,
       lastBatchId: shouldCreateNewBatch ? null : lastBatchId
     };
-  } catch (error) {
-    // console.error("Error checking existing batches:", error);
+  } catch {
     // If we can't check existing batches, start from batch_1
-    // console.log("Could not check existing batches, starting from batch_1");
     return {
       nextBatchNumber: 1,
       shouldCreateNewBatch: true,
@@ -204,7 +202,7 @@ export const uploadCompaniesFromExcel = async (file, onProgress = null, assignee
         console.log(`Encoded ${encodedCompanies.length} companies as Base64 strings`);
 
         // 4. Handle batching logic
-        const chunkSize = 500; // Batch size limit reduced to stay under 1MB document size
+        const chunkSize = 200; // Batch size limit reduced to stay under 1MB document size
         let batchesToUpload = [];
 
         if (targetBatchId) {

@@ -4,11 +4,12 @@ import {
   ArrowLeft,
   Layers,
   Plus,
-  Trash2,
   AlertCircle,
   Loader2,
   TrendingUp,
+  Download,
 } from "lucide-react";
+import { exportClientBudgetSheetToPDF } from "./utils/exportClientBudgetSheet";
 import {
   doc,
   getDoc,
@@ -28,6 +29,7 @@ const ClientComponentForm = lazy(() => import("./ClientComponentForm"));
 // ============================================================================
 // UI COMPONENT: Client Grid Card (Updated 2x2 Layout)
 // ============================================================================
+// eslint-disable-next-line react-refresh/only-export-components
 const ClientCard = ({ client, forecastAmount, onClick }) => {
   // Utilization based on Actual Spend vs Allocated
 
@@ -95,7 +97,7 @@ const ClientCard = ({ client, forecastAmount, onClick }) => {
 
         {/* 4. Remaining (Allocated - Spent) */}
         <div
-          className={`p-2 rounded-lg text-right ${remaining == 0 ? "bg-emerald-50" : ""}`}
+          className={`p-2 rounded-lg text-right ${remaining === 0 ? "bg-emerald-50" : ""}`}
         >
           <p
             className={`text-[10px] uppercase tracking-wider font-semibold mb-1 ${remaining < 0 ? "text-red-600" : "text-indigo-600"}`}
@@ -140,12 +142,13 @@ const ClientCard = ({ client, forecastAmount, onClick }) => {
 };
 
 // ... [ClientSheetView remains unchanged] ...
+// eslint-disable-next-line react-refresh/only-export-components
 const ClientSheetView = ({
   client,
   clientData,
   onBack,
   onOpenModal,
-  onDeleteComponent,
+  fiscalYear,
 }) => {
   // Convert client_components object to array for display
   const componentsArray = useMemo(() => {
@@ -187,7 +190,7 @@ const ClientSheetView = ({
             </h2>
             <div className="flex gap-3 text-xs mt-1 items-center">
               <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-600 font-mono border border-gray-200">
-                FY 25-26
+                FY {fiscalYear}
               </span>
               <span
                 className={`px-2 py-0.5 rounded font-medium ${unassigned < 0 ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700"}`}
@@ -203,12 +206,22 @@ const ClientSheetView = ({
           </div>
         </div>
 
-        <button
-          onClick={onOpenModal}
-          className="bg-black text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-gray-800 transition-all flex items-center gap-2 shadow-sm"
-        >
-          <Plus className="w-4 h-4" /> Add Component
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() =>
+              exportClientBudgetSheetToPDF({ client, clientData, fiscalYear })
+            }
+            className="bg-white text-gray-700 border border-gray-300 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-gray-50 transition-all flex items-center gap-2 shadow-sm"
+          >
+            <Download className="w-4 h-4" /> Export 
+          </button>
+          <button
+            onClick={onOpenModal}
+            className="bg-black text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-gray-800 transition-all flex items-center gap-2 shadow-sm"
+          >
+            <Plus className="w-4 h-4" /> Create / Update Sheet
+          </button>
+        </div>
       </div>
 
       {/* --- TOP SUMMARY CARDS --- */}
@@ -269,19 +282,16 @@ const ClientSheetView = ({
                 <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">
                   Remaining
                 </th>
-                <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider w-24 text-center">
-                  Actions
-                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {componentsArray.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="py-16 text-center text-gray-400">
+                  <td colSpan="5" className="py-16 text-center text-gray-400">
                     <Layers className="w-10 h-10 mx-auto mb-3 opacity-20" />
                     <p className="text-sm">No components found.</p>
                     <p className="text-xs mt-1">
-                      Click "Add Component" to start.
+                      Click "Create/Update Client Budget Sheet" to start.
                     </p>
                   </td>
                 </tr>
@@ -309,20 +319,6 @@ const ClientSheetView = ({
                       >
                         ₹{comp.remaining.toLocaleString()}
                       </td>
-                      <td className="py-3 px-4 text-center">
-                        <div className="flex justify-center gap-2">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onDeleteComponent(comp.key);
-                            }}
-                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-all opacity-100 group-hover:opacity-100"
-                            title="Delete Component"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
                     </tr>
                   );
                 })
@@ -347,7 +343,6 @@ const ClientSheetView = ({
                   <td className="py-3 px-4 text-right font-mono text-sm text-indigo-600">
                     ₹{(totalPlanned - totalActual).toLocaleString()}
                   </td>
-                  <td></td>
                 </tr>
               </tfoot>
             )}
@@ -361,7 +356,11 @@ const ClientSheetView = ({
 // ============================================================================
 // MAIN CONTROLLER
 // ============================================================================
-export default function ManageCSDD_DM({ currentBudget, fiscalYear }) {
+export default function ManageCSDD_DM({
+  currentBudget,
+  fiscalYear,
+  currentUser,
+}) {
   const [activeView, setActiveView] = useState("GRID");
   const [selectedClient, setSelectedClient] = useState(null);
   const [showCompModal, setShowCompModal] = useState(false);
@@ -376,7 +375,7 @@ export default function ManageCSDD_DM({ currentBudget, fiscalYear }) {
   const clientBudgets = useMemo(() => {
     if (!currentBudget?.csddExpenses) return [];
     return Object.entries(currentBudget.csddExpenses)
-      .filter(([_, val]) => typeof val === "object" && val.type === "client")
+      .filter(([, val]) => typeof val === "object" && val.type === "client")
       .map(([key, val]) => ({
         key,
         name: val.client_name,
@@ -497,7 +496,9 @@ export default function ManageCSDD_DM({ currentBudget, fiscalYear }) {
           : serverTimestamp(),
         createdBy: hasExistingData
           ? existingDoc.data().createdBy
-          : "current_user_id",
+          : currentUser?.uid || "unknown",
+        // Initialize PO counter for new client docs (used by CSDD PO numbering)
+        ...(hasExistingData ? {} : { poCounter: 0 }),
       };
 
       await setDoc(clientDocRef, payload, { merge: true });
@@ -520,7 +521,7 @@ export default function ManageCSDD_DM({ currentBudget, fiscalYear }) {
     }
   };
 
-  const handleDeleteComponent = async (componentKey) => {
+  const _handleDeleteComponent = async (componentKey) => {
     if (!window.confirm("Are you sure you want to delete this component?"))
       return;
     if (!selectedClient || !currentBudget?.id || !clientData) return;
@@ -589,7 +590,7 @@ export default function ManageCSDD_DM({ currentBudget, fiscalYear }) {
                     setActiveView("GRID");
                   }}
                   onOpenModal={() => setShowCompModal(true)}
-                  onDeleteComponent={handleDeleteComponent}
+                  fiscalYear={fiscalYear}
                 />
                 <ClientComponentForm
                   show={showCompModal}
@@ -597,6 +598,9 @@ export default function ManageCSDD_DM({ currentBudget, fiscalYear }) {
                   onSubmit={handleCreateOrUpdateBudget}
                   client={selectedClient}
                   existingData={clientData}
+                  currentUser={currentUser}
+                  fiscalYear={fiscalYear}
+                  budgetId={currentBudget?.id}
                 />
               </>
             )}
