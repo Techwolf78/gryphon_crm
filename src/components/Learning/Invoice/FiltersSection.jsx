@@ -42,7 +42,7 @@ function FiltersSection({
             <input
               id="search"
               type="text"
-              placeholder="Search trainers, colleges, IDs..."
+              placeholder="Search trainers, colleges, IDs, invoice numbers..."
               className="w-full pl-10 pr-10 py-1.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
