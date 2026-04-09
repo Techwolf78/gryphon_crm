@@ -28,7 +28,8 @@ import {
   FiArrowLeft,
   FiArrowRight,
   FiMoreVertical,
-  FiUser
+  FiUser,
+  FiAward
 } from "react-icons/fi";
 import { Hourglass, CheckCircle, Clock, Users, FileText, XCircle, Circle, TrendingUp, Layout, Calendar as CalendarIcon, List } from "lucide-react";
 import {
@@ -48,6 +49,7 @@ import {
 import { db } from "../../firebase";
 import { useAuth } from "../../context/AuthContext";
 import TaskDataManager from "../Admin/TaskDataManager";
+import UserScorePanel from "./UserScorePanel";
 
 // --- Helper Functions ---
 
@@ -608,7 +610,7 @@ const LDTaskManager = ({ onBack }) => {
     const tab = searchParams.get("tab");
     if (tab === "admin") {
       setCurrentView("admin");
-    } else if (tab === "kanban" || tab === "calendar" || tab === "table" || tab === "logs") {
+    } else if (tab === "kanban" || tab === "calendar" || tab === "table" || tab === "logs" || tab === "score") {
       setCurrentView(tab);
     }
   }, [searchParams]);
@@ -873,10 +875,11 @@ const LDTaskManager = ({ onBack }) => {
                 <button onClick={() => setCurrentView("kanban")} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all duration-200 font-bold text-[10px] uppercase ${currentView === "kanban" ? "bg-indigo-600 text-white shadow-sm" : "text-gray-500 hover:text-gray-900"}`}><Layout size={14} /> Kanban</button>
                 <button onClick={() => setCurrentView("calendar")} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all duration-200 font-bold text-[10px] uppercase ${currentView === "calendar" ? "bg-indigo-600 text-white shadow-sm" : "text-gray-500 hover:text-gray-900"}`}><CalendarIcon size={14} /> Calendar</button>
                 <button onClick={() => setCurrentView("table")} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all duration-200 font-bold text-[10px] uppercase ${currentView === "table" ? "bg-indigo-600 text-white shadow-sm" : "text-gray-500 hover:text-gray-900"}`}><List size={14} /> Table</button>
-                <button onClick={() => setCurrentView("logs")} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all duration-200 font-bold text-[10px] uppercase ${currentView === "logs" ? "bg-indigo-600 text-white shadow-sm" : "text-gray-500 hover:text-gray-900"}`}><FiFileText size={14} /> Logs</button>
+                <button onClick={() => setCurrentView("score")} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all duration-200 font-bold text-[10px] uppercase ${currentView === "score" ? "bg-indigo-600 text-white shadow-sm" : "text-gray-500 hover:text-gray-900"}`}><FiAward size={14} /> Score</button>
                 {["Admin", "Director", "Direc2", "Head"].includes(user?.role) && (
                   <button onClick={() => setCurrentView("admin")} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all duration-200 font-bold text-[10px] uppercase ${currentView === "admin" ? "bg-indigo-600 text-white shadow-sm" : "text-gray-500 hover:text-gray-900"}`}><FiUser size={14} /> Admin</button>
                 )}
+                <button onClick={() => setCurrentView("logs")} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all duration-200 font-bold text-[10px] uppercase ${currentView === "logs" ? "bg-indigo-600 text-white shadow-sm" : "text-gray-500 hover:text-gray-900"}`}><FiFileText size={14} /> Logs</button>
              </div>
              
              <button onClick={() => window.location.reload()} className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-all font-semibold text-[10px]">
@@ -896,55 +899,57 @@ const LDTaskManager = ({ onBack }) => {
         </div>
 
         {/* Filters Section */}
-        <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm flex flex-wrap items-center gap-4">
-           <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold text-gray-400 uppercase">Filters:</span>
-           </div>
-           
-           <select 
-             value={filterUser} 
-             onChange={(e) => setFilterUser(e.target.value)}
-             className="px-3 py-1.5 bg-gray-50 border border-gray-100 rounded-lg text-xs font-semibold focus:outline-none focus:border-indigo-500"
-           >
-              <option value="all">All Users</option>
-              {assignees.map(u => <option key={u} value={u}>{u}</option>)}
-           </select>
+        {(currentView !== "score" && currentView !== "admin") && (
+          <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm flex flex-wrap items-center gap-4">
+             <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold text-gray-400 uppercase">Filters:</span>
+             </div>
+             
+             <select 
+               value={filterUser} 
+               onChange={(e) => setFilterUser(e.target.value)}
+               className="px-3 py-1.5 bg-gray-50 border border-gray-100 rounded-lg text-xs font-semibold focus:outline-none focus:border-indigo-500"
+             >
+                <option value="all">All Users</option>
+                {assignees.map(u => <option key={u} value={u}>{u}</option>)}
+             </select>
 
-           <div className="flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-lg px-2 py-1">
-              <input 
-                type="date" 
-                value={dateRange.start}
-                onChange={(e) => setDateRange({...dateRange, start: e.target.value})}
-                className="bg-transparent text-[10px] font-bold outline-none"
-              />
-              <span className="text-gray-300">-</span>
-              <input 
-                type="date" 
-                value={dateRange.end}
-                onChange={(e) => setDateRange({...dateRange, end: e.target.value})}
-                className="bg-transparent text-[10px] font-bold outline-none"
-              />
-           </div>
+             <div className="flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-lg px-2 py-1">
+                <input 
+                  type="date" 
+                  value={dateRange.start}
+                  onChange={(e) => setDateRange({...dateRange, start: e.target.value})}
+                  className="bg-transparent text-[10px] font-bold outline-none"
+                />
+                <span className="text-gray-300">-</span>
+                <input 
+                  type="date" 
+                  value={dateRange.end}
+                  onChange={(e) => setDateRange({...dateRange, end: e.target.value})}
+                  className="bg-transparent text-[10px] font-bold outline-none"
+                />
+             </div>
 
-           <button 
-             onClick={resetFilters}
-             className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 uppercase"
-           >
-             Clear Filters
-           </button>
+             <button 
+               onClick={resetFilters}
+               className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 uppercase"
+             >
+               Clear Filters
+             </button>
 
-           <div className="ml-auto flex items-center gap-2">
-              <div className="text-[10px] font-bold text-gray-400 uppercase">
-                {filteredTasks.length} tasks
-              </div>
-              <button
-                onClick={handleLoadMoreTasks}
-                className="px-3 py-1 text-[10px] font-bold bg-white border border-gray-200 text-gray-500 rounded-lg hover:bg-gray-50 transition-all uppercase"
-              >
-                Load More Tasks
-              </button>
-           </div>
-        </div>
+             <div className="ml-auto flex items-center gap-2">
+                <div className="text-[10px] font-bold text-gray-400 uppercase">
+                  {filteredTasks.length} tasks
+                </div>
+                <button
+                  onClick={handleLoadMoreTasks}
+                  className="px-3 py-1 text-[10px] font-bold bg-white border border-gray-200 text-gray-500 rounded-lg hover:bg-gray-50 transition-all uppercase"
+                >
+                  Load More Tasks
+                </button>
+             </div>
+          </div>
+        )}
 
         {/* Dynamic Content */}
         {loading ? (
@@ -985,6 +990,7 @@ const LDTaskManager = ({ onBack }) => {
               }} 
             />}
             {currentView === "admin" && <TaskDataManager />}
+            {currentView === "score" && <UserScorePanel tasks={tasks} assignees={assignees} />}
           </div>
         )}
 
