@@ -18,6 +18,11 @@ export const budgetComponents = {
     printmedia: "Print Media",
     trainertshirts: "Trainer T-shirts",
     tshirts: "T-shirts",
+
+    salary: "Employee Salary",
+    emailsim: "E-Mails & SIM",
+    bags: "Bags",
+
   },
   hr: {
     tshirts: "T-shirts",
@@ -38,6 +43,14 @@ export const budgetComponents = {
     simcard: "SIM Card / Network Tools",
     elevenlabs: "Eleven Labs Subscription",
     performancemarketing: "Performance Marketing",
+    bag: "Bags",
+    Podcast: "Podcast - Assets/Branding",
+    Travel: "Travel",
+
+    salary: "Employee Salary",
+    emailsim: "E-Mails & SIM",
+    bags: "Bags",
+
   },
   admin: {
     emails: "Email Subscriptions",
@@ -46,6 +59,11 @@ export const budgetComponents = {
     tshirts: "T-shirts",
     printmedia: "Print Media",
     diwaligifts: "Diwali Gifts",
+
+    salary: "Employee Salary",
+    emailsim: "E-Mails & SIM",
+    bags: "Bags",
+   
   },
   purchase: {
     emails: "Email Subscriptions",
@@ -64,6 +82,11 @@ export const budgetComponents = {
     placement_events: "Placement Events",
     diwaligifts: "Diwali Gifts",
     travel_expenses: "Travel Expenses",
+
+    salary: "Employee Salary",
+    emailsim: "E-Mails & SIM",
+    bags: "Bags",
+
   },
   management: {
     emails: "Email Subscriptions",
