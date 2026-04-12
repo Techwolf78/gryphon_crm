@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useAuth } from "../../context/AuthContext";
 import ImageCompressor from 'image-compressor.js';
 import { FiX, FiFileText } from 'react-icons/fi';
@@ -69,11 +69,11 @@ const EditTaskModal = ({ task, isOpen, onClose, onSave, assignees, tasksData }) 
     return null;
   };
 
-  const formatDateForInput = (dateValue) => {
+  const formatDateForInput = useCallback((dateValue) => {
     const date = parseDate(dateValue);
     if (!date || isNaN(date.getTime())) return '';
     return date.toISOString().split('T')[0];
-  };
+  }, []);
 
   useEffect(() => {
     if (task) {
@@ -87,7 +87,7 @@ const EditTaskModal = ({ task, isOpen, onClose, onSave, assignees, tasksData }) 
       setSelectedTask(task.task || '');
       setImages(task.images || []);
     }
-  }, [task]);
+  }, [task, formatDateForInput]);
 
   const uploadImage = async (file) => {
     if (!file) return null;
@@ -252,7 +252,7 @@ const EditTaskModal = ({ task, isOpen, onClose, onSave, assignees, tasksData }) 
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white select-text cursor-text"
               placeholder="Enter task title"
             />
           </div>

@@ -6,12 +6,6 @@ import autoTable from "jspdf-autotable";
 const formatNum = (val) =>
   typeof val === "number" ? val.toLocaleString("en-IN") : val || "-";
 
-const parseValue = (val) => {
-  if (val == null || val === "-" || val === "") return 0;
-  const num = parseFloat(val.toString().replace(/,/g, ""));
-  return isNaN(num) ? 0 : num;
-};
-
 // ── Export: Client Budget Sheet to PDF ──
 
 export const exportClientBudgetSheetToPDF = ({

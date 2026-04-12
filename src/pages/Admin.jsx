@@ -6,7 +6,6 @@ import {
   FiHome,
   FiPlus,
   FiRefreshCw,
-  FiTrash2,
   FiAlertCircle,
   FiCalendar,
   FiActivity,
@@ -17,12 +16,13 @@ import {
   FiArrowUp,
   FiArrowDown,
   FiChevronsUp,
+  FiPower,
 } from "react-icons/fi";
+import { CheckCircle2, Circle } from "lucide-react";
 import {
   collection,
   getDocs,
   doc,
-  deleteDoc,
   query,
   orderBy,
   limit,
@@ -43,20 +43,23 @@ import AdminTour from "../components/tours/AdminTour";
 const Admin = () => {
   const [users, setUsers] = useState([]);
   const [logs, setLogs] = useState([]);
-  const [deleteUser, setDeleteUser] = useState(null);
+  const [toggleUser, setToggleUser] = useState(null);
   const [editUser, setEditUser] = useState(null); // New state for edit
-  const [loadingDelete, setLoadingDelete] = useState(false);
+  const [loadingToggle, setLoadingToggle] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   const [currentUser, setCurrentUser] = useState(null);
   const [timeReports, setTimeReports] = useState([]);
   const [timeFilter, setTimeFilter] = useState('all');
+  const [userStatusFilter, setUserStatusFilter] = useState('active'); // status filter for time reports
   const [loadingTime, setLoadingTime] = useState(false);
   const [sortOrder, setSortOrder] = useState(null);
+  
   const formatTimeAgo = (date) => {
     if (!date) return "Unknown";
     
@@ -97,6 +100,7 @@ const Admin = () => {
     }
 
     handleRefresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Auth state listener
@@ -107,6 +111,11 @@ const Admin = () => {
     });
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    // Re-fetch time reports when userStatusFilter changes
+    fetchTimeReports(timeFilter);
+  }, [userStatusFilter]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -164,22 +173,26 @@ const Admin = () => {
     fetchTimeReports('all'); // Load time reports after refresh
   };
 
-  const handleDeleteUserConfirm = async () => {
-    if (!deleteUser) return;
-    setLoadingDelete(true);
+  const handleToggleUserStatus = async () => {
+    if (!toggleUser) return;
+    setLoadingToggle(true);
     try {
-      await Promise.all([
-        deleteDoc(doc(db, "users", deleteUser.id)),
-        deleteDoc(doc(db, "userprofile", deleteUser.id)),
-      ]);
-      const updatedUsers = users.filter((u) => u.id !== deleteUser.id);
+      const newStatus = !toggleUser.isActive; // Toggle the status
+      await updateDoc(doc(db, "users", toggleUser.id), {
+        isActive: newStatus,
+        updatedAt: serverTimestamp(),
+      });
+      // Update local state
+      const updatedUsers = users.map((u) =>
+        u.id === toggleUser.id ? { ...u, isActive: newStatus } : u
+      );
       setUsers(updatedUsers);
       sessionStorage.setItem("userList", JSON.stringify(updatedUsers));
-      setDeleteUser(null);
+      setToggleUser(null);
     } catch {
-      // Error deleting user - handled silently
+      // Error toggling user status - handled silently
     }
-    setLoadingDelete(false);
+    setLoadingToggle(false);
   };
 
   const handleUserUpdated = () => {
@@ -279,7 +292,7 @@ const Admin = () => {
     }
   };
 
-  const fetchTimeReports = async (filter = 'all') => {
+  const fetchTimeReports = async (filter = timeFilter) => {
     setLoadingTime(true);
     try {
       // First, clean up stale sessions (inactive sessions that haven't been updated in 10+ minutes)
@@ -301,6 +314,25 @@ const Admin = () => {
       }
       const snap = await getDocs(q);
       const sessions = snap.docs.map(d => d.data());
+      
+      // Get all relevant users based on status filter
+      let userListQuery = collection(db, "users");
+      if (userStatusFilter === 'active') {
+        userListQuery = query(userListQuery, where('isActive', '==', true));
+      } else if (userStatusFilter === 'inactive') {
+        userListQuery = query(userListQuery, where('isActive', '==', false));
+      }
+      const usersSnap = await getDocs(userListQuery);
+      const filteredUserIds = new Set(usersSnap.docs.map(doc => doc.data().uid));
+      const userNamesMap = {};
+      usersSnap.docs.forEach(doc => {
+        const data = doc.data();
+        userNamesMap[data.uid] = data.name || 'Unknown';
+      });
+
+      // Filter sessions by the selected users
+      const filteredSessions = sessions.filter(s => filteredUserIds.has(s.userId));
+
       // Aggregate by user - get latest location for each user
       const userTotals = {};
       const userLocations = {};
@@ -308,7 +340,7 @@ const Admin = () => {
       const userLastEndTime = {};
       const now = new Date();
       
-      sessions.forEach(s => {
+      filteredSessions.forEach(s => {
         let dur = s.duration || 0;
         if (s.isActive) {
           const start = s.startTime.toDate();
@@ -333,24 +365,7 @@ const Admin = () => {
         }
         userTotals[s.userId] += dur;
       });
-      // Fetch user names
-      const userIds = Object.keys(userTotals);
-      const userNames = {};
-      for (const uid of userIds) {
-        try {
-          const userQuery = query(collection(db, "users"), where("uid", "==", uid));
-          const userSnap = await getDocs(userQuery);
-          if (!userSnap.empty) {
-            const userData = userSnap.docs[0].data();
-            userNames[uid] = userData.name || 'Unknown';
-          } else {
-            userNames[uid] = 'Unknown';
-          }
-        } catch (error) {
-          console.error("Error fetching user:", error);
-          userNames[uid] = 'Unknown';
-        }
-      }
+
       const reports = Object.entries(userTotals).map(([uid, totalSeconds]) => {
         const hours = Math.floor(totalSeconds / 3600);
         const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -360,7 +375,7 @@ const Admin = () => {
         const status = userLastActive[uid] === "Active now" ? "Active now" : formatTimeAgo(lastEndTime);
         return {
           userId: uid,
-          name: userNames[uid] || 'Unknown',
+          name: userNamesMap[uid] || 'Unknown',
           timeString: `${hours}h ${minutes}m ${seconds}s`,
           location: location.error ? "Location unavailable" : location.address || "Unknown",
           city: location.city || "Unknown",
@@ -393,7 +408,8 @@ const Admin = () => {
         u.name?.toLowerCase().includes(search.toLowerCase()) ||
         u.email?.toLowerCase().includes(search.toLowerCase())) &&
       (!roleFilter || u.role === roleFilter) &&
-      (!departmentFilter || (Array.isArray(u.departments) ? u.departments.includes(departmentFilter) : u.department === departmentFilter))
+      (!departmentFilter || (Array.isArray(u.departments) ? u.departments.includes(departmentFilter) : u.department === departmentFilter)) &&
+      (!statusFilter || (statusFilter === 'active' ? u.isActive === true : u.isActive === false))
     );
   });
 
@@ -432,7 +448,7 @@ const Admin = () => {
             Manage users and view system analytics
           </p>
         </div>
-        <div className="w-full sm:w-auto" data-tour="add-user-button">
+        <div className="w-full sm:w-auto flex gap-3" data-tour="add-user-button">
           <NewUser onUserAdded={handleRefresh} />
         </div>
       </div>
@@ -555,6 +571,16 @@ const Admin = () => {
                   <option value="Accounts">Accounts</option>
                 </select>
 
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                >
+                  <option value="">All Status</option>
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+
                 <button
                   onClick={migrateAccountantToAccounts}
                   disabled={refreshing}
@@ -627,10 +653,15 @@ const Admin = () => {
                           <FiEdit className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => setDeleteUser(user)}
-                          className="text-red-500 hover:text-red-700 p-2 rounded-full hover:bg-red-50"
+                          onClick={() => setToggleUser(user)}
+                          className={`p-2 rounded-full transition-colors ${
+                            user.isActive
+                              ? 'text-red-500 hover:text-red-700 hover:bg-red-50'
+                              : 'text-green-500 hover:text-green-700 hover:bg-green-50'
+                          }`}
+                          title={user.isActive ? 'Deactivate User' : 'Activate User'}
                         >
-                          <FiTrash2 className="w-4 h-4" />
+                          <FiPower className="w-4 h-4" />
                         </button>
                       </div>
                     </div>
@@ -656,15 +687,16 @@ const Admin = () => {
 
           {/* Desktop Table Layout */}
           <div className="hidden lg:block" data-tour="user-table">
-            <div className="overflow-hidden">
-              <table className="w-full text-left">
+            <div className="overflow-hidden rounded-lg border border-gray-200">
+              <table className="w-full text-left table-auto">
                 <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
                   <tr>
-                    <th className="px-6 py-3 font-medium">User</th>
-                    <th className="px-6 py-3 font-medium">Email</th>
-                    <th className="px-6 py-3 font-medium">Role</th>
-                    <th className="px-6 py-3 font-medium">Department</th>
-                    <th className="px-6 py-3 font-medium text-right">
+                    <th className="px-3 py-3 font-medium">User</th>
+                    <th className="px-1 py-3 font-medium">Email</th>
+                    <th className="px-1 py-3 font-medium">Role</th>
+                    <th className="px-3 py-3 font-medium">Department</th>
+                    <th className="px-3 py-3 font-medium">Status</th>
+                    <th className="px-3 py-3 font-medium text-right">
                       Actions
                     </th>
                   </tr>
@@ -673,7 +705,7 @@ const Admin = () => {
                   {paginatedUsers.length > 0 ? (
                     paginatedUsers.map((user) => (
                       <tr key={user.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-3 py-4 whitespace-nowrap">
                           <div className="flex items-center gap-3">
                             <UserAvatar
                               photoURL={user.profilePicUrl}
@@ -685,15 +717,15 @@ const Admin = () => {
                             </span>
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-gray-500">
+                        <td className="px-1 py-4 whitespace-nowrap text-gray-500">
                           {user.email}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-1 py-4 whitespace-nowrap">
                           <span className="px-2 py-1 text-xs rounded-full bg-indigo-50 text-indigo-700">
                             {user.role}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-gray-500">
+                        <td className="px-3 py-4 min-w-0">
                           <div className="flex flex-wrap gap-1">
                             {(Array.isArray(user.departments) ? user.departments : (user.department ? [user.department] : [])).map((dept, index) => (
                               <span key={`${dept}-${index}`} className="px-2 py-1 text-xs rounded-full bg-gray-50 text-gray-700">
@@ -702,7 +734,22 @@ const Admin = () => {
                             ))}
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right space-x-2" data-tour="user-actions">
+                        <td className="px-3 py-4 min-w-0">
+                          <div className="flex items-center gap-2">
+                            {user.isActive ? (
+                              <>
+                                <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />
+                                <span className="text-sm text-green-700 font-medium">Active</span>
+                              </>
+                            ) : (
+                              <>
+                                <Circle className="w-5 h-5 text-red-500 shrink-0" />
+                                <span className="text-sm text-red-700 font-medium">Inactive</span>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-3 py-4 whitespace-nowrap text-right space-x-2" data-tour="user-actions">
                           <button
                             onClick={async () => {
                               try {
@@ -724,10 +771,15 @@ const Admin = () => {
                             <FiEdit className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => setDeleteUser(user)}
-                            className="text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-50"
+                            onClick={() => setToggleUser(user)}
+                            className={`p-1 rounded-full transition-colors ${
+                              user.isActive
+                                ? 'text-red-500 hover:text-red-700 hover:bg-red-50'
+                                : 'text-green-500 hover:text-green-700 hover:bg-green-50'
+                            }`}
+                            title={user.isActive ? 'Deactivate User' : 'Activate User'}
                           >
-                            <FiTrash2 className="w-4 h-4" />
+                            <FiPower className="w-4 h-4" />
                           </button>
                         </td>
                       </tr>
@@ -735,7 +787,7 @@ const Admin = () => {
                   ) : (
                     <tr>
                       <td
-                        colSpan="5"
+                        colSpan="6"
                         className="px-6 py-4 text-center text-gray-500"
                       >
                         No users found matching your criteria
@@ -833,6 +885,7 @@ const Admin = () => {
               </p>
             </div>
             <div className="flex flex-col sm:flex-row gap-3">
+          
               <select
                 value={timeFilter}
                 onChange={(e) => {
@@ -846,6 +899,15 @@ const Admin = () => {
                 <option value="3days">Last 3 Days</option>
                 <option value="7days">Last 7 Days</option>
                 <option value="30days">Last 30 Days</option>
+              </select>
+                  <select
+                value={userStatusFilter}
+                onChange={(e) => setUserStatusFilter(e.target.value)}
+                className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              >
+                <option value="active">Active Users</option>
+                <option value="inactive">Inactive Users</option>
+                <option value="all">All Users</option>
               </select>
               <button
                 onClick={() => fetchTimeReports(timeFilter)}
@@ -938,50 +1000,65 @@ const Admin = () => {
       </section>
 
       {/* Delete Confirmation Modal - Make responsive */}
-      {deleteUser && (
-        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50 p-4">
-          <div
-            className="bg-white rounded-xl shadow-lg max-w-md w-full p-4 sm:p-6 max-h-[90vh] overflow-y-auto"
-          >
-            <div className="flex items-center gap-4 mb-4">
-              <UserAvatar
-                photoURL={deleteUser.profilePicUrl}
-                name={deleteUser.name}
-                size={12}
-              />
+      {toggleUser && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full">
+            <div className="flex items-center gap-3 mb-4">
+              <div
+                className={`shrink-0 text-3xl ${
+                  toggleUser.isActive ? 'text-orange-600' : 'text-green-600'
+                }`}
+              >
+                {toggleUser.isActive ? '🔒' : '🔓'}
+              </div>
               <div className="min-w-0 flex-1">
-                <h3 className="font-semibold text-lg">Confirm User Deletion</h3>
+                <h3 className="font-semibold text-lg">
+                  {toggleUser.isActive ? 'Deactivate User' : 'Activate User'}
+                </h3>
                 <p className="text-gray-500 text-sm truncate">
-                  {deleteUser.email}
+                  {toggleUser.email}
                 </p>
               </div>
             </div>
             <p className="text-gray-700 mb-6 text-sm sm:text-base">
-              Are you sure you want to permanently delete{" "}
-              <span className="font-semibold">{deleteUser.name}</span>? This
-              action cannot be undone.
+              {toggleUser.isActive ? (
+                <>
+                  Are you sure you want to <span className="font-semibold">deactivate</span>{" "}
+                  <span className="font-semibold">{toggleUser.name}</span>? They will not be
+                  able to login, but all their data will be preserved.
+                </>
+              ) : (
+                <>
+                  Are you sure you want to <span className="font-semibold">activate</span>{" "}
+                  <span className="font-semibold">{toggleUser.name}</span>? They will be able
+                  to login again.
+                </>
+              )}
             </p>
             <div className="flex flex-col sm:flex-row justify-end gap-3">
               <button
-                onClick={() => setDeleteUser(null)}
+                onClick={() => setToggleUser(null)}
                 className="w-full sm:w-auto px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
               >
                 Cancel
               </button>
               <button
-                onClick={handleDeleteUserConfirm}
-                disabled={loadingDelete}
-                className="w-full sm:w-auto px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                onClick={handleToggleUserStatus}
+                disabled={loadingToggle}
+                className={`w-full sm:w-auto px-4 py-2 text-sm text-white rounded-lg disabled:opacity-50 flex items-center justify-center gap-2 ${
+                  toggleUser.isActive
+                    ? 'bg-orange-600 hover:bg-orange-700'
+                    : 'bg-green-600 hover:bg-green-700'
+                }`}
               >
-                {loadingDelete ? (
+                {loadingToggle ? (
                   <>
                     <FiRefreshCw className="animate-spin" />
-                    Deleting...
+                    {toggleUser.isActive ? 'Deactivating...' : 'Activating...'}
                   </>
                 ) : (
                   <>
-                    <FiTrash2 />
-                    Delete User
+                    {toggleUser.isActive ? '🔒 Deactivate' : '🔓 Activate'}
                   </>
                 )}
               </button>

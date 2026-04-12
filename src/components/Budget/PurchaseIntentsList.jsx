@@ -48,7 +48,7 @@ const PurchaseIntentsList = ({
       try {
         const deptComponents = getComponentsForItem(intentOrKey);
         if (deptComponents?.[componentKey]) return deptComponents[componentKey];
-      } catch (error) {
+      } catch (e) { // eslint-disable-line no-unused-vars
         // ignore
       }
     }
@@ -593,7 +593,7 @@ const PurchaseIntentsList = ({
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-3 z-1000 text-sm">
           <div className="bg-white/95 backdrop-blur-md rounded-xl shadow-[0_8px_24px_rgba(0,0,0,0.15)] w-full max-w-4xl max-h-[90vh] overflow-hidden border border-gray-100">
             {/* Header */}
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex justify-between items-center px-4 py-3 shadow-sm">
+            <div className="bg-linear-to-r from-blue-600 to-indigo-600 text-white flex justify-between items-center px-4 py-3 shadow-sm">
               <h2 className="text-lg font-bold tracking-wide">
                 Purchase Intent Details
               </h2>

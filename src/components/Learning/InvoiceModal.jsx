@@ -48,8 +48,17 @@ function InvoiceModal({ trainer, onClose, onInvoiceGenerated, onToast }) {
     startDate: trainer?.earliestStartDate || "",
     endDate: trainer?.latestEndDate || "",
     billingDate: new Date().toISOString().split("T")[0],
-    trainingRate: trainer?.perHourCost || 0,
-    totalHours: trainer?.assignedHours || 0,
+    trainingRate:
+      Number.isFinite(trainer?.averageRate)
+        ? trainer.averageRate
+        : trainer?.perHourCost || 0,
+    totalHours: trainer?.assignedHours || trainer?.totalCollegeHours || 0,
+    trainingFees:
+      trainer?.totalTrainingFees ||
+      ((trainer?.assignedHours || trainer?.totalCollegeHours || 0) *
+        (Number.isFinite(trainer?.averageRate)
+          ? trainer.averageRate
+          : trainer?.perHourCost || 0)),
     tds: 10,
     adhocAdjustment: 0,
     conveyance: trainer?.totalConveyance || 0,
@@ -265,24 +274,36 @@ const handleSubmit = async (e) => {
   };
 
   const calculateTotalAmount = () => {
+    const trainingFees =
+      invoiceData.trainingFees !== undefined
+        ? invoiceData.trainingFees
+        : (invoiceData.trainingRate || 0) * (invoiceData.totalHours || 0);
+
     return roundToNearestWhole(
-      (invoiceData.trainingRate || 0) * (invoiceData.totalHours || 0) +
-      (parseFloat(invoiceData.conveyance) || 0) +
-      (parseFloat(invoiceData.food) || 0) +
-      (parseFloat(invoiceData.lodging) || 0)
+      trainingFees +
+        (parseFloat(invoiceData.conveyance) || 0) +
+        (parseFloat(invoiceData.food) || 0) +
+        (parseFloat(invoiceData.lodging) || 0),
     );
   };
 
   const calculateNetPayment = () => {
-    const trainingFees = roundToNearestWhole((invoiceData.trainingRate || 0) * (invoiceData.totalHours || 0));
+    const trainingFees = roundToNearestWhole(
+      invoiceData.trainingFees !== undefined
+        ? invoiceData.trainingFees
+        : (invoiceData.trainingRate || 0) * (invoiceData.totalHours || 0),
+    );
     const gstAmount = invoiceData.gst === "18" ? roundToNearestWhole(trainingFees * 0.18) : 0;
     const taxableAmount = trainingFees + gstAmount;
     const tdsAmount = roundToNearestWhole((taxableAmount * (parseFloat(invoiceData.tds) || 0)) / 100);
     const otherExpenses = calculateTotalAmount() - trainingFees;
-    
+
     // Final calculation: (Training Fees + GST - TDS) + Other Expenses + Adhoc Adjustment
     return roundToNearestWhole(
-      taxableAmount - tdsAmount + otherExpenses + (parseFloat(invoiceData.adhocAdjustment) || 0)
+      taxableAmount -
+        tdsAmount +
+        otherExpenses +
+        (parseFloat(invoiceData.adhocAdjustment) || 0),
     );
   };
 

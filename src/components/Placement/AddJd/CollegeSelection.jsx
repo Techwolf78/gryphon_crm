@@ -7,6 +7,9 @@ import {
   DocumentDownloadIcon,
   UploadIcon,
   CogIcon,
+  PlusIcon,
+  TrashIcon,
+  XIcon,
 } from "@heroicons/react/outline";
 
 function CollegeSelection({
@@ -27,6 +30,30 @@ function CollegeSelection({
 }) {
   const [isImporting, setIsImporting] = useState(false);
   const [showTemplateConfig, setShowTemplateConfig] = useState(false);
+  const [otherCollegeEntries, setOtherCollegeEntries] = useState([]);
+  const [customFields, setCustomFields] = useState([]);
+  const [newCustomField, setNewCustomField] = useState("");
+  const [showAddField, setShowAddField] = useState(false);
+
+  // Initialize or update other college entries when "Other" is selected
+  React.useEffect(() => {
+    if (selectedColleges.includes("Other")) {
+      // Parse existing otherCollegesInput to create entries
+      const colleges = otherCollegesInput
+        .split(",")
+        .map(college => college.trim())
+        .filter(college => college.length > 0);
+      
+      const entries = colleges.map(college => ({
+        name: college,
+        email: manualEmails[college] || ""
+      }));
+      
+      setOtherCollegeEntries(entries);
+    } else {
+      setOtherCollegeEntries([]);
+    }
+  }, [selectedColleges, otherCollegesInput, manualEmails]);
 
   const fetchCollegeEmailsFromFirebase = async () => {
     setIsImporting(true);
@@ -44,8 +71,12 @@ function CollegeSelection({
       setShowOtherCollegesInput(!showOtherCollegesInput);
       if (showOtherCollegesInput) {
         setSelectedColleges(selectedColleges.filter((c) => c !== "Other"));
+        setOtherCollegesInput("");
+        setOtherCollegeEntries([]);
       } else {
         setSelectedColleges([...selectedColleges, "Other"]);
+        // Initialize with one empty entry
+        setOtherCollegeEntries([{ name: "", email: "" }]);
       }
       return;
     }
@@ -70,19 +101,75 @@ function CollegeSelection({
     }
   };
 
-  const handleOtherCollegesChange = (e) => {
-    setOtherCollegesInput(e.target.value);
-
-    const colleges = e.target.value
-      .split(",")
-      .map((college) => college.trim())
-      .filter((college) => college.length > 0);
-
+  const handleOtherCollegeNameChange = (index, value) => {
+    const updatedEntries = [...otherCollegeEntries];
+    updatedEntries[index].name = value;
+    setOtherCollegeEntries(updatedEntries);
+    
+    // Update the comma-separated string for backward compatibility
+    const collegesString = updatedEntries
+      .map(entry => entry.name)
+      .filter(name => name.trim() !== "")
+      .join(", ");
+    setOtherCollegesInput(collegesString);
+    
+    // Update selected colleges array
+    const collegeNames = updatedEntries
+      .map(entry => entry.name.trim())
+      .filter(name => name.length > 0);
+    
     const filteredSelected = selectedColleges.filter(
       (college) => availableColleges.includes(college) || college === "Other"
     );
+    
+    setSelectedColleges([...filteredSelected, ...collegeNames]);
+  };
 
-    setSelectedColleges([...filteredSelected, ...colleges]);
+  const handleOtherCollegeEmailChange = (index, value) => {
+    const updatedEntries = [...otherCollegeEntries];
+    updatedEntries[index].email = value;
+    setOtherCollegeEntries(updatedEntries);
+    
+    // Update manual emails
+    const collegeName = updatedEntries[index].name;
+    if (collegeName.trim()) {
+      handleEmailChange(collegeName, value);
+    }
+  };
+
+  const addOtherCollegeEntry = () => {
+    setOtherCollegeEntries([...otherCollegeEntries, { name: "", email: "" }]);
+  };
+
+  const removeOtherCollegeEntry = (index) => {
+    const updatedEntries = otherCollegeEntries.filter((_, i) => i !== index);
+    setOtherCollegeEntries(updatedEntries);
+    
+    // Update the comma-separated string
+    const collegesString = updatedEntries
+      .map(entry => entry.name)
+      .filter(name => name.trim() !== "")
+      .join(", ");
+    setOtherCollegesInput(collegesString);
+    
+    // Update selected colleges
+    const collegeNames = updatedEntries
+      .map(entry => entry.name.trim())
+      .filter(name => name.length > 0);
+    
+    const filteredSelected = selectedColleges.filter(
+      (college) => availableColleges.includes(college) || college === "Other"
+    );
+    
+    setSelectedColleges([...filteredSelected, ...collegeNames]);
+    
+    // Remove from manual emails
+    const removedCollege = otherCollegeEntries[index].name;
+    if (removedCollege && manualEmails[removedCollege]) {
+      const newManualEmails = { ...manualEmails };
+      delete newManualEmails[removedCollege];
+      // Note: You'll need to pass this up through props or handle locally
+    }
   };
 
   const handleEmailInputChange = (college, email) => {
@@ -109,11 +196,6 @@ function CollegeSelection({
 
   // Template configuration functions
   const handleTemplateFieldToggle = (field) => {
-    const requiredFields = ['studentName', 'enrollmentNo', 'email', 'course', 'specialization', 'currentYear'];
-    
-    // Required fields can't be removed
-    if (requiredFields.includes(field)) return;
-    
     onTemplateFieldsChange(prev => 
       prev.includes(field)
         ? prev.filter(f => f !== field)
@@ -121,11 +203,48 @@ function CollegeSelection({
     );
   };
 
+  // Add custom field
+  const handleAddCustomField = () => {
+    if (newCustomField.trim() === "") return;
+    
+    const fieldKey = newCustomField.toLowerCase().replace(/\s+/g, '');
+    const fieldLabel = newCustomField.trim();
+    
+    // Check if field already exists
+    if (fieldLabels[fieldKey] || customFields.some(f => f.key === fieldKey)) {
+      alert("This field already exists!");
+      return;
+    }
+    
+    const newCustomFieldObj = {
+      key: fieldKey,
+      label: fieldLabel,
+      isCustom: true
+    };
+    
+    setCustomFields([...customFields, newCustomFieldObj]);
+    setNewCustomField("");
+    setShowAddField(false);
+    
+    // Automatically select the new field
+    onTemplateFieldsChange(prev => [...prev, fieldKey]);
+  };
+
+  // Remove custom field
+  const handleRemoveCustomField = (fieldKey) => {
+    setCustomFields(customFields.filter(f => f.key !== fieldKey));
+    // Deselect the field if it was selected
+    if (selectedTemplateFields.includes(fieldKey)) {
+      onTemplateFieldsChange(prev => prev.filter(f => f !== fieldKey));
+    }
+  };
+
   const selectAllTemplateFields = () => {
     const allFields = [
       'studentName', 'enrollmentNo', 'email', 'phone', 'course', 'specialization', 
       'currentYear', 'tenthMarks', 'twelfthMarks', 'diplomaMarks', 'cgpa', 
-      'activeBacklogs', 'totalBacklogs', 'gender', 'resumeLink'
+      'activeBacklogs', 'totalBacklogs', 'gender', 'resumeLink',
+      ...customFields.map(f => f.key)
     ];
     onTemplateFieldsChange(allFields);
   };
@@ -135,7 +254,8 @@ function CollegeSelection({
     onTemplateFieldsChange(requiredFields);
   };
 
-  const fieldLabels = {
+  // Base field labels
+  const baseFieldLabels = {
     'studentName': 'Student Name*',
     'enrollmentNo': 'Enrollment No*',
     'email': 'Email*',
@@ -151,6 +271,15 @@ function CollegeSelection({
     'totalBacklogs': 'Total Backlogs',
     'gender': 'Gender',
     'resumeLink': 'Resume Link'
+  };
+
+  // Combine base and custom fields
+  const fieldLabels = {
+    ...baseFieldLabels,
+    ...customFields.reduce((acc, field) => {
+      acc[field.key] = field.label + (field.isRequired ? '*' : '');
+      return acc;
+    }, {})
   };
 
   return (
@@ -206,25 +335,82 @@ function CollegeSelection({
 
         {showTemplateConfig && (
           <>
-            <p className="text-sm text-gray-600 mb-3">
-              Select the data fields you want colleges to provide. Required fields (*) are mandatory.
-            </p>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm text-gray-600">
+                Select the data fields you want colleges to provide. You can also add custom fields.
+              </p>
+              <button
+                onClick={() => setShowAddField(true)}
+                className="flex items-center px-3 py-1 text-sm bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition"
+              >
+                <PlusIcon className="h-4 w-4 mr-1" />
+                Add Custom Field
+              </button>
+            </div>
+
+            {/* Add Custom Field Input */}
+            {showAddField && (
+              <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="text"
+                    value={newCustomField}
+                    onChange={(e) => setNewCustomField(e.target.value)}
+                    placeholder="Enter field name (e.g., GitHub Profile)"
+                    className="flex-1 px-3 py-2 text-sm border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                    autoFocus
+                  />
+                  <button
+                    onClick={handleAddCustomField}
+                    className="px-4 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 transition"
+                  >
+                    Add
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowAddField(false);
+                      setNewCustomField("");
+                    }}
+                    className="p-2 text-gray-500 hover:text-gray-700"
+                  >
+                    <XIcon className="h-5 w-5" />
+                  </button>
+                </div>
+                <p className="text-xs text-purple-600 mt-2">
+                  Custom fields will be added to the template and can be toggled on/off like regular fields.
+                </p>
+              </div>
+            )}
             
             <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-3">
-              {Object.keys(fieldLabels).map(field => (
-                <label key={field} className="flex items-center space-x-2 p-2 hover:bg-gray-50 rounded border border-gray-200">
-                  <input
-                    type="checkbox"
-                    checked={selectedTemplateFields.includes(field)}
-                    onChange={() => handleTemplateFieldToggle(field)}
-                    disabled={fieldLabels[field].includes('*')}
-                    className="rounded text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className={`text-sm ${fieldLabels[field].includes('*') ? 'font-semibold text-gray-800' : 'text-gray-600'}`}>
-                    {fieldLabels[field]}
-                  </span>
-                </label>
-              ))}
+              {Object.keys(fieldLabels).map(field => {
+                const isCustom = customFields.some(f => f.key === field);
+                return (
+                  <label key={field} className={`flex items-center space-x-2 p-2 hover:bg-gray-50 rounded border border-gray-200 ${isCustom ? 'bg-purple-50 border-purple-200' : ''}`}>
+                    <input
+                      type="checkbox"
+                      checked={selectedTemplateFields.includes(field)}
+                      onChange={() => handleTemplateFieldToggle(field)}
+                      className="rounded text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className={`text-sm flex-1 ${fieldLabels[field].includes('*') ? 'font-semibold text-gray-800' : 'text-gray-600'}`}>
+                      {fieldLabels[field]}
+                    </span>
+                    {isCustom && (
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          handleRemoveCustomField(field);
+                        }}
+                        className="text-red-500 hover:text-red-700 ml-1"
+                        title="Remove custom field"
+                      >
+                        <TrashIcon className="h-3 w-3" />
+                      </button>
+                    )}
+                  </label>
+                );
+              })}
             </div>
           </>
         )}
@@ -232,7 +418,7 @@ function CollegeSelection({
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
           <p className="text-blue-700 text-sm">
             <strong>Selected {selectedTemplateFields.length} columns:</strong> {
-              selectedTemplateFields.map(field => fieldLabels[field]).join(', ')
+              selectedTemplateFields.map(field => fieldLabels[field] || field).join(', ')
             }
           </p>
         </div>
@@ -379,45 +565,69 @@ function CollegeSelection({
             })}
           </div>
 
-          {/* Other Colleges Input */}
+          {/* Enhanced Other Colleges Input - Multiple Colleges */}
           {showOtherCollegesInput && (
             <div className="mt-4 p-4 border border-gray-200 rounded-lg bg-orange-50">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Enter other college names and emails
-              </label>
-              <textarea
-                value={otherCollegesInput}
-                onChange={handleOtherCollegesChange}
-                rows={3}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition mb-3"
-                placeholder="e.g. ABC College, XYZ University"
-              />
+              <div className="flex items-center justify-between mb-3">
+                <label className="block text-sm font-medium text-gray-700">
+                  Add Other Colleges
+                </label>
+                <button
+                  onClick={addOtherCollegeEntry}
+                  className="flex items-center px-3 py-1 text-sm bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition"
+                >
+                  <PlusIcon className="h-4 w-4 mr-1" />
+                  Add Another College
+                </button>
+              </div>
 
-              {/* Manual colleges ke emails */}
-              {otherCollegesInput
-                .split(",")
-                .map((college) => college.trim())
-                .filter((college) => college.length > 0)
-                .map((college) => (
-                  <div key={college} className="mb-3">
-                    <label className="block text-xs font-medium text-gray-600 mb-1">
-                      {college} - Email
-                    </label>
-                    <input
-                      type="email"
-                      value={manualEmails[college] || ""}
-                      onChange={(e) =>
-                        handleEmailInputChange(college, e.target.value)
-                      }
-                      placeholder={`Enter email for ${college}`}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-                    />
+              {otherCollegeEntries.map((entry, index) => (
+                <div key={index} className="mb-4 p-3 bg-white rounded-lg border border-orange-200">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-medium text-orange-700">College #{index + 1}</span>
+                    {otherCollegeEntries.length > 1 && (
+                      <button
+                        onClick={() => removeOtherCollegeEntry(index)}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
-                ))}
+                  
+                  <div className="grid grid-cols-1 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        College Name
+                      </label>
+                      <input
+                        type="text"
+                        value={entry.name}
+                        onChange={(e) => handleOtherCollegeNameChange(index, e.target.value)}
+                        placeholder="e.g. ABC College"
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        <MailIcon className="h-3 w-3 inline mr-1" />
+                        College Email
+                      </label>
+                      <input
+                        type="email"
+                        value={entry.email}
+                        onChange={(e) => handleOtherCollegeEmailChange(index, e.target.value)}
+                        placeholder={`Enter email for ${entry.name || 'college'}`}
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
 
-              <p className="text-sm text-gray-500">
-                {otherCollegesInput.split(",").filter((c) => c.trim()).length}{" "}
-                college(s) added
+              <p className="text-sm text-gray-500 mt-2">
+                {otherCollegeEntries.filter(e => e.name.trim()).length} college(s) added
               </p>
             </div>
           )}
@@ -475,6 +685,7 @@ function CollegeSelection({
                 </p>
                 <p className="text-xs text-purple-700 mt-1">
                   Template columns: {selectedTemplateFields.length} selected
+                  {customFields.length > 0 && ` (${customFields.length} custom)`}
                 </p>
               </div>
             </div>
@@ -487,39 +698,70 @@ function CollegeSelection({
             {formData.passingYear} and specializations{" "}
             {formData.specialization.join(", ")}.
           </p>
+          
+          {/* Enhanced Other Colleges Input for No Results */}
           <div className="mt-4 p-4 border border-gray-200 rounded-lg bg-orange-50">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Enter college names and emails manually
-            </label>
-            <textarea
-              value={otherCollegesInput}
-              onChange={handleOtherCollegesChange}
-              rows={3}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition mb-3"
-              placeholder="e.g. ABC College, XYZ University"
-            />
+            <div className="flex items-center justify-between mb-3">
+              <label className="block text-sm font-medium text-gray-700">
+                Add Other Colleges
+              </label>
+              <button
+                onClick={addOtherCollegeEntry}
+                className="flex items-center px-3 py-1 text-sm bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition"
+              >
+                <PlusIcon className="h-4 w-4 mr-1" />
+                Add Another College
+              </button>
+            </div>
 
-            {/* Manual colleges ke emails */}
-            {otherCollegesInput
-              .split(",")
-              .map((college) => college.trim())
-              .filter((college) => college.length > 0)
-              .map((college) => (
-                <div key={college} className="mb-3">
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                    {college} - Email
-                  </label>
-                  <input
-                    type="email"
-                    value={manualEmails[college] || ""}
-                    onChange={(e) =>
-                      handleEmailInputChange(college, e.target.value)
-                    }
-                    placeholder={`Enter email for ${college}`}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-                  />
+            {otherCollegeEntries.map((entry, index) => (
+              <div key={index} className="mb-4 p-3 bg-white rounded-lg border border-orange-200">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-medium text-orange-700">College #{index + 1}</span>
+                  {otherCollegeEntries.length > 1 && (
+                    <button
+                      onClick={() => removeOtherCollegeEntry(index)}
+                      className="text-red-500 hover:text-red-700"
+                    >
+                      <TrashIcon className="h-4 w-4" />
+                    </button>
+                  )}
                 </div>
-              ))}
+                
+                <div className="grid grid-cols-1 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      College Name
+                    </label>
+                    <input
+                      type="text"
+                      value={entry.name}
+                      onChange={(e) => handleOtherCollegeNameChange(index, e.target.value)}
+                      placeholder="e.g. ABC College"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      <MailIcon className="h-3 w-3 inline mr-1" />
+                      College Email
+                    </label>
+                    <input
+                      type="email"
+                      value={entry.email}
+                      onChange={(e) => handleOtherCollegeEmailChange(index, e.target.value)}
+                      placeholder={`Enter email for ${entry.name || 'college'}`}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            <p className="text-sm text-gray-500">
+              {otherCollegeEntries.filter(e => e.name.trim()).length} college(s) added
+            </p>
           </div>
         </div>
       )}

@@ -344,15 +344,6 @@ function CollegeSummaryReport({
       return sum + parseFloat(item.hours || 0);
     }, 0);
 
-    // Add gap (1 row equivalent)
-    yPosition += 10;
-
-    // Add total hours and cost in same row
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "bold");
-    doc.text(`Total Hours: ${totalHours.toFixed(2)}    Total Cost: ₹${totalCost.toFixed(2)}`, marginLeft, yPosition);
-    yPosition += 8;
-
     // Footer
     const pageCount = doc.internal.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {

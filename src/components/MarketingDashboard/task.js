@@ -311,7 +311,7 @@ const tasksData = [
       }
     ]
   },
-    {
+  {
     account: 'IGSB',
     roles: [
       {
@@ -1054,6 +1054,7 @@ const tasksData = [
         tasks: [
           'External Hoardings',
           'Internal Hoardings',
+          'ID card',
           'Standees',
           'Newspaper',
           'Brochure',
@@ -1559,7 +1560,6 @@ const tasksData = [
       }
     ]
   },
-
   {
     account: 'SB',
     roles: [
@@ -1873,5 +1873,22 @@ const tasksData = [
     ]
   }
 ];
+
+// Ensure all Event roles contain the required mandatory tasks (do not remove existing tasks)
+// Normalizes to a single "Backdrop" entry (removes "Backdrops" if present) and adds any missing items.
+tasksData.forEach(account => {
+  account.roles.forEach(role => {
+    if (role.name === 'Event') {
+      // normalize Backdrops -> Backdrop
+      role.tasks = role.tasks.filter(task => task !== 'Backdrops');
+
+      ['Hoarding', 'Certificates', 'Standees', 'Backdrop'].forEach(task => {
+        if (!role.tasks.includes(task)) {
+          role.tasks.push(task);
+        }
+      });
+    }
+  });
+});
 
 export default tasksData;

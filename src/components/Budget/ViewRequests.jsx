@@ -97,7 +97,7 @@ export default function ViewRequests({
     });
 
     return () => unsub();
-  }, [department, fiscalYear, searchText, filterStatus]);
+  }, [department, fiscalYear, searchText, filterStatus, csddCollection]);
   useEffect(() => {
     setCurrentPage(1);
   }, [searchText, filterStatus]);
@@ -549,7 +549,7 @@ export default function ViewRequests({
               <div className="flex flex-col items-start lg:items-end gap-4 min-w-[200px]">
                 {/* Amount Display */}
                 <div className="text-right">
-                  <p className="text-2xl font-bold text-gray-900 bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
+                  <p className="text-2xl font-bold bg-linear-to-r from-indigo-600 to-blue-600 bg-clip-text text-transparent">
                     ₹{(req.totalAmount || 0).toLocaleString("en-IN")}
                   </p>
                   <p className="text-sm text-gray-500 mt-1 flex items-center justify-end gap-1">

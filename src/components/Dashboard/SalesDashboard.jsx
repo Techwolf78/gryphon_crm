@@ -897,8 +897,16 @@ if (selectedUserId) {
 
       if (lead.phase === "closed" && lead.totalCost) {
         revenue += lead.totalCost;
+        if (lead.businessName === "Ballari Institute of Technology & Management") {
+          console.log("Team revenue includes closed lead for Ballari Institute: true");
+        }
 
         if (lead.contractStartDate) {
+          // Log contract start date when lifetime filter is active
+          if (selectedYear === "lifetime") {
+            console.log(`📅 Closed Lead - Code: "${lead.projectCode || lead.id}" | College: "${lead.businessName}" | Contract Start: ${lead.contractStartDate}`);
+          }
+          
           try {
             const contractStartDate = new Date(lead.contractStartDate);
             if (Number.isNaN(contractStartDate.getTime()))
@@ -991,6 +999,9 @@ if (selectedUserId) {
         teamPerformance[memberId].value += 1; // Count of leads
         if (lead.phase === "closed" && lead.totalCost) {
           teamPerformance[memberId].closedRevenue += lead.totalCost;
+          if (lead.businessName === "Ballari Institute of Technology & Management") {
+            console.log("Pipeline shows team revenue for DM user's closed lead for Ballari Institute: true");
+          }
         }
       }
 
@@ -1008,6 +1019,9 @@ if (selectedUserId) {
           : "NA",
         time: timeStr,
       });
+      if (lead.phase === "closed" && lead.businessName === "Ballari Institute of Technology & Management") {
+        console.log("Closed lead for Ballari Institute shown in recent activity: true");
+      }
     });
 
     // Generate chart data
@@ -1162,18 +1176,20 @@ if (selectedUserId) {
           return false;
         }
 
-        // Exclude users with multiple departments
-        const hasMultipleDepartments = user.departments && Array.isArray(user.departments) && user.departments.length > 1;
-        if (hasMultipleDepartments) {
-          return false;
-        }
+        const relevantDepartments = ["sales", "dm"];
 
         if (user.department) {
           // Old format: single department field
-          return user.department.toLowerCase() === "sales" || user.department === "Admin";
-        } else if (user.departments && Array.isArray(user.departments) && user.departments.length === 1) {
-          // New format: departments array - only if exactly one department
-          return user.departments[0].toLowerCase() === "sales" || user.departments[0] === "Admin";
+          const dept = user.department.toLowerCase();
+          const isRelevant = relevantDepartments.includes(dept) || user.department === "Admin";
+          const isDMQualified = dept !== "dm" || (user.role?.toLowerCase() === "director" || user.role?.toLowerCase() === "head");
+          return isRelevant && isDMQualified;
+        } else if (user.departments && Array.isArray(user.departments)) {
+          // New format: departments array
+          const hasRelevantDept = user.departments.some(d => relevantDepartments.includes(d.toLowerCase()) || d === "Admin");
+          const hasDM = user.departments.some(d => d.toLowerCase() === "dm");
+          const isDMQualified = !hasDM || (user.role?.toLowerCase() === "director" || user.role?.toLowerCase() === "head");
+          return hasRelevantDept && isDMQualified;
         }
         return false;
       });
@@ -1239,7 +1255,7 @@ if (selectedUserId) {
         phase: "closed",
         totalCost: dm.totalCost,
         contractStartDate: dm.contractStartDate,
-        assignedTo: dm.createdBy,
+        assignedTo: { uid: dm.createdBy?.uid || dm.createdBy, name: dm.createdBy?.name || "DM User" },
         courses: [{ courseType: dm.course }],
         createdAt: dm.createdAt,
         studentCount: dm.studentCount,
@@ -1282,7 +1298,7 @@ if (selectedUserId) {
         phase: "closed",
         totalCost: dm.totalCost,
         contractStartDate: dm.contractStartDate,
-        assignedTo: dm.createdBy,
+        assignedTo: { uid: dm.createdBy?.uid || dm.createdBy, name: dm.createdBy?.name || "DM User" },
         courses: [{ courseType: dm.course }],
         createdAt: dm.createdAt,
         studentCount: dm.studentCount,
@@ -1463,7 +1479,7 @@ if (selectedUserId) {
         phase: "closed",
         totalCost: dm.totalCost,
         contractStartDate: dm.contractStartDate,
-        assignedTo: dm.createdBy,
+        assignedTo: { uid: dm.createdBy?.uid || dm.createdBy, name: dm.createdBy?.name || "DM User" },
         courses: [{ courseType: dm.course }],
         createdAt: dm.createdAt,
         studentCount: dm.studentCount,
@@ -1935,7 +1951,7 @@ if (selectedUserId) {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 min-w-0">
             <div className="bg-white p-3 md:p-5 rounded-xl border border-gray-200 shadow-sm lg:col-span-2 min-w-0">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                {selectedUserId ? "Individual Pipeline" : "Sales Team Pipeline"}
+                {selectedUserId ? "Individual Pipeline" : "Sales & DM Team Pipeline"}
               </h2>
               <TeamPerformance
                 teamPerformance={dashboardData.teamPerformance}
@@ -1986,8 +2002,23 @@ if (selectedUserId) {
           >
             Colleges for {modalMember?.name}
           </h3>
-          <div className="text-xs text-gray-500 font-medium mt-0.5">
-            Total: <span className="text-indigo-600 font-bold">{modalLeads.length}</span>
+          <div className="text-xs text-gray-500 font-medium mt-0.5 flex items-center gap-2">
+            <span>
+              Total: <span className="text-indigo-600 font-bold">{modalLeads.length}</span>
+            </span>
+            <span className="text-gray-300">|</span>
+            <span className="text-green-600 font-semibold">
+              {modalLeads.filter(l => l.phase === "closed").length} CL
+            </span>
+            <span className="text-red-600 font-semibold">
+              {modalLeads.filter(l => l.phase === "hot").length} H
+            </span>
+            <span className="text-yellow-600 font-semibold">
+              {modalLeads.filter(l => l.phase === "warm").length} W
+            </span>
+            <span className="text-blue-600 font-semibold">
+              {modalLeads.filter(l => l.phase === "cold").length} C
+            </span>
           </div>
         </div>
       </div>

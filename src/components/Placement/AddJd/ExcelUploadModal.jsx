@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { XIcon, UploadIcon } from '@heroicons/react/outline';
 import { db } from '../../../firebase';
 import { doc, setDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { getDocs, deleteDoc } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
 
 const ExcelUploadModal = ({ show, onClose, college, companyName }) => {
@@ -119,16 +120,11 @@ const ExcelUploadModal = ({ show, onClose, college, companyName }) => {
     try {
       // Company code generate karo
       const companyCode = companyName.replace(/\s+/g, '_').toUpperCase();
-      
-      console.log('🔄 Starting Firebase save...');
-      console.log('Company:', companyName);
-      console.log('College:', college);
-      console.log('Students count:', validationResults.jsonStudents.length);
 
       // Field names mapping
       const fieldMapping = {
         'STUDENT NAME': 'studentName',
-        'ENROLLMENT NUMBER': 'enrollmentNo', 
+        'ENROLLMENT NUMBER': 'enrollmentNo',
         'EMAIL': 'email',
         'PHONE NUMBER': 'phone',
         'COURSE': 'course',
@@ -145,14 +141,10 @@ const ExcelUploadModal = ({ show, onClose, college, companyName }) => {
       // Process students data
       const processedStudents = validationResults.jsonStudents.map((student, index) => {
         const processedStudent = {};
-        
-        // Convert field names
         Object.keys(student).forEach(key => {
           const newKey = fieldMapping[key] || key.toLowerCase();
           processedStudent[newKey] = student[key];
         });
-
-        // Add metadata
         return {
           ...processedStudent,
           college: college,
@@ -164,7 +156,6 @@ const ExcelUploadModal = ({ show, onClose, college, companyName }) => {
 
       // Step 1: Company document create/update karo
       const companyDocRef = doc(db, 'studentList', companyCode);
-      
       await setDoc(companyDocRef, {
         companyName: companyName,
         companyCode: companyCode,
@@ -172,9 +163,24 @@ const ExcelUploadModal = ({ show, onClose, college, companyName }) => {
         totalUploads: await getTotalUploads(companyCode) + 1 // Optional: upload count
       }, { merge: true });
 
-      // Step 2: Subcollection mein new document add karo with timestamp
+      // Step 2: Delete only previous uploads for this company and college
       const uploadsCollectionRef = collection(db, 'studentList', companyCode, 'uploads');
-      
+      const prevUploadsSnap = await getDocs(uploadsCollectionRef);
+      // Delete previous uploads in controlled batches to avoid large concurrent deletes
+      const docsToDelete = prevUploadsSnap.docs.filter(docSnap => {
+        const data = docSnap.data();
+        // Compare college name (case-insensitive, trimmed)
+        return (data.college || '').trim().toLowerCase() === (college || '').trim().toLowerCase();
+      });
+      const deleteInBatches = async (docs, batchSize = 50) => {
+        for (let i = 0; i < docs.length; i += batchSize) {
+          const batch = docs.slice(i, i + batchSize);
+          await Promise.all(batch.map(docSnap => deleteDoc(docSnap.ref)));
+        }
+      };
+      await deleteInBatches(docsToDelete);
+
+      // Step 3: Add new upload
       const uploadData = {
         college: college,
         uploadedAt: serverTimestamp(),
@@ -183,24 +189,13 @@ const ExcelUploadModal = ({ show, onClose, college, companyName }) => {
         templateFields: validationResults.headers,
         collegeCode: college.replace(/\s+/g, '_').toUpperCase()
       };
-
-      console.log('📦 Uploading data to:', `studentList/${companyCode}/uploads`);
-      console.log('📊 Data:', uploadData);
-      
       await addDoc(uploadsCollectionRef, uploadData);
 
-      console.log(`✅ ${processedStudents.length} students saved to studentList/${companyCode}/uploads`);
       alert(`✅ ${processedStudents.length} students saved successfully!\n\n📍 Location: studentList/${companyCode}/uploads\n🏫 College: ${college}\n💼 Company: ${companyName}`);
-      
-      // Reset and close
       setUploadedFile(null);
       setValidationResults(null);
       onClose();
-      
     } catch (error) {
-      console.error('❌ Detailed Error saving students:', error);
-      console.error('Error message:', error.message);
-      console.error('Error code:', error.code);
       alert('❌ Error saving student data: ' + error.message);
     } finally {
       setIsUploading(false);
@@ -222,10 +217,10 @@ const ExcelUploadModal = ({ show, onClose, college, companyName }) => {
 
   return (
     <div className="fixed inset-0 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-white w-full max-w-2xl rounded-xl shadow-2xl z-[10000] transform transition-all duration-300 scale-100 max-h-[90vh] flex flex-col">
+      <div className="bg-white w-full max-w-2xl rounded-xl shadow-2xl z-10000 transform transition-all duration-300 scale-100 max-h-[90vh] flex flex-col">
         
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-4 flex justify-between items-center rounded-t-xl flex-shrink-0">
+        <div className="bg-linear-to-r from-blue-600 to-indigo-700 px-6 py-4 flex justify-between items-center rounded-t-xl shrink-0">
           <h2 className="text-xl font-semibold text-white">
             Upload Student Data
           </h2>
@@ -238,7 +233,7 @@ const ExcelUploadModal = ({ show, onClose, college, companyName }) => {
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto flex-grow">
+        <div className="p-6 overflow-y-auto grow">
           {/* Storage Info - UPDATED */}
           <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
             <h4 className="font-semibold text-blue-800 mb-2">📁 Storage Information</h4>
@@ -325,7 +320,7 @@ const ExcelUploadModal = ({ show, onClose, college, companyName }) => {
         </div>
 
         {/* Footer */}
-        <div className="bg-gray-50 px-6 py-4 flex justify-end space-x-3 flex-shrink-0">
+        <div className="bg-gray-50 px-6 py-4 flex justify-end space-x-3 shrink-0">
           <button
             onClick={onClose}
             className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-100"

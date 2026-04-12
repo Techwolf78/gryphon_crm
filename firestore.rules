@@ -1,9 +1,28 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Allow read-only access to PlacementForms for the public upload page
+    match /PlacementForms/{formId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // Task names and descriptions management
+    match /task_names/{docId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ["Admin", "Director", "Direc2", "Head"];
+    }
+
+    match /task_descriptions/{docId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ["Admin", "Director", "Direc2", "Head"];
+    }
+
     // Allow read/write access to all users for development
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if request.auth != null;
     }
   }
 }

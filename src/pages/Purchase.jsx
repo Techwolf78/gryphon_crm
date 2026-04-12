@@ -315,11 +315,9 @@ function Purchase() {
   useEffect(() => {
     if (!currentUser) return;
 
-    // Users data - sets ready state for user data loading
-    const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
-      setUsersLoaded(true);
-      setLoading(false);
-    });
+    // Mark users as ready immediately - no need to listen to the entire users collection
+    setUsersLoaded(true);
+    setLoading(false);
 
     // Budget query for ALL departments (purchase can see all)
     const budgetQuery = query(
@@ -377,7 +375,6 @@ function Purchase() {
     });
 
     return () => {
-      unsubUsers();
       unsubBudget();
       unsubIntents();
       unsubOrders();
@@ -763,13 +760,7 @@ function Purchase() {
         throw error;
       }
     },
-    [
-      currentUser,
-      currentFiscalYear,
-      selectedIntent,
-      activeBudget,
-      departmentBudget,
-    ],
+    [currentUser, currentFiscalYear, selectedIntent],
   );
 
   const handleUpdatePurchaseOrder = async (updatedOrder) => {

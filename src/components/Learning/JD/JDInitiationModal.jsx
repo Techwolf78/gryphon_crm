@@ -135,10 +135,86 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
 
   // Update table1DataByDomain when memoized data changes (only if no existing config or no table data)
   useEffect(() => {
-    if (!existingConfig || !existingConfig.table1DataByDomain) {
-      setTable1DataByDomain(_table1DataByDomainMemo);
+    // If there is an existing config, we should honor it First
+    if (existingConfig && existingConfig.table1DataByDomain && (!operationsConfig || !operationsConfig.hasChanges)) {
+      // Handled in existingConfig effect below
+      return;
     }
-  }, [_table1DataByDomainMemo, existingConfig]);
+
+    if (!existingConfig || !existingConfig.table1DataByDomain || (operationsConfig && operationsConfig.hasChanges)) {
+      setTable1DataByDomain(prev => {
+        // If we already have current session data (prev), reconcile it with the new operations config
+        if (Object.keys(prev).length > 0 && operationsConfig?.hasChanges) {
+          const reconciled = { ..._table1DataByDomainMemo };
+          if (prev["JD"] && reconciled["JD"]) {
+            reconciled["JD"] = reconciled["JD"].map(newRow => {
+              const newBatchCode = newRow.batches?.[0]?.batchCode;
+              const prevRow = prev["JD"].find(pRow => {
+                const pBatchCode = pRow.batches?.[0]?.batchCode;
+                return (pBatchCode && pBatchCode === newBatchCode) || pRow.batch === newRow.batch;
+              });
+
+              if (prevRow) {
+                return {
+                  ...newRow,
+                  batches: newRow.batches.map(newBatch => {
+                    const prevBatch = prevRow.batches.find(pb => pb.batchCode === newBatch.batchCode);
+                    if (prevBatch) {
+                      return {
+                        ...newBatch,
+                        trainers: prevBatch.trainers || [],
+                        assignedHours: prevBatch.assignedHours || 0
+                      };
+                    }
+                    return newBatch;
+                  }),
+                  assignedHours: prevRow.assignedHours || 0
+                };
+              }
+              return newRow;
+            });
+          }
+          return reconciled;
+        }
+        
+        // If we don't have prev data, but we had existing config data before the change, try to reconcile with that
+        if (existingConfig && existingConfig.table1DataByDomain && operationsConfig?.hasChanges) {
+          const reconciled = { ..._table1DataByDomainMemo };
+          if (existingConfig.table1DataByDomain["JD"] && reconciled["JD"]) {
+             reconciled["JD"] = reconciled["JD"].map(newRow => {
+              const newBatchCode = newRow.batches?.[0]?.batchCode;
+              const prevRow = existingConfig.table1DataByDomain["JD"].find(pRow => {
+                const pBatchCode = pRow.batches?.[0]?.batchCode;
+                return (pBatchCode && pBatchCode === newBatchCode) || pRow.batch === newRow.batch;
+              });
+
+              if (prevRow) {
+                return {
+                  ...newRow,
+                  batches: newRow.batches.map(newBatch => {
+                    const prevBatch = prevRow.batches.find(pb => pb.batchCode === newBatch.batchCode);
+                    if (prevBatch) {
+                      return {
+                        ...newBatch,
+                        trainers: prevBatch.trainers || [],
+                        assignedHours: prevBatch.assignedHours || 0
+                      };
+                    }
+                    return newBatch;
+                  }),
+                  assignedHours: prevRow.assignedHours || 0
+                };
+              }
+              return newRow;
+            });
+          }
+          return reconciled;
+        }
+
+        return _table1DataByDomainMemo;
+      });
+    }
+  }, [_table1DataByDomainMemo, existingConfig, operationsConfig]);
 
   // Load existing configuration if provided
   useEffect(() => {
@@ -191,8 +267,7 @@ function JDInitiationModal({ training, onClose, onConfirm, isMerged = false, sel
           setTable1DataByDomain(_table1DataByDomainMemo);
         }
       } else if (operationsConfigChanged) {
-        // Operations config was modified, use recalculated table data based on new operations config
-        setTable1DataByDomain(_table1DataByDomainMemo);
+        // Handled in table initialization effect
       }
 
       // Hours are now always editable by default

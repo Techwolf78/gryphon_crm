@@ -541,7 +541,16 @@ const formatIndianNumber = (num, decimals = 2) => {
         const leadsQuery = query(collection(db, "leads"), where("projectCode", "==", originalProjectCode));
         const leadsSnapshot = await getDocs(leadsQuery);
         leadsSnapshot.forEach(async (docSnap) => {
-          await updateDoc(docSnap.ref, { projectCode: newProjectCode, collegeName: trimmedCollegeName, businessName: trimmedCollegeName, totalCost: formData.totalCost, updatedAt: new Date(), updatedBy: user?.email || user?.displayName || "Unknown User" });
+          await updateDoc(docSnap.ref, { 
+            projectCode: newProjectCode, 
+            collegeName: trimmedCollegeName, 
+            businessName: trimmedCollegeName, 
+            totalCost: formData.totalCost,
+            contractStartDate: formData.contractStartDate || null,
+            contractEndDate: formData.contractEndDate || null,
+            updatedAt: new Date(), 
+            updatedBy: user?.email || user?.displayName || "Unknown User" 
+          });
         });
       } else {
         // Normal update if Project Code didn't change
@@ -586,7 +595,15 @@ const formatIndianNumber = (num, decimals = 2) => {
         const leadsQuery = query(collection(db, "leads"), where("projectCode", "==", newProjectCode));
         const leadsSnapshot = await getDocs(leadsQuery);
         leadsSnapshot.forEach(async (docSnap) => {
-          await updateDoc(docSnap.ref, { collegeName: trimmedCollegeName, businessName: trimmedCollegeName, totalCost: formData.totalCost, updatedAt: new Date(), updatedBy: user?.email || user?.displayName || "Unknown User" });
+          await updateDoc(docSnap.ref, { 
+            collegeName: trimmedCollegeName, 
+            businessName: trimmedCollegeName, 
+            totalCost: formData.totalCost,
+            contractStartDate: formData.contractStartDate || null,
+            contractEndDate: formData.contractEndDate || null,
+            updatedAt: new Date(), 
+            updatedBy: user?.email || user?.displayName || "Unknown User" 
+          });
         });
       }
 

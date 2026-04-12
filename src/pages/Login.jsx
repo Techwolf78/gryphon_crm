@@ -172,7 +172,10 @@ export default function LoginPage() {
     }
 
     try {
-      await login(email, password);
+      const loginResult = await login(email, password);
+      if (!loginResult) {
+        throw { code: "auth/invalid-credential", message: "Login verification failed" };
+      }
       if (rememberMe) {
         localStorage.setItem("rememberedEmail", email);
         localStorage.setItem("rememberedPassword", password);
@@ -181,37 +184,55 @@ export default function LoginPage() {
         localStorage.removeItem("rememberedPassword");
       }
     } catch (error) {
+      const errorCode = error.code || "unknown";
+      const errorMsg = error.message || "No error message provided";
+      console.error(`❌ [LOGIN_FAILURE] Reason: ${errorCode} | Detail: ${errorMsg}`);
+      
       // Login failed - error handled through UI feedback
 
       let errorMessage = "Login failed. Please try again.";
 
       // Handle Firebase authentication errors
       switch (error.code) {
+        case "auth/user-deactivated":
+          console.warn("🚫 [DEBUG] User account is DEACTIVATED in Firestore");
+          errorMessage = "❌ Your account has been deactivated. Please contact your administrator to regain access.";
+          break;
         case "auth/user-not-found":
+          console.warn("🚫 [DEBUG] User NOT FOUND in Firebase Auth");
           setFieldErrors(prev => ({
             ...prev,
             email: ["No account found with this email address"]
           }));
           break;
         case "auth/wrong-password":
+          console.warn("🚫 [DEBUG] WRONG PASSWORD for user:", email);
           setFieldErrors(prev => ({
             ...prev,
             password: ["Incorrect password. Please try again."]
           }));
           break;
         case "auth/invalid-email":
+          console.warn("🚫 [DEBUG] INVALID EMAIL format:", email);
           setFieldErrors(prev => ({
             ...prev,
             email: ["Invalid email format"]
           }));
           break;
         case "auth/too-many-requests":
+          console.warn("🚫 [DEBUG] TOO MANY REQUESTS for user:", email);
           errorMessage = "Too many failed attempts. Please try again later.";
           break;
         case "auth/user-disabled":
+          console.warn("🚫 [DEBUG] Account DISABLED in Firebase Console");
           errorMessage = "This account has been disabled. Please contact admin.";
           break;
+        case "auth/invalid-credential":
+          console.warn("🚫 [DEBUG] INVALID CREDENTIALS (generic error)");
+          errorMessage = "Incorrect email or password. Please check your credentials.";
+          break;
         default:
+          console.warn(`⚠️ [DEBUG] UNHANDLED AUTH ERROR: ${error.code}`);
           errorMessage = "Login failed. Please check your credentials and try again.";
       }
 

@@ -736,9 +736,22 @@ function GenerateTrainerInvoice() {
             return days;
           };
 
+          const totalTrainingFees = trainer.allBatches.reduce(
+            (sum, batch) =>
+              sum + (batch.assignedHours || 0) * (batch.perHourCost || 0),
+            0,
+          );
+
+          const averageRate = trainer.totalCollegeHours
+            ? totalTrainingFees / trainer.totalCollegeHours
+            : trainer.perHourCost || 0;
+
           const finalTrainer = {
             ...trainer,
             assignedHours: trainer.totalCollegeHours, // Use cycle-specific hours
+            perHourCost: averageRate,
+            totalTrainingFees,
+            averageRate,
             topics: Array.from(trainer.allTopics), // Convert Set to Array for topics
             // Calculate total allowances from all batches (per-day rate × number of training days)
             // For JD domain, take allowances only once (not summed across batches)
@@ -782,7 +795,10 @@ function GenerateTrainerInvoice() {
                   }, 0),
             totalConveyance:
               trainer.domain === "JD"
-                ? trainer.allBatches[0]?.conveyance || 0
+                ? trainer.allBatches.reduce(
+                    (sum, batch) => sum + (batch.conveyance || 0),
+                    0,
+                  )
                 : trainer.allBatches.reduce(
                     (sum, batch) => sum + (batch.conveyance || 0),
                     0,
@@ -1132,6 +1148,9 @@ function GenerateTrainerInvoice() {
                 .includes(searchTerm.toLowerCase()) ||
               trainer.projectCode
                 .toLowerCase()
+                .includes(searchTerm.toLowerCase()) ||
+              trainer.invoiceData?.billNumber
+                ?.toLowerCase()
                 .includes(searchTerm.toLowerCase());
 
             // Date range filter
@@ -1219,7 +1238,10 @@ function GenerateTrainerInvoice() {
         trainer.trainerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         trainer.trainerId.toLowerCase().includes(searchTerm.toLowerCase()) ||
         trainer.businessName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        trainer.projectCode.toLowerCase().includes(searchTerm.toLowerCase()),
+        trainer.projectCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        trainer.invoiceData?.billNumber
+          ?.toLowerCase()
+          .includes(searchTerm.toLowerCase()),
     );
 
     if (matchingTrainers.length === 0) return null;
@@ -1240,9 +1262,7 @@ function GenerateTrainerInvoice() {
       0,
     );
     const totalCost = matchingTrainers.reduce((sum, t) => {
-      const hours = t.totalCollegeHours || t.assignedHours || 0;
-      const rate = t.perHourCost || 0;
-      return sum + hours * rate;
+      return sum + (t.totalTrainingFees || (t.totalCollegeHours || t.assignedHours || 0) * (t.perHourCost || 0));
     }, 0);
 
     // Calculate detailed earnings breakdown

@@ -3,6 +3,7 @@ import { useAuth } from "../../context/AuthContext"; // Adjust the path as neede
 import PropTypes from "prop-types";
 import {
   FiTrendingUp,
+  FiTrendingDown,
   FiUsers,
   FiFilter,
   FiChevronDown,
@@ -629,6 +630,8 @@ const LdDashboard = ({ filters }) => {
     trainingSessionsPrev: 0,
     trainingRevenue: 0,
     trainingRevenuePrev: 0,
+    spentAmount: 0,
+    spentAmountPrev: 0,
     completionRate: 0,
     completionRatePrev: 0,
     activePrograms: 0,
@@ -929,6 +932,7 @@ const LdDashboard = ({ filters }) => {
     let activeStudents = 0;
     let trainingSessions = 0;
     let trainingRevenue = 0;
+    let spentAmount = 0;
     let completionRate = 0;
     let activePrograms = 0;
     let totalTrainingHours = 0;
@@ -1035,6 +1039,7 @@ const LdDashboard = ({ filters }) => {
         }
         revenueByDate[dateKey].sessionCount += 1;
         revenueByDate[dateKey].cost += session.fee || 0;
+        spentAmount += session.fee || 0;
       }
 
       let createdDate = new Date(session.createdAt);
@@ -1145,6 +1150,7 @@ const LdDashboard = ({ filters }) => {
         }
         revenueByDate[dateKey].revenue += training.originalFormData.totalCost || 0;
         revenueByDate[dateKey].cost += training.totalCost || 0;
+        spentAmount += training.totalCost || 0;
       }
     });
 
@@ -1341,6 +1347,7 @@ const LdDashboard = ({ filters }) => {
       activeStudents,
       trainingSessions,
       trainingRevenue,
+      spentAmount,
       completionRate,
       activePrograms,
       totalTrainingHours,
@@ -1612,6 +1619,7 @@ const LdDashboard = ({ filters }) => {
         activeStudentsPrev: prevData.activeStudents,
         trainingSessionsPrev: prevData.trainingSessions,
         trainingRevenuePrev: prevData.trainingRevenue,
+        spentAmountPrev: prevData.spentAmount || 0,
         completionRatePrev: prevData.completionRate,
         activeProgramsPrev: prevData.activePrograms,
         totalTrainingHoursPrev: prevData.totalTrainingHours,
@@ -1631,6 +1639,8 @@ const LdDashboard = ({ filters }) => {
         trainingSessionsPrev: 0,
         trainingRevenue: 0,
         trainingRevenuePrev: 0,
+        spentAmount: 0,
+        spentAmountPrev: 0,
         completionRate: 0,
         completionRatePrev: 0,
         activePrograms: 0,
@@ -1763,10 +1773,10 @@ const LdDashboard = ({ filters }) => {
       color: "bg-purple-600",
     },
     {
-      title: "Completion Rate",
-      value: `${dashboardData.completionRate.toFixed(1)}%`,
-      change: calculateGrowth(dashboardData.completionRate, dashboardData.completionRatePrev),
-      icon: <FiTrendingUp className="text-white" size={16} />,
+      title: "Spent Amount",
+      value: formatCurrency(dashboardData.spentAmount),
+      change: calculateGrowth(dashboardData.spentAmount, dashboardData.spentAmountPrev),
+      icon: <FiTrendingDown className="text-white" size={16} />,
       color: "bg-orange-600",
     },
   ], [dashboardData]);
@@ -2311,7 +2321,7 @@ const LdDashboard = ({ filters }) => {
             style={{ maxHeight: "600px" }}
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-white via-gray-50 to-indigo-50">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-linear-to-r from-white via-gray-50 to-indigo-50">
               <div className="flex items-center gap-3">
                 <div className="bg-indigo-100 text-indigo-600 rounded-full w-10 h-10 flex items-center justify-center font-bold text-lg shadow-sm">
                   {modalTrainer?.name?.[0] || "?"}
@@ -2392,7 +2402,7 @@ const LdDashboard = ({ filters }) => {
             </div>
 
             {/* Footer */}
-            <div className="px-6 py-3 bg-gradient-to-r from-white via-gray-50 to-indigo-50 border-t border-gray-100 flex justify-end">
+            <div className="px-6 py-3 bg-linear-to-r from-white via-gray-50 to-indigo-50 border-t border-gray-100 flex justify-end">
               <button
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 text-white font-semibold shadow hover:bg-indigo-700 transition focus:outline-none focus:ring-2 focus:ring-indigo-400"
                 onClick={() => setIsModalOpen(false)}

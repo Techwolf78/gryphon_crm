@@ -91,7 +91,7 @@ export default function ClientBudgetForm({
       setError("");
       setIsSubmitting(false);
     }
-  }, [show, client, existingData]);
+  }, [show, client, existingData, budgetId, currentUser?.displayName, fiscalYear]);
 
   // Calculate totals
   const totalAllocated = components.reduce(
@@ -258,7 +258,7 @@ export default function ClientBudgetForm({
   if (!show || !client) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[1000] animate-fade-in overflow-y-auto">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-1000 animate-fade-in overflow-y-auto">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden border border-gray-200 my-8">
         {/* --- HEADER --- */}
         <div className="bg-linear-to-r from-indigo-50 to-blue-50 border-b border-gray-200 p-4 flex justify-between items-center sticky top-0 bg-white">
@@ -458,7 +458,7 @@ export default function ClientBudgetForm({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {components.map((comp, index) => {
+                  {components.map((comp) => {
                     const remaining = comp.allocated - comp.spent;
                     return (
                       <tr key={comp.id} className="hover:bg-gray-50">

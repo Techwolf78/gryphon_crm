@@ -242,6 +242,51 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     const userCred = await signInWithEmailAndPassword(auth, email, password);
+    console.log("✅ Firebase authentication successful for:", email);
+
+    // CHECK IF USER IS ACTIVE BEFORE ALLOWING LOGIN
+    try {
+      console.log("🔍 Attempting to fetch user document for UID:", userCred.user.uid);
+      
+      // Query the users collection where uid field matches the authentication UID
+      const q = query(collection(db, "users"), where("uid", "==", userCred.user.uid));
+      const querySnapshot = await getDocs(q);
+      
+      console.log("📄 Query completed. Found documents:", querySnapshot.docs.length);
+      
+      if (querySnapshot.docs.length > 0) {
+        const userData = querySnapshot.docs[0].data();
+        console.log("👤 User data fetched:", {
+          name: userData.name,
+          email: userData.email,
+          isActive: userData.isActive,
+          role: userData.role
+        });
+        
+        // If user is deactivated, sign them out immediately
+        if (userData.isActive === false) {
+          console.warn("❌ User is DEACTIVATED - Login blocked:", email);
+          await signOut(auth);
+          // Create a custom error for the login page to handle
+          const error = new Error("User account has been deactivated");
+          error.code = "auth/user-deactivated";
+          throw error;
+        }
+        
+        console.log("✅ User is ACTIVE - Login allowed:", email);
+      } else {
+        console.warn(`⚠️ User document not found in Firestore for UID: ${userCred.user.uid}`);
+        console.warn("ℹ️ Allowing login to continue due to backward compatibility.");
+      }
+    } catch (firestoreError) {
+      // If it's our custom deactivation error, rethrow it
+      if (firestoreError.code === "auth/user-deactivated") {
+        throw firestoreError;
+      }
+      // For other Firestore errors, log but continue for backward compatibility
+      console.error("❌ Error verifying user status:", firestoreError.code, firestoreError.message);
+      console.warn("ℹ️ Continuing login due to backward compatibility");
+    }
 
     // Get location data
     const location = await getUserLocation();
@@ -270,8 +315,13 @@ export const AuthProvider = ({ children }) => {
       timestamp: serverTimestamp(),
     });
 
+    console.log("📊 Login recorded in audit logs");
     await refreshSession();
     await startSession(userCred.user.uid, locationData);
+    console.log("🎉 Session started successfully");
+    
+    // Return the user credential
+    return userCred.user;
   };
 
   const logout = async () => {

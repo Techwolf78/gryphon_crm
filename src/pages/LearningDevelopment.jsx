@@ -31,8 +31,10 @@ import {
   Calendar,
   PlayCircle,
   DollarSign,
+  ClipboardList,
 } from "lucide-react";
 import BudgetDashboard from "../components/Budget/BudgetDashboard";
+import LDTaskManager from "../components/Learning/LDTaskManager";
 
 function LearningDevelopment() {
   const [trainings, setTrainings] = useState([]);
@@ -45,11 +47,40 @@ function LearningDevelopment() {
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState(() => {
     try {
+      // 1) URL parameter takes precedence, then localStorage fallback
+      const params = new URLSearchParams(window.location.search);
+      const urlTab = params.get("tab");
+      if (urlTab) return urlTab;
       return localStorage.getItem("ld_activeTab") || "newContact";
     } catch {
       return "newContact";
     }
   });
+
+  const updateTabUrl = (tab) => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (tab && tab !== "newContact") {
+        params.set("tab", tab);
+      } else {
+        params.delete("tab");
+      }
+      const newUrl = `${window.location.pathname}?${params.toString()}`;
+      window.history.replaceState(null, "", newUrl);
+    } catch {
+      // ignore URL update errors
+    }
+  };
+
+  const setActiveTabAndPersist = (newTab) => {
+    setActiveTab(newTab);
+    try {
+      localStorage.setItem("ld_activeTab", newTab);
+    } catch {
+      // ignore storage errors
+    }
+    updateTabUrl(newTab);
+  };
   const [selectedInitiationTraining, setSelectedInitiationTraining] =
     useState(null);
   const [showInitiationModal, setShowInitiationModal] = useState(false);
@@ -225,36 +256,65 @@ function LearningDevelopment() {
     if (!searchTerm || searchTerm.trim() === "") return trainings;
 
     const query = searchTerm.toLowerCase().trim();
-    const queryWords = query.split(/\s+/).filter(word => word.length > 0);
+    const normalizedQuery = query.replace(/[^a-z0-9]/g, "");
+    const queryWords = query.split(/\s+/).filter((word) => word.length > 0);
 
     return trainings
       .map((training) => {
+        const trainingIdentifier =
+          training.projectCode || training.collegeCode || training.id || "";
+        const normalizedTrainingIdentifier = trainingIdentifier
+          .toString()
+          .toLowerCase()
+          .replace(/[^a-z0-9]/g, "");
+
         // Combine searchable fields
         const searchableText = [
-          training.collegeName || '',
-          training.businessName || '',
-          training.trainingName || '',
-          training.collegeName?.replace(/[^a-zA-Z0-9]/g, ' ') || '', // Remove special chars for better matching
-          training.businessName?.replace(/[^a-zA-Z0-9]/g, ' ') || '',
-          training.trainingName?.replace(/[^a-zA-Z0-9]/g, ' ') || ''
-        ].join(' ').toLowerCase();
+          training.collegeName || "",
+          training.businessName || "",
+          training.trainingName || "",
+          training.projectCode || "",
+          training.collegeCode || "",
+          trainingIdentifier,
+          training.collegeName?.replace(/[^a-zA-Z0-9]/g, " ") || "",
+          training.businessName?.replace(/[^a-zA-Z0-9]/g, " ") || "",
+          training.trainingName?.replace(/[^a-zA-Z0-9]/g, " ") || "",
+          training.projectCode?.replace(/[^a-zA-Z0-9]/g, " ") || "",
+          training.collegeCode?.replace(/[^a-zA-Z0-9]/g, " ") || "",
+          trainingIdentifier?.replace(/[^a-zA-Z0-9]/g, " ") || "",
+        ]
+          .join(" ")
+          .toLowerCase();
 
         let score = 0;
         let matches = 0;
+
+        // Exact code match should always win for exact project/college codes
+        if (
+          normalizedQuery.length > 0 &&
+          normalizedTrainingIdentifier === normalizedQuery
+        ) {
+          score += 300;
+          matches += 1;
+        }
 
         // Check each query word
         for (const word of queryWords) {
           if (word.length < 2) continue; // Skip very short words
 
           // Exact word match (highest score)
-          if (searchableText.includes(` ${word} `) || searchableText.startsWith(word + ' ') || searchableText.endsWith(' ' + word)) {
+          if (
+            searchableText.includes(` ${word} `) ||
+            searchableText.startsWith(word + " ") ||
+            searchableText.endsWith(" " + word)
+          ) {
             score += 100;
             matches++;
             continue;
           }
 
           // Partial word match (good score)
-          const partialMatches = searchableText.split(/\s+/).filter(textWord =>
+          const partialMatches = searchableText.split(/\s+/).filter((textWord) =>
             textWord.includes(word) || word.includes(textWord)
           );
           if (partialMatches.length > 0) {
@@ -264,7 +324,7 @@ function LearningDevelopment() {
           }
 
           // Fuzzy matching (Levenshtein distance <= 2)
-          const fuzzyMatches = searchableText.split(/\s+/).filter(textWord => {
+          const fuzzyMatches = searchableText.split(/\s+/).filter((textWord) => {
             if (Math.abs(textWord.length - word.length) > 2) return false;
             return levenshteinDistance(textWord, word) <= 2;
           });
@@ -284,22 +344,25 @@ function LearningDevelopment() {
         // Boost score for matches in preferred fields
         if (training.collegeName?.toLowerCase().includes(query)) score += 20;
         if (training.businessName?.toLowerCase().includes(query)) score += 15;
+        if (training.projectCode?.toLowerCase().includes(query)) score += 20;
+        if (training.collegeCode?.toLowerCase().includes(query)) score += 20;
+        if (trainingIdentifier.toLowerCase().includes(query)) score += 20;
 
         // Boost for exact phrase match
         if (searchableText.includes(query)) score += 30;
 
         return { training, score, matches };
       })
-      .filter(item => item.matches > 0) // Only include items with at least one match
+      .filter((item) => item.matches > 0) // Only include items with at least one match
       .sort((a, b) => {
         // Sort by score (descending), then by matches (descending), then by name (ascending)
         if (b.score !== a.score) return b.score - a.score;
         if (b.matches !== a.matches) return b.matches - a.matches;
-        const nameA = (a.training.collegeName || a.training.businessName || '').toLowerCase();
-        const nameB = (b.training.collegeName || b.training.businessName || '').toLowerCase();
+        const nameA = (a.training.collegeName || a.training.businessName || "").toLowerCase();
+        const nameB = (b.training.collegeName || b.training.businessName || "").toLowerCase();
         return nameA.localeCompare(nameB);
       })
-      .map(item => item.training);
+      .map((item) => item.training);
   };
 
   // Levenshtein distance function for fuzzy matching
@@ -410,13 +473,8 @@ function LearningDevelopment() {
     }
   }, [activeTab]);
 
-  // Persist active tab so it survives reloads
   useEffect(() => {
-    try {
-      localStorage.setItem("ld_activeTab", activeTab);
-    } catch {
-      // ignore storage errors
-    }
+    updateTabUrl(activeTab);
   }, [activeTab]);
 
   const handleViewStudentData = (item) => {
@@ -479,10 +537,16 @@ function LearningDevelopment() {
 
   // Handle operations configuration
   const handleOperationsConfigured = (config) => {
-    setOperationsConfig(config);
-    setExistingJDConfig((prev) =>
-      prev ? { ...prev, operationsConfig: config } : null
-    );
+    // Check if configuration actually changed to avoid unnecessary resets
+    const configChanged = !operationsConfig || JSON.stringify(operationsConfig) !== JSON.stringify(config);
+    
+    if (configChanged) {
+      setOperationsConfig({ ...config, hasChanges: true });
+      setExistingJDConfig((prev) =>
+        prev ? { ...prev, operationsConfig: { ...config, hasChanges: true } } : null
+      );
+    }
+    
     setShowOperationsConfigModal(false);
     setShowJDInitiationModal(true);
   };
@@ -576,6 +640,14 @@ function LearningDevelopment() {
     );
   }
 
+  if (activeTab === "ldTasks") {
+    return (
+      <div className="bg-gray-50 min-h-screen">
+        <LDTaskManager onBack={() => setActiveTabAndPersist("newContact")} />
+      </div>
+    );
+  }
+
   return (
     <>
       <LearningDevelopmentTour userId={user?.uid} />
@@ -592,25 +664,36 @@ function LearningDevelopment() {
         theme="light"
       />
       <div className="bg-gray-50 min-h-screen pt-0 -mt-2">
-        <div
-          className="flex justify-between items-center mb-1"
-          data-tour="ld-header"
-        >
-          <h1 className="text-2xl font-bold text-blue-800">
-            Training Dashboard
-          </h1>
-          <button
-            onClick={handleViewTrainers}
-            className="px-2 py-0.5 bg-blue-600 text-white font-medium rounded-full shadow-md hover:bg-blue-700 hover:shadow-lg transform hover:scale-105 transition-all duration-200 border border-gray-300 text-sm"
-            data-tour="view-trainers-button"
-          >
-            View Trainers
-          </button>
-        </div>
+        {activeTab !== "ldTasks" && (
+          <>
+            <div
+              className="flex justify-between items-center mb-1"
+              data-tour="ld-header"
+            >
+              <h1 className="text-2xl font-bold text-blue-800">
+                Training Dashboard
+              </h1>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setActiveTabAndPersist("ldTasks")}
+                  className="px-2 py-0.5 bg-indigo-600 text-white font-medium rounded-full shadow-md hover:bg-indigo-700 hover:shadow-lg transform hover:scale-105 transition-all duration-200 border border-indigo-300 text-sm flex items-center gap-1"
+                >
+                  <ClipboardList size={14} />
+                  Task Module
+                </button>
+                <button
+                  onClick={handleViewTrainers}
+                  className="px-2 py-0.5 bg-blue-600 text-white font-medium rounded-full shadow-md hover:bg-blue-700 hover:shadow-lg transform hover:scale-105 transition-all duration-200 border border-gray-300 text-sm"
+                  data-tour="view-trainers-button"
+                >
+                  View Trainers
+                </button>
+              </div>
+            </div>
 
-        {/* Enhanced Tab Navigation with Sliding Indicator */}
-        <div className="relative mb-0.5">
-          <div className="flex border-b border-gray-200">
+            {/* Enhanced Tab Navigation with Sliding Indicator */}
+            <div className="relative mb-0.5">
+              <div className="flex border-b border-gray-200">
             <button
               className={`flex-1 px-6 py-2 font-medium text-sm transition-all duration-150 ${
                 activeTab === "newContact"
@@ -687,6 +770,8 @@ function LearningDevelopment() {
             }}
           ></div>
         </div>
+      </>
+    )}
 
         {error && (
           <div className="mb-2 p-3 bg-red-100 border-l-4 border-red-500 text-red-700">
@@ -857,7 +942,7 @@ function LearningDevelopment() {
                   <div className="relative flex-1">
                     <input
                       type="text"
-                      placeholder="Search colleges names..."
+                      placeholder="Search college names or codes..."
                       value={collegeSearchTerm}
                       onChange={(e) => setCollegeSearchTerm(e.target.value)}
                       className="w-full px-3 py-1.5 pl-8 pr-8 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"

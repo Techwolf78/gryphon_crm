@@ -10,6 +10,8 @@ function BulkUploadModal({ show, onClose, allUsers = null, currentUser = null })
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [selectedAssignee, setSelectedAssignee] = useState('');
+  const [unassignedWarningConfirmed, setUnassignedWarningConfirmed] = useState(false);
+  const [unassignedWarningExpanded, setUnassignedWarningExpanded] = useState(false);
   const [users, setUsers] = useState({});
   const [batches, setBatches] = useState([]);
   const [batchInfo, setBatchInfo] = useState(null);
@@ -118,7 +120,7 @@ function BulkUploadModal({ show, onClose, allUsers = null, currentUser = null })
   const updateTargetBatch = useCallback((numCompanies, batchId) => {
     if (!numCompanies) return;
 
-    const chunkSize = 500;
+    const chunkSize = 200;
     const maxSizeKB = 900; // 900KB to be safe under 1MB
     const sizePerCompanyKB = 1; // Rough estimate
 
@@ -260,6 +262,7 @@ function BulkUploadModal({ show, onClose, allUsers = null, currentUser = null })
     const selectedFile = e.target.files[0];
     setFile(selectedFile);
     setSelectedBatchId('auto'); // Reset to auto when file changes
+    setUnassignedWarningConfirmed(false);
     if (selectedFile) {
       calculateBatchInfo(selectedFile);
     } else {
@@ -304,6 +307,10 @@ function BulkUploadModal({ show, onClose, allUsers = null, currentUser = null })
       const finalAssigneeId = selectedAssignee && selectedAssignee !== 'unassigned' ? selectedAssignee : null;
       if (finalAssigneeId) {
         console.log("👤 Leads will be assigned to user:", finalAssigneeId);
+      } else if (!unassignedWarningConfirmed) {
+        alert("Please acknowledge that unassigned leads may get lost before proceeding.");
+        setUploading(false);
+        return;
       }
 
       // Use the new uploadCompaniesFromExcel function
@@ -457,7 +464,10 @@ function BulkUploadModal({ show, onClose, allUsers = null, currentUser = null })
               </label>
               <select
                 value={selectedAssignee}
-                onChange={(e) => setSelectedAssignee(e.target.value)}
+                onChange={(e) => {
+                  setSelectedAssignee(e.target.value);
+                  setUnassignedWarningConfirmed(false);
+                }}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
               >
                 <option value="">Don't assign (leave unassigned)</option>
@@ -474,6 +484,39 @@ function BulkUploadModal({ show, onClose, allUsers = null, currentUser = null })
               <p className="text-xs text-gray-500 mt-1">
                 Select a user from the Placement department to assign all uploaded leads to them immediately.
               </p>
+
+              {(file && (!selectedAssignee || selectedAssignee === '')) && (
+                <div className="mt-3 p-3 border border-yellow-300 bg-yellow-50 rounded">
+                  <p className="text-xs text-yellow-800 font-semibold">
+                    Unassigned leads are less visible and may be harder to manage.
+                    <button
+                      type="button"
+                      onClick={() => setUnassignedWarningExpanded(prev => !prev)}
+                      className="ml-2 text-blue-600 hover:text-blue-800 focus:outline-none"
+                    >
+                      {unassignedWarningExpanded ? 'Show less' : 'Read more'}
+                    </button>
+                  </p>
+
+                  {unassignedWarningExpanded && (
+                    <div className="mt-2 text-xs text-gray-700">
+                      <p>
+                        Assigning leads to a Placement user improves traceability, reduces the risk of missed follow-up, and enables better analytics. If you proceed unassigned, you acknowledge that these leads may not be automatically surfaced to the right team member.
+                      </p>
+                    </div>
+                  )}
+
+                  <label className="flex items-center mt-2 text-xs text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={unassignedWarningConfirmed}
+                      onChange={(e) => setUnassignedWarningConfirmed(e.target.checked)}
+                      className="mr-2 h-4 w-4 text-green-600 border-gray-300 rounded"
+                    />
+                    I have read and accept that unassigned leads may be harder to manage.
+                  </label>
+                </div>
+              )}
             </div>
           )}
 
@@ -495,15 +538,13 @@ function BulkUploadModal({ show, onClose, allUsers = null, currentUser = null })
             <p><strong>Expected columns:</strong></p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
               <div>
-                <p className="font-medium text-green-700">Required:</p>
+                <p className="font-medium text-green-700">Required (current implementation):</p>
                 <ul className="list-disc list-inside text-xs">
                   <li>CompanyName (or Company Name)</li>
-                  <li>ContactPerson (or Contact Person)</li>
-                  <li>Designation</li>
-                  <li>Phone</li>
-                  <li>CompanyUrl (or Company URL)</li>
-                  <li>LinkedinUrl (or LinkedIn URL)</li>
                 </ul>
+                <p className="text-xs text-gray-600 mt-1">
+                  Note: other fields are accepted if present but are not strictly enforced and default to blank if omitted.
+                </p>
               </div>
               <div>
                 <p className="font-medium text-blue-700">Optional:</p>
@@ -519,7 +560,7 @@ function BulkUploadModal({ show, onClose, allUsers = null, currentUser = null })
               </div>
             </div>
             <p className="mt-2 text-xs text-red-600 font-medium">
-              ⚠️ Each batch of ~500 companies creates:<br/>
+              ⚠️ Each batch of ~200 companies creates:<br/>
               - 1 write per batch document<br/><br/>
               For 58,000 companies: ~116 batches × 1 = 116 writes<br/><br/>
               Free tier: 20,000 writes/day. This upload is well within limits.<br/><br/>
@@ -546,9 +587,9 @@ function BulkUploadModal({ show, onClose, allUsers = null, currentUser = null })
             </button>
             <button
               onClick={handleUpload}
-              disabled={!file || uploading}
+              disabled={!file || uploading || (!selectedAssignee && !unassignedWarningConfirmed)}
               className={`px-6 py-2.5 rounded-lg text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 ${
-                file && !uploading
+                file && !uploading && (selectedAssignee || unassignedWarningConfirmed)
                   ? "bg-green-600 hover:bg-green-700"
                   : "bg-gray-400 cursor-not-allowed"
               }`}

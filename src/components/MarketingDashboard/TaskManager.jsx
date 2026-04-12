@@ -11,8 +11,52 @@ import {
 import { useDroppable } from "@dnd-kit/core";
 import { useDraggable } from "@dnd-kit/core";
 import ImageCompressor from "image-compressor.js";
-import { FiPaperclip, FiImage, FiX, FiChevronLeft, FiChevronRight, FiEdit2, FiRefreshCw, FiAlertCircle, FiFileText } from "react-icons/fi";
-import { Hourglass } from "lucide-react";
+import { FiPaperclip, FiImage, FiX, FiChevronLeft, FiChevronRight, FiEdit2, FiRefreshCw, FiAlertCircle, FiFileText, FiCopy } from "react-icons/fi";
+import { Hourglass, CheckCircle, Clock, Users, FileText, XCircle, Circle, TrendingUp } from "lucide-react";
+
+const flipStyles = `
+  @keyframes slideInFromRight {
+    from {
+      opacity: 0;
+      transform: translateX(100px) rotateY(-45deg);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0) rotateY(0deg);
+    }
+  }
+  
+  @keyframes slideInFromLeft {
+    from {
+      opacity: 0;
+      transform: translateX(-100px) rotateY(45deg);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0) rotateY(0deg);
+    }
+  }
+  
+  .table-flip-in {
+    animation: slideInFromRight 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    transform-style: preserve-3d;
+    perspective: 1200px;
+  }
+  
+  .summary-flip-in {
+    animation: slideInFromLeft 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    transform-style: preserve-3d;
+    perspective: 1200px;
+  }
+`;
+
+// Inject styles
+if (typeof window !== 'undefined' && !document.getElementById('table-flip-styles')) {
+  const styleElement = document.createElement('style');
+  styleElement.id = 'table-flip-styles';
+  styleElement.textContent = flipStyles;
+  document.head.appendChild(styleElement);
+}
 
 const isPDF = (url) => {
   if (!url) return false;
@@ -195,9 +239,19 @@ const TableSkeleton = () => (
   </div>
 );
 
-const TaskCard = ({ task, getRoleDisplay, getRoleColor, handleDelete, moveTask, onImageDelete, onEditTask, isDraggable = true, user }) => {
+const TaskCard = ({ task, getRoleDisplay, getRoleColor, handleDelete, moveTask, onImageDelete, onEditTask, onDuplicateTask, isDraggable = true, user }) => {
   const [showImageModal, setShowImageModal] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  const roleColors = {
+    "Video Editor": "bg-purple-50 text-purple-700 border-purple-100",
+    "Graphic Designer": "bg-orange-50 text-orange-700 border-orange-100",
+    Manager: "bg-blue-50 text-blue-700 border-blue-100",
+    Developer: "bg-teal-50 text-teal-700 border-teal-100",
+    "Content Writer": "bg-pink-50 text-pink-700 border-pink-100",
+  };
+
+  const currentRoleStyle = roleColors[task.role] || "bg-gray-50 text-gray-700 border-gray-100";
 
   // Keyboard navigation for modal
   useEffect(() => {
@@ -266,104 +320,117 @@ const TaskCard = ({ task, getRoleDisplay, getRoleColor, handleDelete, moveTask, 
     }
   };
 
-  const getActionButtons = (status, task, onEditTask, user) => {
+  const getActionButtons = (status, task, onEditTask, user, onDuplicateTask) => {
     const editButton = (
       <button
-        onClick={() => onEditTask(task)}
-        className="px-2 py-1 text-xs text-gray-800 rounded-full hover:opacity-80 transition-colors font-medium shadow-sm"
-        style={{ backgroundColor: "#E6E6FA" }}
+        onClick={(e) => { e.stopPropagation(); onEditTask(task); }}
+        className="px-1.5 py-0.5 text-[10px] text-gray-800 rounded-md hover:opacity-80 transition-colors font-medium shadow-sm bg-[#E6E6FA]"
       >
         Edit
+      </button>
+    );
+
+    const duplicateButton = (
+      <button
+        onClick={(e) => { e.stopPropagation(); onDuplicateTask(task); }}
+        className="p-1 text-gray-500 hover:text-blue-600 transition-colors"
+        title="Duplicate Task"
+      >
+        <FiCopy className="w-3 h-3" />
       </button>
     );
 
     switch (status) {
       case "not_started":
         return (
-          <div className="flex gap-2">
+          <div className="flex gap-1 items-center">
             { (task.assignedTo === user?.displayName || ["Director", "Head", "Admin"].includes(user?.role)) && (
               <button
-                onClick={() => moveTask(task.id, "in_progress")}
-                className="px-2 py-1 text-xs bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-colors font-medium shadow-sm"
+                onClick={(e) => { e.stopPropagation(); moveTask(task.id, "in_progress"); }}
+                className="px-1.5 py-0.5 text-[10px] bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors font-medium shadow-sm"
               >
                 Start
               </button>
             ) }
             { (task.assignedTo === user?.displayName || ["Director", "Head", "Admin"].includes(user?.role)) && (
               <button
-                onClick={() => moveTask(task.id, "cancelled")}
-                className="px-2 py-1 text-xs bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors font-medium shadow-sm"
+                onClick={(e) => { e.stopPropagation(); moveTask(task.id, "cancelled"); }}
+                className="px-1.5 py-0.5 text-[10px] bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors font-medium shadow-sm"
               >
                 Cancel
               </button>
             ) }
             { (task.assignedTo === user?.displayName || ["Director", "Head", "Admin"].includes(user?.role)) && editButton }
+            { duplicateButton }
           </div>
         );
       case "in_progress":
         return (
-          <div className="flex gap-2">
+          <div className="flex gap-1 items-center">
             { (task.assignedTo === user?.displayName || ["Director", "Head", "Admin"].includes(user?.role)) && (
               <button
-                onClick={() => moveTask(task.id, "completed")}
-                className="px-2 py-1 text-xs bg-green-500 text-white rounded-full hover:bg-green-600 transition-colors font-medium shadow-sm"
+                onClick={(e) => { e.stopPropagation(); moveTask(task.id, "completed"); }}
+                className="px-1.5 py-0.5 text-[10px] bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors font-medium shadow-sm"
               >
                 Complete
               </button>
             ) }
             { (task.assignedTo === user?.displayName || ["Director", "Head", "Admin"].includes(user?.role)) && (
               <button
-                onClick={() => moveTask(task.id, "not_started")}
-                className="px-2 py-1 text-xs bg-gray-500 text-white rounded-full hover:bg-gray-600 transition-colors font-medium shadow-sm"
+                onClick={(e) => { e.stopPropagation(); moveTask(task.id, "not_started"); }}
+                className="px-1.5 py-0.5 text-[10px] bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors font-medium shadow-sm"
               >
                 Back
               </button>
             ) }
             { (task.assignedTo === user?.displayName || ["Director", "Head", "Admin"].includes(user?.role)) && editButton }
+            { duplicateButton }
           </div>
         );
       case "completed":
         return (
-          <div className="flex gap-2">
+          <div className="flex gap-1 items-center">
             { (task.assignedTo === user?.displayName || ["Director", "Head", "Admin"].includes(user?.role)) && (
               <button
-                onClick={() => moveTask(task.id, "in_progress")}
-                className="px-2 py-1 text-xs bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-colors font-medium shadow-sm"
+                onClick={(e) => { e.stopPropagation(); moveTask(task.id, "in_progress"); }}
+                className="px-1.5 py-0.5 text-[10px] bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors font-medium shadow-sm"
               >
                 Reopen
               </button>
             ) }
             { (task.assignedTo === user?.displayName || ["Director", "Head", "Admin"].includes(user?.role)) && (
               <button
-                onClick={() => handleDelete(task.id)}
-                className="px-2 py-1 text-xs bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors font-medium shadow-sm"
+                onClick={(e) => { e.stopPropagation(); handleDelete(task.id); }}
+                className="px-1.5 py-0.5 text-[10px] bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors font-medium shadow-sm"
               >
                 Delete
               </button>
             ) }
             { (task.assignedTo === user?.displayName || ["Director", "Head", "Admin"].includes(user?.role)) && editButton }
+            { duplicateButton }
           </div>
         );
       case "cancelled":
         return (
-          <div className="flex gap-2">
+          <div className="flex gap-1 items-center">
             { (task.assignedTo === user?.displayName || ["Director", "Head", "Admin"].includes(user?.role)) && (
               <button
-                onClick={() => moveTask(task.id, "not_started")}
-                className="px-2 py-1 text-xs bg-gray-500 text-white rounded-full hover:bg-gray-600 transition-colors font-medium shadow-sm"
+                onClick={(e) => { e.stopPropagation(); moveTask(task.id, "not_started"); }}
+                className="px-1.5 py-0.5 text-[10px] bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors font-medium shadow-sm"
               >
                 Restore
               </button>
             ) }
             { (task.assignedTo === user?.displayName || ["Director", "Head", "Admin"].includes(user?.role)) && (
               <button
-                onClick={() => handleDelete(task.id)}
-                className="px-2 py-1 text-xs bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors font-medium shadow-sm"
+                onClick={(e) => { e.stopPropagation(); handleDelete(task.id); }}
+                className="px-1.5 py-0.5 text-[10px] bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors font-medium shadow-sm"
               >
                 Delete
               </button>
             ) }
             { (task.assignedTo === user?.displayName || ["Director", "Head", "Admin"].includes(user?.role)) && editButton }
+            { duplicateButton }
           </div>
         );
       default:
@@ -496,36 +563,42 @@ const TaskCard = ({ task, getRoleDisplay, getRoleColor, handleDelete, moveTask, 
         </div>
       )}
       <h4
-        className="font-medium text-gray-900 mb-0.5 pr-6 text-xs"
+        className="font-semibold text-gray-900 mb-1 pr-6 text-xs leading-tight line-clamp-2 select-text cursor-text"
         style={getStatusStyles(task.status)}
       >
         {task.title || task.description}
       </h4>
-      <p
-        className={`text-xs mb-0.5 ${task.status === "cancelled" ? "text-gray-500" : "text-gray-600"}`}
-      >
-        {task.assignedTo || "Unassigned"}
-      </p>
-      <div className="flex justify-between mb-0.5">
-        <div className="flex gap-1">
-          {task.role && (
-            <div
-              className={`inline-flex items-center px-1 py-0 rounded-full text-xs font-medium ${getRoleColor(task.role)}`}
-            >
-              👤 {getRoleDisplay(task.role)}
-            </div>
-          )}
+
+      <div className="flex flex-wrap gap-1 mb-1.5 select-text cursor-text">
+        <div className="flex items-center text-[9px] text-gray-500 font-medium bg-gray-50 px-1 py-0.5 rounded border border-gray-100">
+          <Users size={9} className="mr-0.5" />
+          {task.assignedTo || "Unassigned"}
         </div>
-        <div className="flex gap-1">
-          {task.account && (
-            <div className="inline-flex items-center px-1 py-0 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-              🏢 {task.account}
-            </div>
-          )}
-        </div>
+        
+        {task.role && (
+          <div className={`inline-flex items-center px-1 py-0.5 rounded text-[9px] font-semibold border ${currentRoleStyle}`}>
+            {getRoleDisplay(task.role)}
+          </div>
+        )}
+
+        {task.account && (
+          <div className="inline-flex items-center px-1 py-0.5 rounded text-[9px] font-semibold bg-purple-50 text-purple-700 border border-purple-100">
+            {task.account}
+          </div>
+        )}
+
+        {task.task && (
+          <div className="inline-flex items-center px-1 py-0.5 rounded bg-indigo-50 text-indigo-700 text-[9px] font-semibold border border-indigo-100">
+            {task.task}
+          </div>
+        )}
       </div>
-      <div className="flex items-center justify-between mt-1">
-        {getActionButtons(task.status, task, onEditTask, user)}
+
+      <div className="flex items-center justify-between mt-auto pt-1 border-t border-gray-50 gap-1">
+        <div className="flex flex-wrap gap-1 items-center">
+          {getActionButtons(task.status, task, onEditTask, user, onDuplicateTask)}
+        </div>
+        
         {task.dueDate && task.status !== "completed" && (() => {
           const due = parseDate(task.dueDate);
           if (!due) return null;
@@ -536,21 +609,22 @@ const TaskCard = ({ task, getRoleDisplay, getRoleColor, handleDelete, moveTask, 
           const days = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
           
           let colorClass = "text-green-600";
-          let text = `${days} days left`;
+          let text = `${days}d`;
           
           if (days < 0) {
             colorClass = "text-red-500";
-            text = `Overdue by ${Math.abs(days)} days`;
+            text = `${Math.abs(days)}d Overdue`;
           } else if (days === 0) {
             colorClass = "text-orange-500";
-            text = "Due Today";
+            text = "Today";
           } else if (days <= 3) {
             colorClass = "text-orange-500";
+            text = `${days}d`;
           }
-  
+
           return (
-            <div className={`text-xs font-medium ${colorClass} flex items-center gap-1`}>
-              <span><Hourglass size={12}/></span> {text}
+            <div className={`text-[9px] font-bold ${colorClass} flex items-center gap-0.5 shrink-0`}>
+              <Hourglass size={9}/> {text}
             </div>
           );
         })()}
@@ -619,6 +693,7 @@ const CalendarView = ({
   moveTask,
   onImageDelete,
   onEditTask,
+  onDuplicateTask,
   currentDate,
   onDateChange,
   user,
@@ -785,6 +860,7 @@ const CalendarView = ({
                 moveTask={moveTask}
                 onImageDelete={onImageDelete}
                 onEditTask={onEditTask}
+                onDuplicateTask={onDuplicateTask}
                 isDraggable={false}
                 user={user}
               />
@@ -806,6 +882,7 @@ const TableView = ({
   handleDelete,
   moveTask,
   onEditTask,
+  onDuplicateTask,
   user,
 }) => {
   const getStatusBadge = (status) => {
@@ -902,6 +979,11 @@ const TableView = ({
                           +{task.images.length - 1} more images
                         </div>
                       )}
+                      {task.task && (
+                        <div className="mt-1 inline-flex items-center px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 text-[10px] font-bold border border-indigo-100 uppercase tracking-tighter">
+                          📌 {task.task}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </td>
@@ -934,6 +1016,15 @@ const TableView = ({
                         Edit
                       </button>
                     ) }
+
+                    <button
+                      onClick={() => onDuplicateTask(task)}
+                      className="p-1 px-1.5 text-xs text-gray-600 bg-gray-50 rounded-full hover:bg-gray-100 transition-colors font-semibold shadow-sm flex items-center gap-1"
+                      title="Duplicate Task"
+                    >
+                      <FiCopy className="w-3 h-3" />
+                      Copy
+                    </button>
 
                     {/* Status change buttons */}
                     {task.status === "not_started" && (task.assignedTo === user?.displayName || ["Director", "Head", "Admin"].includes(user?.role)) && (
@@ -989,6 +1080,398 @@ const TableView = ({
             )}
           </tbody>
         </table>
+      </div>
+    </div>
+  );
+};
+
+const SummaryView = ({ tasks, selectedMonth, selectedUser, customDateRange }) => {
+  const [selectedAccount, setSelectedAccount] = useState(null);
+
+  // Filter tasks by selected month and user
+  const getFilteredTasks = () => {
+    let filtered = tasks;
+
+    // Filter by User
+    if (selectedUser) {
+      filtered = filtered.filter(task => task.assignedTo === selectedUser);
+    }
+
+    // Filter by Month
+    if (!selectedMonth || selectedMonth === 'lifetime') return filtered;
+
+    let monthStart, monthEnd;
+
+    if (selectedMonth === 'custom' && customDateRange?.startDate) {
+      monthStart = new Date(customDateRange.startDate);
+      monthStart.setHours(0, 0, 0, 0);
+      
+      if (customDateRange.endDate) {
+        monthEnd = new Date(customDateRange.endDate);
+        monthEnd.setHours(23, 59, 59, 999);
+      } else {
+        monthEnd = new Date(); // Default to today if no end date
+        monthEnd.setHours(23, 59, 59, 999);
+      }
+    } else if (selectedMonth !== 'custom') {
+      const [year, month] = selectedMonth.split('-');
+      monthStart = new Date(parseInt(year), parseInt(month) - 1, 1);
+      monthEnd = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59);
+    } else {
+      return filtered; // If custom selected but no start date
+    }
+
+    return filtered.filter(task => {
+      let taskDate = null;
+
+      if (task.createdAt) {
+        if (task.createdAt instanceof Date) {
+          taskDate = task.createdAt;
+        } else if (typeof task.createdAt === 'string') {
+          taskDate = new Date(task.createdAt);
+        } else if (task.createdAt?.toDate) {
+          taskDate = task.createdAt.toDate();
+        }
+      }
+
+      if (!taskDate) return false;
+      return taskDate >= monthStart && taskDate <= monthEnd;
+    });
+  };
+
+  const filteredTasks = getFilteredTasks();
+
+  // Aggregate tasks by account
+  const getAccountsSummary = () => {
+    const accountsMap = {};
+
+    filteredTasks.forEach(task => {
+      // Check if task description/title contains "IGSB"
+      const taskContent = `${task.title || ''} ${task.description || ''}`.toLowerCase();
+      let account = task.account || 'Unassigned';
+      
+      // If IGSB is mentioned in the task, use IGSB as the account
+      if (taskContent.includes('igsb')) {
+        account = 'IGSB';
+      }
+      
+      if (!accountsMap[account]) {
+        accountsMap[account] = {
+          total: 0,
+          byMonth: {},
+          byStatus: {
+            not_started: 0,
+            in_progress: 0,
+            completed: 0,
+            cancelled: 0
+          },
+          tasks: []
+        };
+      }
+
+      accountsMap[account].total += 1;
+      accountsMap[account].byStatus[task.status || 'not_started'] += 1;
+      accountsMap[account].tasks.push(task);
+    });
+
+    return accountsMap;
+  };
+
+  const accountsSummary = getAccountsSummary();
+  const accountsList = Object.keys(accountsSummary).sort();
+  const grandTotal = Object.values(accountsSummary).reduce((sum, acc) => sum + acc.total, 0);
+
+  const summaryCards = [
+    {
+      title: "Total Tasks",
+      value: grandTotal,
+      icon: FileText,
+      color: "text-blue-600",
+      bgColor: "bg-blue-50"
+    },
+    {
+      title: "Active Accounts",
+      value: accountsList.length,
+      icon: Users,
+      color: "text-purple-600",
+      bgColor: "bg-purple-50"
+    },
+    {
+      title: "Completed",
+      value: Object.values(accountsSummary).reduce((sum, acc) => sum + acc.byStatus.completed, 0),
+      icon: CheckCircle,
+      color: "text-green-600",
+      bgColor: "bg-green-50"
+    },
+    {
+      title: "In Progress",
+      value: Object.values(accountsSummary).reduce((sum, acc) => sum + acc.byStatus.in_progress, 0),
+      icon: Clock,
+      color: "text-orange-600",
+      bgColor: "bg-orange-50"
+    }
+  ];
+
+  if (selectedAccount && accountsSummary[selectedAccount]) {
+    const accountTasks = accountsSummary[selectedAccount].tasks;
+    return (
+      <div className="space-y-3">
+        {/* Header */}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setSelectedAccount(null)}
+            className="px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            ← Back
+          </button>
+          <div className="flex-1">
+            <h2 className="text-lg font-semibold text-gray-900">{selectedAccount}</h2>
+            <p className="text-xs text-gray-600">{accountTasks.length} tasks</p>
+          </div>
+        </div>
+
+        {/* Tasks Table */}
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <table className="w-full">
+            <thead className="bg-gray-50/80">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  ID
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider flex-1">
+                  Task
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-32">
+                  Assignee
+                </th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-20">
+                  Status
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {accountTasks.length === 0 ? (
+                <tr>
+                  <td colSpan="4" className="px-4 py-8 text-center text-gray-500 text-sm">
+                    No tasks for this account
+                  </td>
+                </tr>
+              ) : (
+                accountTasks.map((task) => (
+                  <tr key={task.id} className="hover:bg-gray-50/50">
+                    <td className="px-4 py-3 text-xs font-medium text-gray-600">
+                      {task.id && !isNaN(parseInt(task.id.replace("dmtask", "")))
+                        ? parseInt(task.id.replace("dmtask", ""))
+                        : "-"}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-900 font-medium">
+                      {task.title || task.description}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      {task.assignedTo ? (
+                        <span className="inline-flex items-center px-2 py-1 rounded-md bg-blue-50 text-xs font-medium text-blue-700">
+                          {task.assignedTo}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400 text-xs italic">Unassigned</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span
+                        className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${
+                          task.status === "completed"
+                            ? "bg-green-50 text-green-700"
+                            : task.status === "in_progress"
+                              ? "bg-orange-50 text-orange-700"
+                              : task.status === "cancelled"
+                                ? "bg-red-50 text-red-700"
+                                : "bg-gray-50 text-gray-700"
+                        }`}
+                      >
+                        {task.status || "pending"}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {summaryCards.map((card) => {
+          const IconComponent = card.icon;
+          return (
+            <div
+              key={card.title}
+              className={`${card.bgColor} rounded-xl p-3 border border-gray-200/50`}
+            >
+              <div className="flex items-center justify-between">
+                <div className={`p-2 rounded-lg ${card.bgColor} border border-gray-200/30`}>
+                  <IconComponent className={`w-4 h-4 ${card.color}`} />
+                </div>
+                <div className="text-right">
+                  <p className={`text-xs font-medium ${card.color} uppercase tracking-wide`}>
+                    {card.title}
+                  </p>
+                  <p className="text-lg font-bold text-gray-900">
+                    {card.value}
+                  </p>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Accounts Summary Table */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50/80">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider sticky left-0 bg-gray-50/80 z-10 min-w-[180px]">
+                  Account
+                </th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-20">
+                  Total
+                </th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-20">
+                  Done
+                </th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-20">
+                  Active
+                </th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-20">
+                  Pending
+                </th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-20">
+                  Cancelled
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {accountsList.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="px-4 py-8 text-center">
+                    <div className="flex flex-col items-center gap-2">
+                      <FileText className="w-8 h-8 text-gray-400" />
+                      <p className="text-sm text-gray-500">No tasks available</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                accountsList.map((account) => {
+                  const data = accountsSummary[account];
+
+                  return (
+                    <tr key={account} className="hover:bg-gray-50/50">
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900 sticky left-0 bg-white hover:bg-gray-50/50 z-10 min-w-[180px]">
+                        <button
+                          onClick={() => setSelectedAccount(account)}
+                          className="flex items-center gap-2 w-full text-blue-600 hover:text-blue-700 hover:underline transition-all"
+                        >
+                          <div className="w-6 h-6 rounded-md bg-blue-100 flex items-center justify-center shrink-0">
+                            <span className="text-xs font-semibold text-blue-700">
+                              {account.charAt(0).toUpperCase()}
+                            </span>
+                          </div>
+                          <span className="truncate">{account}</span>
+                        </button>
+                      </td>
+
+                      <td className="px-4 py-3 text-center">
+                        <span className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-gray-100 text-xs font-semibold text-gray-700">
+                          {data.total}
+                        </span>
+                      </td>
+
+                      <td className="px-4 py-3 text-center">
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-green-50 text-xs font-medium text-green-700">
+                          <CheckCircle className="w-3 h-3" />
+                          {data.byStatus.completed}
+                        </span>
+                      </td>
+
+                      <td className="px-4 py-3 text-center">
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-orange-50 text-xs font-medium text-orange-700">
+                          <Clock className="w-3 h-3" />
+                          {data.byStatus.in_progress}
+                        </span>
+                      </td>
+
+                      <td className="px-4 py-3 text-center">
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-gray-50 text-xs font-medium text-gray-700">
+                          <Circle className="w-3 h-3" />
+                          {data.byStatus.not_started}
+                        </span>
+                      </td>
+
+                      <td className="px-4 py-3 text-center">
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-red-50 text-xs font-medium text-red-700">
+                          <XCircle className="w-3 h-3" />
+                          {data.byStatus.cancelled}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+
+              {accountsList.length > 0 && (
+                <tr className="bg-gray-50 font-semibold border-t border-gray-200">
+                  <td className="px-4 py-3 text-sm text-gray-900 sticky left-0 bg-gray-50 z-10 min-w-[180px]">
+                    <div className="flex items-center gap-2">
+                      <TrendingUp className="w-4 h-4 text-gray-600" />
+                      <span>TOTAL</span>
+                    </div>
+                  </td>
+
+                  <td className="px-4 py-3 text-center">
+                    <span className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-gray-200 text-xs font-bold text-gray-800">
+                      {grandTotal}
+                    </span>
+                  </td>
+
+                  <td className="px-4 py-3 text-center">
+                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-green-100 text-xs font-bold text-green-800">
+                      <CheckCircle className="w-3 h-3" />
+                      {Object.values(accountsSummary).reduce((sum, acc) => sum + acc.byStatus.completed, 0)}
+                    </span>
+                  </td>
+
+                  <td className="px-4 py-3 text-center">
+                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-orange-100 text-xs font-bold text-orange-800">
+                      <Clock className="w-3 h-3" />
+                      {Object.values(accountsSummary).reduce((sum, acc) => sum + acc.byStatus.in_progress, 0)}
+                    </span>
+                  </td>
+
+                  <td className="px-4 py-3 text-center">
+                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-gray-100 text-xs font-bold text-gray-800">
+                      <Circle className="w-3 h-3" />
+                      {Object.values(accountsSummary).reduce((sum, acc) => sum + acc.byStatus.not_started, 0)}
+                    </span>
+                  </td>
+
+                  <td className="px-4 py-3 text-center">
+                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-red-100 text-xs font-bold text-red-800">
+                      <XCircle className="w-3 h-3" />
+                      {Object.values(accountsSummary).reduce((sum, acc) => sum + acc.byStatus.cancelled, 0)}
+                    </span>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
@@ -1133,6 +1616,14 @@ const TaskManager = ({ onBack }) => {
     return monday;
   });
   const [calendarCurrentDate, setCalendarCurrentDate] = useState(new Date());
+  const [showSummary, setShowSummary] = useState(false);
+  const [selectedSummaryMonth, setSelectedSummaryMonth] = useState("lifetime");
+  const [selectedSummaryUser, setSelectedSummaryUser] = useState("");
+  const [summaryCustomDateRange, setSummaryCustomDateRange] = useState({
+    startDate: "",
+    endDate: "",
+  });
+  const [allTasksForSummary, setAllTasksForSummary] = useState([]);
 
   const roleAbbreviations = {
     "Video Editor": "VE",
@@ -1262,7 +1753,7 @@ const TaskManager = ({ onBack }) => {
           };
         });
         const previousLength = tasks.length;
-        const previousFilteredLength = filteredTasks.length;
+        const previousFilteredLength = 0; // Can't access filteredTasks here
         setTasks(tasksData);
         if (initialLoadRef.current) {
           setIsLoading(false);
@@ -1379,7 +1870,7 @@ const TaskManager = ({ onBack }) => {
     return () => {
       unsubscribeTasks();
     };
-  }, [user?.uid, user?.displayName, refreshTrigger, currentLimit, currentView, filters.user]);
+  }, [user?.uid, user?.displayName, refreshTrigger, currentLimit, currentView, filters.user, currentWeek, filters.endDate, filters.role, filters.startDate, loadingMore, noMoreCount, tasks.length, user?.role]);
 
   useEffect(() => {
     if (currentView === "logs" && logsConfirmed) {
@@ -1451,6 +1942,32 @@ const TaskManager = ({ onBack }) => {
       }
     };
   }, []);
+
+  // Fetch ALL tasks for summary view (without pagination limit)
+  useEffect(() => {
+    if (!showSummary) return; // Only fetch when summary is shown
+    
+    const fetchAllTasks = async () => {
+      try {
+        const tasksRef = collection(db, "marketing_tasks");
+        const querySnapshot = await getDocs(tasksRef);
+        const allTasks = [];
+        
+        querySnapshot.forEach((doc) => {
+          allTasks.push({
+            id: doc.id,
+            ...doc.data(),
+          });
+        });
+        
+        setAllTasksForSummary(allTasks);
+      } catch (error) {
+        console.error("Error fetching all tasks for summary:", error);
+      }
+    };
+    
+    fetchAllTasks();
+  }, [showSummary]);
 
   const goToPreviousWeek = () => {
     setCurrentWeek((prev) => {
@@ -1665,10 +2182,6 @@ const TaskManager = ({ onBack }) => {
     }
   };
 
-  const getTasksByStatus = (status) => {
-    return filteredTasks.filter((t) => t.status === status);
-  };
-
   const filteredTasks = tasks.filter((task) => {
     if (filters.user && task.assignedTo !== filters.user) return false;
     if (filters.role && task.role !== filters.role) return false;
@@ -1725,6 +2238,10 @@ const TaskManager = ({ onBack }) => {
     return true;
   });
 
+  const getTasksByStatus = (status) => {
+    return filteredTasks.filter((t) => t.status === status);
+  };
+
   const handleEditTask = (task) => {
     if (task.assignedTo !== user?.displayName && !["Director", "Head", "Admin"].includes(user?.role)) {
       alert("You can only edit your own tasks.");
@@ -1732,6 +2249,42 @@ const TaskManager = ({ onBack }) => {
     }
     setEditingTask(task);
     setShowEditModal(true);
+  };
+
+  const handleDuplicateTask = async (task) => {
+    try {
+      const taskId = await getNextTaskId();
+      const taskData = {
+        title: task.title,
+        description: task.description,
+        assignedTo: task.assignedTo,
+        role: task.role || null,
+        account: task.account || null,
+        rolePlay: task.rolePlay || null,
+        task: task.task || null,
+        dueDate: task.dueDate || null,
+        startDate: task.startDate || getTodayIST(),
+        status: "not_started",
+        images: task.images || [],
+        userId: user.uid,
+        originalUserId: user.uid,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+
+      const docRef = doc(db, "marketing_tasks", taskId);
+      const newTask = { ...taskData, id: taskId };
+      
+      setTasks((prev) => [newTask, ...prev]);
+      await setDoc(docRef, { ...taskData, id: taskId });
+      
+      setToastMessage("Task duplicated successfully!");
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+    } catch (error) {
+      console.error("Error duplicating task:", error);
+      alert("Failed to duplicate task.");
+    }
   };
 
   const handleSaveTaskDates = async (taskId, taskData) => {
@@ -2004,8 +2557,99 @@ const TaskManager = ({ onBack }) => {
                   </div>
                 </div>
 
+                {/* Summary Back Button */}
+                {currentView === "table" && showSummary && (
+                  <div className="mb-4 p-2">
+                    <div className="flex items-center justify-between flex-wrap gap-4">
+                      <div className="flex items-center gap-4">
+                        <div>
+                          <h2 className="text-md font-bold text-gray-900">Summary Analytics</h2>
+                          <p className="text-xs text-gray-600 mt-0.5">View task distribution across all accounts</p>
+                        </div>
+                        <div className="h-12 w-px bg-gray-300 hidden sm:block"></div>
+                        <div className="flex items-center gap-2">
+                          <label htmlFor="monthFilter" className="text-xs font-semibold text-gray-700">
+                            Filter by Month:
+                          </label>
+                          <select
+                            id="monthFilter"
+                            value={selectedSummaryMonth}
+                            onChange={(e) => setSelectedSummaryMonth(e.target.value)}
+                            className="px-2 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white shadow-sm hover:border-gray-400 transition-colors font-medium"
+                          >
+                            <option value="lifetime">📅 Lifetime (All Months)</option>
+                            <option value="custom">📅 Custom Date Range</option>
+                            {Array.from({ length: 12 }, (_, i) => {
+                              const date = new Date();
+                              date.setMonth(date.getMonth() - i);
+                              const year = date.getFullYear();
+                              const month = String(date.getMonth() + 1).padStart(2, '0');
+                              const monthName = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+                              return (
+                                <option key={`${year}-${month}`} value={`${year}-${month}`}>
+                                  {monthName}
+                                </option>
+                              );
+                            })}
+                          </select>
+                        </div>
+
+                        {selectedSummaryMonth === "custom" && (
+                          <div className="flex items-center gap-2 animate-in fade-in slide-in-from-left-2 duration-300">
+                            <div className="flex items-center gap-1.5">
+                              <label htmlFor="summaryStartDate" className="text-[10px] font-semibold text-gray-500 uppercase">From</label>
+                              <input
+                                type="date"
+                                id="summaryStartDate"
+                                value={summaryCustomDateRange.startDate}
+                                onChange={(e) => setSummaryCustomDateRange(prev => ({ ...prev, startDate: e.target.value }))}
+                                className="px-2 py-1 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
+                              />
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <label htmlFor="summaryEndDate" className="text-[10px] font-semibold text-gray-500 uppercase">To</label>
+                              <input
+                                type="date"
+                                id="summaryEndDate"
+                                value={summaryCustomDateRange.endDate}
+                                onChange={(e) => setSummaryCustomDateRange(prev => ({ ...prev, endDate: e.target.value }))}
+                                className="px-2 py-1 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="flex items-center gap-2">
+                          <label htmlFor="userFilter" className="text-xs font-semibold text-gray-700">
+                            Filter by Users:
+                          </label>
+                          <select
+                            id="userFilter"
+                            value={selectedSummaryUser}
+                            onChange={(e) => setSelectedSummaryUser(e.target.value)}
+                            className="px-2 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white shadow-sm hover:border-gray-400 transition-colors font-medium"
+                          >
+                            <option value="">👤 All Users</option>
+                            {assignees.map((assignee) => (
+                              <option key={assignee} value={assignee}>
+                                {assignee}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setShowSummary(false)}
+                        className="px-2 py-1 bg-linear-to-r from-gray-600 to-gray-700 text-white rounded-lg hover:from-gray-700 hover:to-gray-800 transition-all shadow-md hover:shadow-lg text-xs font-semibold flex items-center gap-2"
+                      >
+                        ← Back to Table
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Filters */}
-                {currentView !== "logs" && (
+                {currentView !== "logs" && !showSummary && (
                   <div className="mb-2 bg-white rounded-xl p-2 shadow-sm border border-gray-200">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-sm font-medium text-gray-700">
@@ -2111,33 +2755,44 @@ const TaskManager = ({ onBack }) => {
                         {filteredTasks.length} tasks
                       </div>
 
-                      <button
-                        onClick={() => {
-                          if (!buttonDisabled && !noMoreTasks) {
-                            setLoadingMore(true);
-                            setCurrentLimit((prev) => prev + 100);
-                            loadMoreTimeoutRef.current = setTimeout(() => {
-                              if (loadingMore) {
-                                setLoadingMore(false);
-                                setShowNoMorePopup(true);
-                                setNoMoreTasks(true);
-                              }
-                            }, 5000);
-                          }
-                        }}
-                        disabled={buttonDisabled || noMoreTasks}
-                        className={`px-2 py-1 text-xs rounded-lg transition-colors ${
-                          buttonDisabled || noMoreTasks
-                            ? "bg-gray-400 text-gray-600 cursor-not-allowed"
-                            : "bg-blue-500 text-white hover:bg-blue-600"
-                        }`}
-                      >
-                        {noMoreTasks
-                          ? "No More Tasks"
-                          : buttonDisabled
-                            ? `Load More Tasks :${countdown}`
-                            : "Load More Tasks"}
-                      </button>
+                      {!showSummary && (
+                        <button
+                          onClick={() => {
+                            if (!buttonDisabled && !noMoreTasks) {
+                              setLoadingMore(true);
+                              setCurrentLimit((prev) => prev + 100);
+                              loadMoreTimeoutRef.current = setTimeout(() => {
+                                if (loadingMore) {
+                                  setLoadingMore(false);
+                                  setShowNoMorePopup(true);
+                                  setNoMoreTasks(true);
+                                }
+                              }, 5000);
+                            }
+                          }}
+                          disabled={buttonDisabled || noMoreTasks}
+                          className={`px-2 py-1 text-xs rounded-lg transition-colors ${
+                            buttonDisabled || noMoreTasks
+                              ? "bg-gray-400 text-gray-600 cursor-not-allowed"
+                              : "bg-blue-500 text-white hover:bg-blue-600"
+                          }`}
+                        >
+                          {noMoreTasks
+                            ? "No More Tasks"
+                            : buttonDisabled
+                              ? `Load More Tasks :${countdown}`
+                              : "Load More Tasks"}
+                        </button>
+                      )}
+
+                      {currentView === "table" && !showSummary && (
+                        <button
+                          onClick={() => setShowSummary(true)}
+                          className="px-2 py-1 text-xs bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors font-medium"
+                        >
+                          Summary
+                        </button>
+                      )}
                     </div>
                   </div>
                 )}
@@ -2262,7 +2917,7 @@ const TaskManager = ({ onBack }) => {
                             value={startDate}
                             onChange={(e) => setStartDate(e.target.value)}
                             className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-gray-50"
-                            placeholder="Start Date"
+                            placeholder="dd-mm-yyyy"
                           />
                         </div>
                         {canEditDueDate && (
@@ -2273,11 +2928,11 @@ const TaskManager = ({ onBack }) => {
                               value={dueDate}
                               onChange={(e) => setDueDate(e.target.value)}
                               className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-gray-50"
-                              placeholder="Due Date"
+                              placeholder="dd-mm-yyyy"
                             />
                           </div>
                         )}
-                        <div className="sm:col-span-2 lg:col-span-4">
+                        <div className="sm:col-span-2 lg:col-span-4 select-text">
                           <textarea
                             value={title}
                             onChange={(e) => {
@@ -2286,7 +2941,7 @@ const TaskManager = ({ onBack }) => {
                               }
                             }}
                             placeholder={placeholderText}
-                            className="w-full px-2 py-2 text-xs border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-gray-50 resize-none"
+                            className="w-full px-2 py-2 text-xs border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-gray-50 resize-none select-text cursor-text"
                             rows="3"
                             required
                           />
@@ -2340,11 +2995,18 @@ const TaskManager = ({ onBack }) => {
                               setStartDate(getTodayIST());
                               setDueDate("");
                               clearImage();
-                              setShowForm(false);
+                              setFormError("");
                             }}
                             className="px-3 py-1.5 bg-gray-500 text-white rounded-full hover:bg-gray-600 transition-colors font-medium text-xs shadow-sm"
                           >
                             Reset
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setShowForm(false)}
+                            className="px-3 py-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors font-medium text-xs shadow-sm"
+                          >
+                            Close
                           </button>
                           {imagePreview && (
                              isPDF(imagePreview) ? (
@@ -2387,6 +3049,7 @@ const TaskManager = ({ onBack }) => {
                           moveTask={moveTask}
                           onImageDelete={handleImageDelete}
                           onEditTask={handleEditTask}
+                          onDuplicateTask={handleDuplicateTask}
                           user={user}
                         />
                       ))}
@@ -2409,6 +3072,7 @@ const TaskManager = ({ onBack }) => {
                           moveTask={moveTask}
                           onImageDelete={handleImageDelete}
                           onEditTask={handleEditTask}
+                          onDuplicateTask={handleDuplicateTask}
                           user={user}
                         />
                       ))}
@@ -2431,6 +3095,7 @@ const TaskManager = ({ onBack }) => {
                           moveTask={moveTask}
                           onImageDelete={handleImageDelete}
                           onEditTask={handleEditTask}
+                          onDuplicateTask={handleDuplicateTask}
                           user={user}
                         />
                       ))}
@@ -2453,6 +3118,7 @@ const TaskManager = ({ onBack }) => {
                           moveTask={moveTask}
                           onImageDelete={handleImageDelete}
                           onEditTask={handleEditTask}
+                          onDuplicateTask={handleDuplicateTask}
                           user={user}
                         />
                       ))}
@@ -2468,6 +3134,7 @@ const TaskManager = ({ onBack }) => {
                   moveTask={moveTask}
                   onImageDelete={handleImageDelete}
                   onEditTask={handleEditTask}
+                  onDuplicateTask={handleDuplicateTask}
                   currentDate={calendarCurrentDate}
                   onDateChange={(direction) => {
                     if (direction === 1) goToNextMonth();
@@ -2476,15 +3143,32 @@ const TaskManager = ({ onBack }) => {
                   user={user}
                 />
               ) : currentView === "table" ? (
-                <TableView
-                  tasks={filteredTasks}
-                  getRoleDisplay={getRoleDisplay}
-                  getRoleColor={getRoleColor}
-                  handleDelete={handleDelete}
-                  moveTask={moveTask}
-                  onEditTask={handleEditTask}
-                  user={user}
-                />
+                <div key={showSummary ? "summary" : "table"}>
+                  {showSummary ? (
+                    <div className="summary-flip-in">
+                      <SummaryView 
+                        tasks={allTasksForSummary} 
+                        selectedMonth={selectedSummaryMonth} 
+                        selectedUser={selectedSummaryUser} 
+                        customDateRange={summaryCustomDateRange}
+                        assignees={assignees}
+                      />
+                    </div>
+                  ) : (
+                    <div className="table-flip-in">
+                      <TableView
+                        tasks={filteredTasks}
+                        getRoleDisplay={getRoleDisplay}
+                        getRoleColor={getRoleColor}
+                        handleDelete={handleDelete}
+                        moveTask={moveTask}
+                        onEditTask={handleEditTask}
+                        onDuplicateTask={handleDuplicateTask}
+                        user={user}
+                      />
+                    </div>
+                  )}
+                </div>
               ) : currentView === "logs" ? (
                 <LogsView logs={logs} loading={logsLoading} confirmed={logsConfirmed} onConfirm={() => setLogsConfirmed(true)} />
               ) : null}
