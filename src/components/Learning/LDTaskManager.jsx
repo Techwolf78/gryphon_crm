@@ -50,6 +50,7 @@ import { db } from "../../firebase";
 import { useAuth } from "../../context/AuthContext";
 import TaskDataManager from "../Admin/TaskDataManager";
 import UserScorePanel from "./UserScorePanel";
+import UserScoreDetails from "./UserScoreDetails";
 
 // --- Helper Functions ---
 
@@ -594,7 +595,8 @@ const LDTaskManager = ({ onBack }) => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [currentView, setCurrentView] = useState(searchParams.get("tab") === "admin" ? "admin" : "kanban");
-  const [assignees, setAssignees] = useState([]);  
+  const [assignees, setAssignees] = useState([]);
+  const [scoreDetailsUser, setScoreDetailsUser] = useState("all");
   const [projectCodes, setProjectCodes] = useState([]);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [showTitleDropdown, setShowTitleDropdown] = useState(false);
@@ -616,14 +618,32 @@ const LDTaskManager = ({ onBack }) => {
   }, [searchParams]);
 
   const [dateRange, setDateRange] = useState({ start: "", end: "" });
+  const [isFilterInitialized, setIsFilterInitialized] = useState(false);
+  const isManagement = ["Admin", "Director", "Direc2", "Head"].includes(user?.role);
 
   const resetFilters = () => {
-    setFilterUser("all");
+    setFilterUser(isManagement ? "all" : user?.displayName || "all");
     setDateRange({ start: "", end: "" });
   };
 
+  useEffect(() => {
+    if (!user || isFilterInitialized) return;
+
+    if (isManagement) {
+      setFilterUser("all");
+    } else if (user.displayName) {
+      setFilterUser(user.displayName);
+    }
+    setIsFilterInitialized(true);
+  }, [user, isManagement, isFilterInitialized]);
+
   const handleLoadMoreTasks = () => {
     toast.info("All tasks are already loaded in real-time snapshot.");
+  };
+
+  const openScoreDetails = (user) => {
+    setScoreDetailsUser(user || "all");
+    setCurrentView("score-details");
   };
 
   const filteredTasks = tasks.filter(task => {
@@ -659,6 +679,10 @@ const LDTaskManager = ({ onBack }) => {
   const filteredProjectCodeOptions = projectCodes.filter(code =>
     (code || "").toLowerCase().includes((formData.projectCode || "").toLowerCase())
   );
+
+  const isTaskEdit = Boolean(editingTask);
+  const canEditDueDate = !isTaskEdit || ["Admin", "Director", "Head"].includes(user?.role);
+  const showDueDateWarning = isTaskEdit && !canEditDueDate;
 
   useEffect(() => {
     const q = query(collection(db, "learning_tasks"), orderBy("createdAt", "desc"));
@@ -744,6 +768,12 @@ const LDTaskManager = ({ onBack }) => {
        toast.error("MISSING DATA");
        return;
     }
+
+    if (editingTask && !canEditDueDate && formData.dueDate !== editingTask.dueDate) {
+      toast.error("Only Head, Admin, or Director can change the due date after task creation.");
+      return;
+    }
+
     try {
       if (editingTask) {
         await updateDoc(doc(db, "learning_tasks", editingTask.id), {
@@ -899,7 +929,7 @@ const LDTaskManager = ({ onBack }) => {
         </div>
 
         {/* Filters Section */}
-        {(currentView !== "score" && currentView !== "admin") && (
+        {(currentView !== "score" && currentView !== "score-details" && currentView !== "admin") && (
           <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm flex flex-wrap items-center gap-4">
              <div className="flex items-center gap-2">
                 <span className="text-[10px] font-bold text-gray-400 uppercase">Filters:</span>
@@ -908,10 +938,13 @@ const LDTaskManager = ({ onBack }) => {
              <select 
                value={filterUser} 
                onChange={(e) => setFilterUser(e.target.value)}
-               className="px-3 py-1.5 bg-gray-50 border border-gray-100 rounded-lg text-xs font-semibold focus:outline-none focus:border-indigo-500"
+               disabled={isManagement}
+               className={`px-3 py-1.5 border rounded-lg text-xs font-semibold focus:outline-none focus:border-indigo-500 ${isManagement ? "bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed" : "bg-gray-50 border-gray-100 text-gray-900"}`}
              >
                 <option value="all">All Users</option>
-                {assignees.map(u => <option key={u} value={u}>{u}</option>)}
+                {!isManagement && user?.displayName && (
+                  <option value={user.displayName}>{user.displayName}</option>
+                )}
              </select>
 
              <div className="flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-lg px-2 py-1">
@@ -990,14 +1023,17 @@ const LDTaskManager = ({ onBack }) => {
               }} 
             />}
             {currentView === "admin" && <TaskDataManager />}
-            {currentView === "score" && <UserScorePanel tasks={tasks} assignees={assignees} />}
+            {currentView === "score" && <UserScorePanel tasks={tasks} assignees={assignees} onViewDetails={openScoreDetails} />}
+            {currentView === "score-details" && (
+              <UserScoreDetails tasks={tasks} selectedUser={scoreDetailsUser} onBack={() => setCurrentView("score")} />
+            )}
           </div>
         )}
 
         {/* Modal */}
         {showAddModal && (
           <div className="fixed inset-0 z-100 flex items-center justify-center bg-gray-900/40 backdrop-blur-sm p-2">
-            <div className="bg-white rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden border border-gray-200 max-h-[80vh]">
+            <div className="bg-white rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden border border-gray-200 max-h-[90vh]">
               <div className="px-3 py-2 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
                 <h3 className="font-bold text-gray-900 text-sm">{editingTask ? "Edit Task" : "New Task"}</h3>
                 <button onClick={() => setShowAddModal(false)} className="p-1 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-lg transition-all"><FiX size={18} /></button>
@@ -1140,7 +1176,19 @@ const LDTaskManager = ({ onBack }) => {
 
                   <div>
                     <label className="block text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">Due Date *</label>
-                    <input required type="date" value={formData.dueDate} onChange={e => setFormData({...formData, dueDate: e.target.value})} className="w-full px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg focus:border-indigo-500 outline-none transition-all font-semibold text-gray-900 text-sm" />
+                    <input
+                      required
+                      type="date"
+                      disabled={isTaskEdit && !canEditDueDate}
+                      value={formData.dueDate}
+                      onChange={e => setFormData({...formData, dueDate: e.target.value})}
+                      className={`w-full px-3 py-1.5 border rounded-lg transition-all font-semibold text-sm ${isTaskEdit && !canEditDueDate ? "bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed" : "bg-gray-50 border-gray-200 text-gray-900 focus:border-indigo-500 outline-none"}`}
+                    />
+                    {showDueDateWarning && (
+                      <p className="mt-2 text-[10px] text-rose-600 font-semibold">
+                        Ask Head: to change the due date after creation.
+                      </p>
+                    )}
                   </div>
                 </div>
 
