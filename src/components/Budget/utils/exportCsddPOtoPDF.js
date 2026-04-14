@@ -16,6 +16,89 @@ const parseValue = (val) => {
   return isNaN(num) ? 0 : num;
 };
 
+// ── Icon Drawers (vector) ──
+
+const drawGlobeIcon = (pdf, cx, cy, r) => {
+  pdf.setDrawColor(100, 100, 100);
+  pdf.setLineWidth(0.2);
+  pdf.circle(cx, cy, r, "S");
+  // horizontal & vertical axes
+  pdf.line(cx - r, cy, cx + r, cy);
+  pdf.line(cx, cy - r, cx, cy + r);
+  // inner ellipse (meridian)
+  pdf.ellipse(cx, cy, r * 0.5, r, "S");
+};
+
+const drawEmailIcon = (pdf, cx, cy, r) => {
+  pdf.setDrawColor(100, 100, 100);
+  pdf.setLineWidth(0.2);
+  const w = r * 2.4;
+  const h = r * 1.6;
+  const left = cx - w / 2;
+  const top = cy - h / 2;
+  pdf.rect(left, top, w, h, "S");
+  // V-flap
+  pdf.line(left, top, cx, cy + 0.3);
+  pdf.line(left + w, top, cx, cy + 0.3);
+};
+
+const drawPhoneIcon = (pdf, cx, cy, r) => {
+  pdf.setDrawColor(100, 100, 100);
+  pdf.setLineWidth(0.2);
+  const w = r * 1.2;
+  const h = r * 2;
+  // handset body
+  pdf.rect(cx - w / 2, cy - h / 2, w, h, "S");
+  // earpiece line
+  pdf.line(cx - w / 2 + 0.3, cy - h / 2 + 0.4, cx + w / 2 - 0.3, cy - h / 2 + 0.4);
+  // mouthpiece line
+  pdf.line(cx - w / 2 + 0.3, cy + h / 2 - 0.4, cx + w / 2 - 0.3, cy + h / 2 - 0.4);
+};
+
+const addFooterToAllPages = (pdf) => {
+  const totalPages = pdf.internal.getNumberOfPages();
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const lineY = pageHeight - 18;
+  const textY = lineY + 5;
+
+  for (let i = 1; i <= totalPages; i++) {
+    pdf.setPage(i);
+
+    // Horizontal divider
+    pdf.setDrawColor(160, 160, 160);
+    pdf.setLineWidth(0.4);
+    pdf.line(14, lineY, pageWidth - 14, lineY);
+
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(8);
+    pdf.setTextColor(100, 100, 100);
+
+    // Globe + website
+    const iconR = 1.5;
+    drawGlobeIcon(pdf, 18, textY - 1, iconR);
+    pdf.text("www.gryphonacademy.co.in", 22, textY);
+
+    // Email + address
+    drawEmailIcon(pdf, 82, textY - 1, iconR);
+    pdf.text("connect@gryphonacademy.co.in", 86, textY);
+
+    // Phone + number
+    drawPhoneIcon(pdf, 152, textY - 1, iconR);
+    pdf.text("8956444509", 156, textY);
+
+    // Page number
+    pdf.setFontSize(7);
+    pdf.setTextColor(140, 140, 140);
+    pdf.text(
+      `Page ${i} of ${totalPages}`,
+      pageWidth - 14,
+      pageHeight - 8,
+      { align: "right" },
+    );
+  }
+};
+
 // ── Main Export (3-page PDF) ──
 // Page 1: Purchase Order (identical to standard PO)
 // Page 2: Main Department Budget Summary
@@ -87,18 +170,7 @@ export const exportCsddPurchaseOrderToPDF = async (order, vendorData) => {
   pdf.text(`Date : ${approvedDate}`, 15, 52);
   pdf.text(`PO No. : ${order.poNumber || `PO-${order.id?.slice(-6)}`}`, 15, 58);
 
-  if (clientKey) {
-    pdf.text(
-      `Client : ${order.clientName || clientKey.replace(/_/g, " ")}`,
-      120,
-      52,
-    );
-    pdf.text(
-      `Component : ${(order.csddComponent || "").replace(/_/g, " ")}`,
-      120,
-      58,
-    );
-  }
+  
 
   // Vendor Table
   autoTable(pdf, {
@@ -254,10 +326,7 @@ export const exportCsddPurchaseOrderToPDF = async (order, vendorData) => {
   pdf.text("Payment Date: ___________________", 20, payY);
   pdf.text("Payment Terms: ___________________", 120, payY);
 
-  pdf.setFontSize(8);
-  pdf.text("Generated via Gryphon Purchase Order System", 105, 285, {
-    align: "center",
-  });
+
 
   // ═══════════════════════════════════════
   // PAGE 2 — Main Department Budget Summary
@@ -346,14 +415,21 @@ export const exportCsddPurchaseOrderToPDF = async (order, vendorData) => {
     },
   });
 
-  // Signatures
+  // Signatures — anchor near bottom, above footer (footer line at pageHeight-18)
+  const pg2Height = pdf.internal.pageSize.getHeight();
+  const sigTableHeight = 42; // 2 rows × minCellHeight 20 + borders
+  const footerTopY = pg2Height - 18;
+  const idealSigY2 = footerTopY - sigTableHeight - 3;
+  const sigStartY2 = Math.max(pdf.lastAutoTable.finalY + 5, idealSigY2);
+
   autoTable(pdf, {
-    startY: pdf.lastAutoTable.finalY + 10,
+    startY: sigStartY2,
     body: [
       ["", ""],
       ["Signature\n\n(Founder & Director)", "Signature\n\n(Co-Founder)"],
     ],
     theme: "grid",
+    tableWidth: 182,
     styles: {
       fontSize: 9,
       halign: "center",
@@ -361,7 +437,7 @@ export const exportCsddPurchaseOrderToPDF = async (order, vendorData) => {
       textColor: [40, 40, 40],
       lineColor: [0, 0, 0],
     },
-    columnStyles: { 0: { cellWidth: 36 }, 1: { cellWidth: 36 } },
+    columnStyles: { 0: { cellWidth: 91 }, 1: { cellWidth: 91 } },
   });
 
   // ═══════════════════════════════════════
@@ -457,15 +533,21 @@ export const exportCsddPurchaseOrderToPDF = async (order, vendorData) => {
       },
     });
 
- 
-    // Signatures
+    // Signatures — anchor near bottom, above footer
+    const pg3Height = pdf.internal.pageSize.getHeight();
+    const sigTableH3 = 42;
+    const footerTop3 = pg3Height - 18;
+    const idealSigY3 = footerTop3 - sigTableH3 - 3;
+    const sigStartY3 = Math.max(pdf.lastAutoTable.finalY + 5, idealSigY3);
+
     autoTable(pdf, {
-      startY: pdf.lastAutoTable.finalY + 15,
+      startY: sigStartY3,
       body: [
         ["", ""],
         ["Signature\n\n(DM Head)", "Signature\n\n(Delivery Head)"],
       ],
       theme: "grid",
+      tableWidth: 182,
       styles: {
         fontSize: 9,
         halign: "center",
@@ -473,9 +555,12 @@ export const exportCsddPurchaseOrderToPDF = async (order, vendorData) => {
         textColor: [40, 40, 40],
         lineColor: [0, 0, 0],
       },
-      columnStyles: { 0: { cellWidth: 60 }, 1: { cellWidth: 60 } },
+      columnStyles: { 0: { cellWidth: 91 }, 1: { cellWidth: 91 } },
     });
   }
+
+  // Add footer with contact info + page numbers to every page
+  addFooterToAllPages(pdf);
 
   pdf.save(`CSDD_PO_${order.poNumber || order.id}.pdf`);
 };
