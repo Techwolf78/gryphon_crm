@@ -520,12 +520,15 @@ const AddVendorModal = ({ show, onClose, vendorCategories, currentUser }) => {
       newErrors.contactPerson = "Contact person is required";
     }
 
-    if (!formData.phone.trim()) {
-      newErrors.phone = "Phone number is required";
-    } else if (
+    if (
+      formData.phone &&
+      formData.phone.trim() !== "" &&
+      formData.phone.trim() !== "-" &&
+      formData.phone.trim().toLowerCase() !== "n/a" &&
+      formData.phone.trim().toLowerCase() !== "na" &&
       !/^[+]?\d+$/.test(formData.phone.replace(/\s/g, ""))
     ) {
-      newErrors.phone = "Please enter a valid phone number";
+      newErrors.phone = "Please enter a valid phone number or leave empty";
     }
 
     if (!formData.email.trim()) {
@@ -731,7 +734,7 @@ const AddVendorModal = ({ show, onClose, vendorCategories, currentUser }) => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Phone Number *
+                    Phone Number
                   </label>
                   <input
                     type="tel"
@@ -1007,12 +1010,15 @@ const EditVendorModal = ({
       newErrors.contactPerson = "Contact person is required";
     }
 
-    if (!formData.phone.trim()) {
-      newErrors.phone = "Phone number is required";
-    } else if (
+    if (
+      formData.phone &&
+      formData.phone.trim() !== "" &&
+      formData.phone.trim() !== "-" &&
+      formData.phone.trim().toLowerCase() !== "n/a" &&
+      formData.phone.trim().toLowerCase() !== "na" &&
       !/^[+]?\d+$/.test(formData.phone.replace(/\s/g, ""))
     ) {
-      newErrors.phone = "Please enter a valid phone number";
+      newErrors.phone = "Please enter a valid phone number or leave empty";
     }
 
     if (!formData.email.trim()) {
@@ -1149,7 +1155,7 @@ const EditVendorModal = ({
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Phone Number *
+                  Phone Number
                 </label>
                 <input
                   type="tel"

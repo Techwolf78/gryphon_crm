@@ -340,6 +340,17 @@ function BudgetDashboard({
     return department || "admin";
   }, [currentUserData, department]);
 
+  // Full list of departments the user belongs to (lowercased)
+  const currentUserDepartments = useMemo(() => {
+    if (currentUserData?.departments && Array.isArray(currentUserData.departments)) {
+      return currentUserData.departments.map((d) => d.toLowerCase());
+    }
+    if (currentUserData?.department) {
+      return [currentUserData.department.toLowerCase()];
+    }
+    return [department?.toLowerCase() || "admin"];
+  }, [currentUserData, department]);
+
   const currentUserDepartmentComponents = getDepartmentComponents(
     currentUserDepartment,
   );
@@ -1083,6 +1094,7 @@ function BudgetDashboard({
                 currentUser={currentUser}
                 fiscalYear={currentFiscalYear}
                 userDepartment={currentUserDepartment}
+                userDepartments={currentUserDepartments}
                 getComponentsForItem={getComponentsForItem}
                 showDepartment={showDepartment}
               />

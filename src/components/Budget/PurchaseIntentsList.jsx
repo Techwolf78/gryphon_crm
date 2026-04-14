@@ -10,6 +10,7 @@ const PurchaseIntentsList = ({
   onFiltersChange,
   currentUser,
   userDepartment,
+  userDepartments = [],
   getComponentsForItem,
   showDepartment = false,
 }) => {
@@ -139,12 +140,17 @@ const PurchaseIntentsList = ({
   };
 
   // Check if current user is from purchase department
-  const isPurchaseDepartment = ["purchase", "admin", "hr"].includes(
-    userDepartment?.toLowerCase(),
+  // Support both single department (userDepartment) and multi-department (userDepartments) users
+  const deptList = userDepartments.length > 0
+    ? userDepartments
+    : [userDepartment?.toLowerCase()].filter(Boolean);
+
+  const isPurchaseDepartment = deptList.some((d) =>
+    ["purchase", "admin", "hr"].includes(d)
   );
 
   // DM can also approve CSDD intents
-  const isDmDepartment = userDepartment?.toLowerCase() === "dm";
+  const isDmDepartment = deptList.includes("dm");
 
   const canCreatePO = (intent) => {
     if (!currentUser || intent.status !== "submitted") return false;
@@ -158,7 +164,7 @@ const PurchaseIntentsList = ({
   const canDelete = (intent) => {
     if (!currentUser) return false;
     const isCreator = intent.createdBy === currentUser.uid;
-    const isAdmin = userDepartment?.toLowerCase() === "admin";
+    const isAdmin = deptList.includes("admin");
     return (
       (intent.status === "submitted" || intent.status === "rejected") &&
       (isCreator || isAdmin)

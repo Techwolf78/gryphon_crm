@@ -246,6 +246,17 @@ function Purchase() {
     return "admin";
   }, [currentUserData]);
 
+  // Full list of departments the user belongs to (lowercased)
+  const currentUserDepartments = useMemo(() => {
+    if (currentUserData?.departments && Array.isArray(currentUserData.departments)) {
+      return currentUserData.departments.map((d) => d.toLowerCase());
+    }
+    if (currentUserData?.department) {
+      return [currentUserData.department.toLowerCase()];
+    }
+    return ["admin"];
+  }, [currentUserData]);
+
   const currentUserDepartmentComponents = getDepartmentComponents(
     currentUserDepartment,
   );
@@ -1268,6 +1279,7 @@ function Purchase() {
                 currentUser={currentUser}
                 fiscalYear={currentFiscalYear}
                 userDepartment={currentUserDepartment}
+                userDepartments={currentUserDepartments}
                 getComponentsForItem={getComponentsForItem}
                 showDepartment={true} // Show department column for purchase view
               />
