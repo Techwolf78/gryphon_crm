@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 
 const PurchaseIntentsList = ({
   intents,
@@ -6,6 +6,7 @@ const PurchaseIntentsList = ({
   componentColors,
   onCreatePurchaseOrder,
   onDeleteIntent,
+  onEditIntent,
   filters,
   onFiltersChange,
   currentUser,
@@ -22,6 +23,9 @@ const PurchaseIntentsList = ({
   const [deletingId, setDeletingId] = useState(null);
   const [activeDropdown, setActiveDropdown] = useState(null);
   const [viewModal, setViewModal] = useState(null);
+  const [editModal, setEditModal] = useState(null);
+  const [editFormData, setEditFormData] = useState(null);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const handleSort = (key) => {
     setSortConfig((current) => ({
@@ -169,6 +173,150 @@ const PurchaseIntentsList = ({
       (intent.status === "submitted" || intent.status === "rejected") &&
       (isCreator || isAdmin)
     );
+  };
+
+  const canEdit = (intent) => {
+    if (!currentUser || !onEditIntent) return false;
+    const isCreator = intent.createdBy === currentUser.uid;
+    const isAdmin = deptList.includes("admin");
+    const isPurchase = deptList.includes("purchase");
+    return (
+      (intent.status === "submitted" || intent.status === "rejected") &&
+      (isCreator || isAdmin || isPurchase)
+    );
+  };
+
+  const openEditModal = useCallback((intent) => {
+    setEditFormData({
+      title: intent.title || "",
+      description: intent.description || "",
+      requestedItems: (intent.requestedItems || []).map((item, i) => ({
+        sno: item.sno || i + 1,
+        category: item.category || "",
+        description: item.description || "",
+        quantity: item.quantity || 0,
+        estPricePerUnit: item.estPricePerUnit || 0,
+        estTotal: item.estTotal || 0,
+      })),
+      requiredBy: intent.requiredBy || "",
+      includeGST: intent.includeGST || false,
+      budgetComponent: intent.selectedBudgetComponent || intent.budgetComponent || "",
+    });
+    setEditModal(intent);
+    setActiveDropdown(null);
+  }, []);
+
+  const handleEditItemChange = (index, field, value) => {
+    setEditFormData((prev) => {
+      const updatedItems = prev.requestedItems.map((item, i) => {
+        if (i === index) {
+          const updatedItem = { ...item, [field]: value };
+          if (field === "quantity" || field === "estPricePerUnit") {
+            const qty = parseFloat(updatedItem.quantity) || 0;
+            const price = parseFloat(updatedItem.estPricePerUnit) || 0;
+            updatedItem.estTotal = qty * price;
+          }
+          return updatedItem;
+        }
+        return item;
+      });
+      return { ...prev, requestedItems: updatedItems };
+    });
+  };
+
+  const addEditItem = () => {
+    setEditFormData((prev) => ({
+      ...prev,
+      requestedItems: [
+        ...prev.requestedItems,
+        {
+          sno: prev.requestedItems.length + 1,
+          category: prev.budgetComponent,
+          description: "",
+          quantity: "",
+          estPricePerUnit: "",
+          estTotal: 0,
+        },
+      ],
+    }));
+  };
+
+  const removeEditItem = (index) => {
+    if (editFormData.requestedItems.length > 1) {
+      setEditFormData((prev) => ({
+        ...prev,
+        requestedItems: prev.requestedItems
+          .filter((_, i) => i !== index)
+          .map((item, i) => ({ ...item, sno: i + 1 })),
+      }));
+    }
+  };
+
+  const getEditBaseTotal = () => {
+    if (!editFormData) return 0;
+    return editFormData.requestedItems.reduce(
+      (sum, item) => sum + (item.estTotal || 0),
+      0,
+    );
+  };
+
+  const getEditGrandTotal = () => {
+    const base = getEditBaseTotal();
+    return editFormData?.includeGST ? base * 1.18 : base;
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editModal || !editFormData || !onEditIntent) return;
+
+    // Basic validation
+    if (!editFormData.title.trim()) {
+      alert("Title is required");
+      return;
+    }
+    for (let i = 0; i < editFormData.requestedItems.length; i++) {
+      const item = editFormData.requestedItems[i];
+      if (!item.description.trim()) {
+        alert(`Please enter a description for item ${i + 1}`);
+        return;
+      }
+      if (!item.quantity || parseFloat(item.quantity) <= 0) {
+        alert(`Please enter a valid quantity for item ${i + 1}`);
+        return;
+      }
+      if (!item.estPricePerUnit || parseFloat(item.estPricePerUnit) <= 0) {
+        alert(`Please enter a valid price for item ${i + 1}`);
+        return;
+      }
+    }
+
+    setSavingEdit(true);
+    try {
+      const updatedFields = {
+        title: editFormData.title,
+        description: editFormData.description || "",
+        requestedItems: editFormData.requestedItems.map((item) => ({
+          sno: item.sno,
+          category: item.category || editFormData.budgetComponent,
+          description: item.description,
+          quantity: parseFloat(item.quantity) || 0,
+          estPricePerUnit: parseFloat(item.estPricePerUnit) || 0,
+          estTotal: item.estTotal || 0,
+        })),
+        requiredBy: editFormData.requiredBy || "",
+        includeGST: editFormData.includeGST,
+        baseTotal: getEditBaseTotal(),
+        estimatedTotal: getEditGrandTotal(),
+      };
+
+      await onEditIntent(editModal.id, updatedFields);
+      setEditModal(null);
+      setEditFormData(null);
+    } catch (error) {
+      console.error("Error updating intent:", error);
+      alert("Failed to update purchase intent. Please try again.");
+    } finally {
+      setSavingEdit(false);
+    }
   };
 
   const formatDate = (timestamp) => {
@@ -503,6 +651,32 @@ const PurchaseIntentsList = ({
                               </svg>
                               View Details
                             </button>
+
+                            {/* Edit Action */}
+                            {canEdit(intent) && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openEditModal(intent);
+                                }}
+                                className="flex items-center w-full px-3 py-1.5 text-blue-600 hover:bg-blue-50"
+                              >
+                                <svg
+                                  className="w-3.5 h-3.5 mr-2"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                  />
+                                </svg>
+                                Edit Intent
+                              </button>
+                            )}
 
                             {/* Create PO Action - Only for Purchase Department */}
                             {canCreatePO(intent) && (
@@ -844,6 +1018,360 @@ const PurchaseIntentsList = ({
           "
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Intent Modal */}
+      {editModal && editFormData && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-3 z-1000 text-sm">
+          <div className="bg-white/95 backdrop-blur-md rounded-xl shadow-[0_8px_24px_rgba(0,0,0,0.15)] w-full max-w-4xl max-h-[90vh] overflow-hidden border border-gray-100">
+            {/* Header */}
+            <div className="bg-linear-to-r from-amber-500 to-orange-500 text-white flex justify-between items-center px-4 py-3 shadow-sm">
+              <h2 className="text-lg font-bold tracking-wide">
+                Edit Purchase Intent
+              </h2>
+              <button
+                onClick={() => {
+                  setEditModal(null);
+                  setEditFormData(null);
+                }}
+                className="p-1 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+              >
+                <svg
+                  className="w-4 h-4 text-white"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-4 overflow-y-auto max-h-[70vh] space-y-6">
+              {/* Basic + Financial Info */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Basic Information */}
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900 mb-2 border-b border-gray-200 pb-1">
+                    Basic Information
+                  </h3>
+                  <div className="space-y-3 text-xs">
+                    {showDepartment && (
+                      <div>
+                        <dt className="font-medium text-gray-500">
+                          Department
+                        </dt>
+                        <dd className="text-gray-900">
+                          {editModal.department?.toUpperCase() || "Unknown"}
+                        </dd>
+                      </div>
+                    )}
+                    <div>
+                      <label className="font-medium text-gray-500 block mb-1">Title *</label>
+                      <input
+                        type="text"
+                        value={editFormData.title}
+                        onChange={(e) =>
+                          setEditFormData((prev) => ({
+                            ...prev,
+                            title: e.target.value,
+                          }))
+                        }
+                        className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="font-medium text-gray-500 block mb-1">Description</label>
+                      <textarea
+                        value={editFormData.description}
+                        onChange={(e) =>
+                          setEditFormData((prev) => ({
+                            ...prev,
+                            description: e.target.value,
+                          }))
+                        }
+                        rows={3}
+                        className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                      />
+                    </div>
+                    <div>
+                      <dt className="font-medium text-gray-500">
+                        Budget Component
+                      </dt>
+                      <dd className="text-gray-900 mt-1">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getComponentColor(editModal)}`}>
+                          {getComponentName(editModal)}
+                        </span>
+                      </dd>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Financial Details */}
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900 mb-2 border-b border-gray-200 pb-1">
+                    Financial Details
+                  </h3>
+                  <div className="space-y-3 text-xs">
+                    <div>
+                      <dt className="font-medium text-gray-500">
+                        Total Estimate
+                      </dt>
+                      <dd className="text-gray-900 font-semibold flex items-center gap-1 text-sm mt-1">
+                        ₹{getEditGrandTotal().toLocaleString("en-IN")}
+                        {editFormData.includeGST && (
+                          <span className="text-xs text-gray-500 font-normal">
+                            (Incl. GST)
+                          </span>
+                        )}
+                      </dd>
+                    </div>
+                    {editFormData.includeGST && (
+                      <div>
+                        <dt className="font-medium text-gray-500">
+                          Base Cost (Excl. GST)
+                        </dt>
+                        <dd className="text-gray-600">
+                          ₹{getEditBaseTotal().toLocaleString("en-IN")}
+                        </dd>
+                      </div>
+                    )}
+                    <div>
+                      <dt className="font-medium text-gray-500">Status</dt>
+                      <dd>
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold shadow-sm ${getStatusColor(
+                            editModal.status,
+                          )}`}
+                        >
+                          {editModal.status.replace(/_/g, " ")}
+                        </span>
+                      </dd>
+                    </div>
+                    <div>
+                      <label className="font-medium text-gray-500 block mb-1">Required By</label>
+                      <input
+                        type="date"
+                        value={editFormData.requiredBy}
+                        onChange={(e) =>
+                          setEditFormData((prev) => ({
+                            ...prev,
+                            requiredBy: e.target.value,
+                          }))
+                        }
+                        className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2 mt-2">
+                      <input
+                        id="edit-intent-gst"
+                        type="checkbox"
+                        checked={editFormData.includeGST}
+                        onChange={(e) =>
+                          setEditFormData((prev) => ({
+                            ...prev,
+                            includeGST: e.target.checked,
+                          }))
+                        }
+                        className="h-4 w-4 text-amber-600 border-gray-300 rounded focus:ring-amber-500"
+                      />
+                      <label
+                        htmlFor="edit-intent-gst"
+                        className="text-xs text-gray-700 font-medium"
+                      >
+                        Include GST Estimate (18%)
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Requested Items */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-base font-semibold text-gray-900 border-b border-gray-200 pb-1">
+                    Requested Items ({editFormData.requestedItems.length})
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={addEditItem}
+                    className="px-2.5 py-1 text-xs text-amber-600 border border-amber-200 rounded-lg hover:bg-amber-50 font-medium"
+                  >
+                    + Add Item
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {editFormData.requestedItems.map((item, index) => (
+                    <div
+                      key={index}
+                      className="bg-gray-50 border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow"
+                    >
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-xs font-semibold text-gray-700">Item {item.sno}</span>
+                        {editFormData.requestedItems.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeEditItem(index)}
+                            className="text-red-500 hover:text-red-700 text-xs font-medium"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
+                        <div>
+                          <span className="font-medium text-gray-500 block mb-1">
+                            Category
+                          </span>
+                          <div className="text-gray-900 px-2.5 py-1.5 bg-gray-100 border border-gray-200 rounded-lg">
+                            {getComponentName(editFormData.budgetComponent) || item.category}
+                          </div>
+                        </div>
+                        <div>
+                          <label className="font-medium text-gray-500 block mb-1">
+                            Description *
+                          </label>
+                          <input
+                            type="text"
+                            value={item.description}
+                            onChange={(e) =>
+                              handleEditItemChange(index, "description", e.target.value)
+                            }
+                            className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="font-medium text-gray-500 block mb-1">
+                            Quantity *
+                          </label>
+                          <input
+                            type="number"
+                            value={item.quantity}
+                            onChange={(e) =>
+                              handleEditItemChange(index, "quantity", e.target.value)
+                            }
+                            min="1"
+                            className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="font-medium text-gray-500 block mb-1">
+                            Est. Price (₹) *
+                          </label>
+                          <input
+                            type="number"
+                            value={item.estPricePerUnit}
+                            onChange={(e) =>
+                              handleEditItemChange(index, "estPricePerUnit", e.target.value)
+                            }
+                            min="0"
+                            step="0.01"
+                            className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                          />
+                        </div>
+                      </div>
+                      <div className="mt-2 pt-2 border-t border-gray-200 text-xs font-medium text-gray-700">
+                        Item Total: ₹{(item.estTotal || 0).toLocaleString("en-IN")}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Timeline (read-only) */}
+              <div>
+                <h3 className="text-base font-semibold text-gray-900 mb-2 border-b border-gray-200 pb-1">
+                  Timeline
+                </h3>
+                <dl className="space-y-2 text-xs">
+                  <div>
+                    <dt className="font-medium text-gray-500">Created</dt>
+                    <dd className="text-gray-900">
+                      {formatDateTime(editModal.createdAt)}
+                    </dd>
+                  </div>
+                  {editModal.updatedAt && (
+                    <div>
+                      <dt className="font-medium text-gray-500">Last Edited</dt>
+                      <dd className="text-gray-900">
+                        {formatDateTime(editModal.updatedAt)}
+                      </dd>
+                    </div>
+                  )}
+                </dl>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex justify-end gap-2 p-4 border-t border-gray-200 bg-gray-50">
+              <button
+                onClick={() => {
+                  setEditModal(null);
+                  setEditFormData(null);
+                }}
+                disabled={savingEdit}
+                className="
+                  px-4 py-1.5 text-gray-700 bg-white border border-gray-300 rounded-lg font-medium text-xs
+                  shadow-[inset_0_-1px_2px_rgba(0,0,0,0.15),inset_0_1px_2px_rgba(255,255,255,0.6)]
+                  hover:bg-gray-50
+                  active:shadow-[inset_0_1px_2px_rgba(0,0,0,0.25),inset_0_-1px_1px_rgba(255,255,255,0.5)]
+                  active:translate-y-[0.5px]
+                  transition-all duration-150 ease-in-out
+                  disabled:opacity-50
+                "
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveEdit}
+                disabled={savingEdit}
+                className="
+                  px-4 py-1.5 bg-amber-600 text-white rounded-lg font-semibold text-xs
+                  shadow-[inset_0_1px_2px_rgba(255,255,255,0.3),0_2px_4px_rgba(0,0,0,0.2)]
+                  hover:bg-amber-700
+                  active:shadow-[inset_0_2px_4px_rgba(0,0,0,0.3),0_1px_2px_rgba(255,255,255,0.3)]
+                  active:translate-y-[0.5px]
+                  transition-all duration-150 ease-in-out
+                  disabled:opacity-50 flex items-center gap-1.5
+                "
+              >
+                {savingEdit ? (
+                  <>
+                    <svg
+                      className="animate-spin h-3.5 w-3.5 text-white"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
+                    </svg>
+                    Saving...
+                  </>
+                ) : (
+                  "Save Changes"
+                )}
               </button>
             </div>
           </div>

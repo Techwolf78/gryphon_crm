@@ -628,6 +628,20 @@ function BudgetDashboard({
     }
   }, []);
 
+  const handleEditIntent = useCallback(
+    async (intentId, updatedFields) => {
+      try {
+        await DepartmentService.updateIntent(intentId, updatedFields, currentUser);
+        toast.success("Purchase intent updated successfully!");
+      } catch (error) {
+        console.error("Error updating intent:", error);
+        toast.error("Failed to update purchase intent.");
+        throw error;
+      }
+    },
+    [currentUser],
+  );
+
   const handleCreatePurchaseOrder = useCallback(
     async (orderData) => {
       try {
@@ -1085,6 +1099,7 @@ function BudgetDashboard({
                 budgetComponents={currentUserDepartmentComponents}
                 componentColors={componentColors}
                 onDeleteIntent={handleDeleteIntent}
+                onEditIntent={handleEditIntent}
                 onCreatePurchaseOrder={(intent) => {
                   setSelectedIntent(intent);
                   setShowPurchaseOrderModal(true);

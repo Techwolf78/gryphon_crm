@@ -425,6 +425,8 @@ const PurchaseOrderModal = ({
               <input
                 type="number"
                 value={formData.finalPrice}
+                disabled
+               //Disabled for now - May re-enable later
                 onChange={(e) =>
                   setFormData((prev) => ({
                     ...prev,
@@ -433,7 +435,7 @@ const PurchaseOrderModal = ({
                 }
                 min="0"
                 step="0.01"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 cursor-not-allowed"
                 required
               />
               <div className="mt-1 text-sm text-gray-600">

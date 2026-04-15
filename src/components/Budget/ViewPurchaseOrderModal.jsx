@@ -88,7 +88,7 @@ const ViewPurchaseOrderModal = ({
           </h2>
 
           <div className="flex gap-2">
-            {!isEditing ? (
+            {/* {!isEditing ? (
               <button
                 onClick={() => setIsEditing(true)}
                 className="
@@ -116,7 +116,7 @@ const ViewPurchaseOrderModal = ({
               >
                 Save
               </button>
-            )}
+            )} */}
             <button
               onClick={onClose}
               className="px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-100"

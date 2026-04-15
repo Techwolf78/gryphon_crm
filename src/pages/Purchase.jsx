@@ -824,6 +824,20 @@ function Purchase() {
     [currentUser],
   );
 
+  const handleEditIntent = useCallback(
+    async (intentId, updatedFields) => {
+      try {
+        await DepartmentService.updateIntent(intentId, updatedFields, currentUser);
+        toast.success("Purchase intent updated successfully!");
+      } catch (error) {
+        console.error("Error updating intent:", error);
+        toast.error("Failed to update purchase intent.");
+        throw error;
+      }
+    },
+    [currentUser],
+  );
+
   const handleApproveOrder = async (order) => {
     if (!order || !order.id) {
       console.error("Invalid order object:", order);
@@ -1269,6 +1283,7 @@ function Purchase() {
                 budgetComponents={currentUserDepartmentComponents}
                 componentColors={componentColors}
                 onDeleteIntent={handleDeleteIntent}
+                onEditIntent={handleEditIntent}
                 onApproveIntent={handleApproveIntent}
                 onCreatePurchaseOrder={(intent) => {
                   setSelectedIntent(intent);

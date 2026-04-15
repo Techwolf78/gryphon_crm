@@ -225,6 +225,15 @@ export const DepartmentService = {
     await deleteDoc(doc(db, "purchase_intents", intentId));
   },
 
+  async updateIntent(intentId, updatedFields, user) {
+    const intentRef = doc(db, "purchase_intents", intentId);
+    await updateDoc(intentRef, {
+      ...updatedFields,
+      updatedAt: serverTimestamp(),
+      updatedBy: user.uid,
+    });
+  },
+
   // ==========================================
   // 5. PURCHASE ORDERS (THE COMPLEX TRANSACTION)
   // ==========================================
