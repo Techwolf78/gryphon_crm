@@ -673,7 +673,7 @@ function Purchase() {
           const deptCode =
             DepartmentService.getDepartmentCode(intentDepartment);
           const prefix =
-            intentDepartment?.toLowerCase() === "dm" ? "ICEM" : "GA";
+            intentDepartment?.toLowerCase() === "dm" ? "GA" : "GA";
           const currentCount = targetBudget.data().poCounter || 0;
           const newCount = currentCount + 1;
           const poNumber = `${prefix}/${currentFiscalYear}/${deptCode}/${newCount
