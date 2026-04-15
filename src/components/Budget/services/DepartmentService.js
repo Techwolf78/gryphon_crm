@@ -240,7 +240,7 @@ export const DepartmentService = {
 
     // 1. Prepare Data
     const deptCode = this.getDepartmentCode(department);
-    const prefix = department?.toLowerCase() === "dm" ? "ICEM" : "GA";
+    const prefix = department?.toLowerCase() === "dm" ? "GA" : "GA";
     const totalAmount = orderData.finalAmount;
     const intentId = orderData.intentId;
     const budgetComponent =
@@ -514,7 +514,7 @@ export const DepartmentService = {
       // 3. Generate PO Number
       // (Reusing logic: In a real app, extract generatePurchaseOrderNumber to a shared helper)
       const deptCode = this.getDepartmentCode(department);
-      const prefix = department?.toLowerCase() === "dm" ? "ICEM" : "GA";
+      const prefix = department?.toLowerCase() === "dm" ? "GA" : "GA";
       const currentCount = targetBudget.data().poCounter || 0;
       const newCount = currentCount + 1;
       const poNumber = `${prefix}/${currentFiscalYear}/${deptCode}/${newCount

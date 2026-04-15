@@ -4,7 +4,7 @@ import tailwindcss from "@tailwindcss/vite";
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: "/sync", // 👈 this is critical
+  base: "", // 👈 this is critical
   plugins: [react(), tailwindcss()],
   define: {
     global: "globalThis",
