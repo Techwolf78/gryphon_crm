@@ -31,7 +31,7 @@ const prodFirebaseConfig = {
   measurementId: "G-M8D2ECH5ZX"
 };
 
-const firebaseConfig = window.location.hostname === 'localhost' ? prodFirebaseConfig : prodFirebaseConfig;
+const firebaseConfig = window.location.hostname === 'localhost' ? devFirebaseConfig : prodFirebaseConfig;
 
 
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
