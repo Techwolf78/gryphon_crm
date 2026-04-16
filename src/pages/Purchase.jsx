@@ -856,6 +856,28 @@ function Purchase() {
     }
   };
 
+  const handleRejectPurchaseOrder = useCallback(
+    async (order) => {
+      try {
+        await DepartmentService.rejectPurchaseOrder(order, currentUser);
+        toast.success(`Purchase Order ${order.poNumber} rejected and budget reversed.`);
+      } catch (error) {
+        console.error("Error rejecting purchase order:", error);
+        let errorMessage = "Failed to reject purchase order. ";
+        if (error.message.includes("already rejected")) {
+          errorMessage = "This purchase order is already rejected.";
+        } else if (error.message.includes("No active budget")) {
+          errorMessage += "No active budget found for this department.";
+        } else {
+          errorMessage += error.message || "Please try again.";
+        }
+        toast.error(errorMessage);
+        throw error;
+      }
+    },
+    [currentUser],
+  );
+
   // Action handlers for budget table
   const handleEditBudget = (budget) => {
     setEditingBudget(budget);
@@ -1274,6 +1296,7 @@ function Purchase() {
                 showDepartment={true} // Show department column for purchase view
                 onUpdatePurchaseOrder={handleUpdatePurchaseOrder}
                 onApproveOrder={handleApproveOrder}
+                onRejectOrder={handleRejectPurchaseOrder}
               />
             )}
 
