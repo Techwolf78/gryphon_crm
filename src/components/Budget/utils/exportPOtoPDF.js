@@ -118,7 +118,7 @@ export const exportPurchaseOrderToPDF = async (order, vendorData) => {
   // PAGE 1 (Purchase Order)
   // ---------------------------
 
-  const logoUrl = "/gryphon_logo.png";
+  const logoUrl = "/sync/gryphon_logo.png";
   try {
     docPDF.addImage(logoUrl, "PNG", 14, 10, 45, 25);
   } catch {
@@ -296,7 +296,7 @@ export const exportPurchaseOrderToPDF = async (order, vendorData) => {
         "Signature\n\n(HR)",
         "Signature\n\n(Delivery Head)",
         "Signature\n\n(Co-Founder)",
-        "Signature\n\n(Founder & Director)",
+        "Signature\n\n(Founder)",
       ],
     ],
     theme: "grid",
@@ -452,7 +452,7 @@ export const exportPurchaseOrderToPDF = async (order, vendorData) => {
     startY: sigStartY2,
     body: [
       ["", ""],
-      ["Signature\n\n(Founder & Director)", "Signature\n\n(Co-Founder)"],
+      ["Signature\n\n(Founder)", "Signature\n\n(Co-Founder)"],
     ],
     theme: "grid",
     tableWidth: 182,

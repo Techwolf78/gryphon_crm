@@ -280,6 +280,9 @@ const ClientSheetView = ({
                   Total Spend
                 </th>
                 <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">
+                  Spent %
+                </th>
+                <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">
                   Remaining
                 </th>
               </tr>
@@ -287,7 +290,7 @@ const ClientSheetView = ({
             <tbody className="divide-y divide-gray-100">
               {componentsArray.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="py-16 text-center text-gray-400">
+                  <td colSpan="6" className="py-16 text-center text-gray-400">
                     <Layers className="w-10 h-10 mx-auto mb-3 opacity-20" />
                     <p className="text-sm">No components found.</p>
                     <p className="text-xs mt-1">
@@ -314,6 +317,20 @@ const ClientSheetView = ({
                       <td className="py-3 px-4 text-sm text-gray-600 text-right font-mono">
                         ₹{Number(comp.spent || 0).toLocaleString()}
                       </td>
+                      <td className="py-3 px-4 text-sm text-right font-mono font-medium">
+                        {comp.allocated > 0
+                          ? <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
+                              ((comp.spent / comp.allocated) * 100) >= 90
+                                ? 'bg-red-100 text-red-700'
+                                : ((comp.spent / comp.allocated) * 100) >= 70
+                                  ? 'bg-amber-100 text-amber-700'
+                                  : 'bg-emerald-100 text-emerald-700'
+                            }`}>
+                              {((comp.spent / comp.allocated) * 100).toFixed(1)}%
+                            </span>
+                          : <span className="text-gray-400">—</span>
+                        }
+                      </td>
                       <td
                         className={`py-3 px-4 text-sm text-right font-mono font-bold ${comp.remaining < 0 ? "text-red-600" : "text-emerald-600"}`}
                       >
@@ -339,6 +356,20 @@ const ClientSheetView = ({
                   </td>
                   <td className="py-3 px-4 text-right font-mono text-sm">
                     ₹{totalActual.toLocaleString()}
+                  </td>
+                  <td className="py-3 px-4 text-right font-mono text-sm">
+                    {totalPlanned > 0
+                      ? <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
+                          ((totalActual / totalPlanned) * 100) >= 90
+                            ? 'bg-red-100 text-red-700'
+                            : ((totalActual / totalPlanned) * 100) >= 70
+                              ? 'bg-amber-100 text-amber-700'
+                              : 'bg-emerald-100 text-emerald-700'
+                        }`}>
+                          {((totalActual / totalPlanned) * 100).toFixed(1)}%
+                        </span>
+                      : '—'
+                    }
                   </td>
                   <td className="py-3 px-4 text-right font-mono text-sm text-indigo-600">
                     ₹{(totalPlanned - totalActual).toLocaleString()}
