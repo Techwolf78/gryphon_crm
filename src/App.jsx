@@ -155,7 +155,7 @@ const App = () => (
     <ErrorBoundary>
       <AuthProvider>
         <NotificationsProvider>
-          <Router basename="/sync">
+          <Router basename="/">
             <AppContent />
           </Router>
         </NotificationsProvider>
