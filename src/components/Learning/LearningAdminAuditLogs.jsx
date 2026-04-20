@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { FiAlertCircle, FiClock, FiUser, FiActivity, FiChevronLeft, FiFilter, FiCalendar } from "react-icons/fi";
 import PropTypes from "prop-types";
@@ -17,6 +18,7 @@ import { useAuth } from "../../context/AuthContext";
 
 const LearningAdminAuditLogs = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -174,7 +176,7 @@ const LearningAdminAuditLogs = () => {
                   Go Back
                 </button>
                 <button
-                  onClick={() => window.location.href = '/'}
+                  onClick={() => navigate('/')}
                   className="w-full sm:w-auto inline-flex items-center justify-center px-3 py-2 bg-blue-600 border border-transparent rounded-md text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors text-sm sm:text-base font-medium"
                 >
                   Dashboard

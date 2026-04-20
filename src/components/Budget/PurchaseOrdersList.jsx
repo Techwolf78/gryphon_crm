@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { exportPurchaseOrderToPDF } from "./utils/exportPOtoPDF"; // Make sure this path is correct
 import { exportCsddPurchaseOrderToPDF } from "./utils/exportCsddPOtoPDF";
 import ViewPurchaseOrderModal from "./ViewPurchaseOrderModal";
@@ -13,6 +13,7 @@ const PurchaseOrdersList = ({
   getComponentsForItem,
   showDepartment = false,
   onUpdatePurchaseOrder,
+  onRejectOrder,
 }) => {
   const [sortConfig, setSortConfig] = useState({
     key: "createdAt",
@@ -20,6 +21,8 @@ const PurchaseOrdersList = ({
   });
   const [viewModal, setViewModal] = useState(null);
   const [activeDropdown, setActiveDropdown] = useState(null);
+  const [rejectConfirm, setRejectConfirm] = useState(null);
+  const [rejectingOrderId, setRejectingOrderId] = useState(null);
 
   // Helper function to get vendor details by ID
   const getVendorDetails = (vendorId) => {
@@ -143,6 +146,7 @@ const PurchaseOrdersList = ({
       approved: "bg-green-100 text-green-800 border-green-200",
       completed: "bg-blue-100 text-blue-800 border-blue-200",
       cancelled: "bg-gray-100 text-gray-800 border-gray-200",
+      rejected: "bg-red-100 text-red-800 border-red-200",
     };
     return colors[status] || "bg-gray-100 text-gray-800 border-gray-200";
   };
@@ -180,6 +184,22 @@ const PurchaseOrdersList = ({
     }
   };
 
+  const handleRejectClick = useCallback((order) => {
+    setRejectConfirm(order);
+    setActiveDropdown(null);
+  }, []);
+
+  const confirmReject = useCallback(async () => {
+    if (!rejectConfirm || !onRejectOrder) return;
+    setRejectingOrderId(rejectConfirm.id);
+    try {
+      await onRejectOrder(rejectConfirm);
+    } finally {
+      setRejectingOrderId(null);
+      setRejectConfirm(null);
+    }
+  }, [rejectConfirm, onRejectOrder]);
+
   return (
     <div className="space-y-4" onClick={handleClickOutside}>
       {/* Filters */}
@@ -201,6 +221,7 @@ const PurchaseOrdersList = ({
               <option value="approved">Approved</option>
               <option value="completed">Completed</option>
               <option value="cancelled">Cancelled</option>
+              <option value="rejected">Rejected</option>
             </select>
           </div>
 
@@ -450,6 +471,33 @@ const PurchaseOrdersList = ({
                                 </svg>
                                 Export To PDF
                               </button>
+
+                              {/* Reject Action — only for approved orders */}
+                              {order.status === "approved" && onRejectOrder && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRejectClick(order);
+                                  }}
+                                  disabled={rejectingOrderId === order.id}
+                                  className="flex items-center w-full px-3 py-1.5 text-red-600 hover:bg-red-50 disabled:opacity-50"
+                                >
+                                  <svg
+                                    className="w-3.5 h-3.5 mr-2"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
+                                    />
+                                  </svg>
+                                  Reject PO
+                                </button>
+                              )}
                             </div>
                           </div>
                         )}
@@ -504,6 +552,84 @@ const PurchaseOrdersList = ({
             phone: getVendorPhone(viewModal),
           }}
         />
+      )}
+
+      {/* Reject Confirmation Modal */}
+      {rejectConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-3 z-50 text-sm">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+            <div className="p-4">
+              <div className="flex items-center justify-center w-10 h-10 mx-auto bg-red-100 rounded-full mb-3">
+                <svg
+                  className="w-5 h-5 text-red-600"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
+                  />
+                </svg>
+              </div>
+              <h3 className="text-base font-semibold text-gray-900 text-center mb-1.5">
+                Reject Purchase Order?
+              </h3>
+              <p className="text-gray-600 text-center mb-1 text-sm">
+                Are you sure you want to reject{" "}
+                <strong>{rejectConfirm.poNumber}</strong>?
+              </p>
+              <p className="text-gray-500 text-center mb-4 text-xs">
+                This will reverse the spent amount (₹
+                {(rejectConfirm.finalAmount || rejectConfirm.totalCost || 0).toLocaleString("en-IN")}
+                ) from the department budget and reset the linked purchase intent.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setRejectConfirm(null)}
+                  disabled={rejectingOrderId === rejectConfirm.id}
+                  className="flex-1 px-3 py-1.5 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmReject}
+                  disabled={rejectingOrderId === rejectConfirm.id}
+                  className="flex-1 px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-semibold disabled:opacity-50 flex items-center justify-center text-sm"
+                >
+                  {rejectingOrderId === rejectConfirm.id ? (
+                    <>
+                      <svg
+                        className="animate-spin -ml-1 mr-1.5 h-3.5 w-3.5 text-white"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        ></circle>
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        ></path>
+                      </svg>
+                      Rejecting...
+                    </>
+                  ) : (
+                    "Reject PO"
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

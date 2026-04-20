@@ -156,13 +156,13 @@ export const generateInvoicePDF = async (invoiceData) => {
     const conveyance = safeInvoiceData.conveyance || 0;
     const food = safeInvoiceData.food || 0;
     const lodging = safeInvoiceData.lodging || 0;
-    const subTotal = trainingAmount + conveyance + food + lodging;
+    const subTotal = Math.round(trainingAmount + conveyance + food + lodging);
     const gstAmount = safeInvoiceData.gst === "18" ? Math.round(trainingAmount * 0.18) : 0;
     const taxableAmount = trainingAmount + gstAmount;
-    const tdsAmount = (taxableAmount * (safeInvoiceData.tds || 0)) / 100;
+    const tdsAmount = Math.round((taxableAmount * (safeInvoiceData.tds || 0)) / 100);
     const otherExpenses = subTotal - trainingAmount;
     const adhocAdjustment = safeInvoiceData.adhocAdjustment || 0;
-    const netPayable = taxableAmount - tdsAmount + otherExpenses + adhocAdjustment;
+    const netPayable = Math.round(taxableAmount - tdsAmount + otherExpenses + adhocAdjustment);
 
     // Calculate number of sessions (training days)
     const calculateSessions = () => {

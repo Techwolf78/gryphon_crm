@@ -246,6 +246,17 @@ function Purchase() {
     return "admin";
   }, [currentUserData]);
 
+  // Full list of departments the user belongs to (lowercased)
+  const currentUserDepartments = useMemo(() => {
+    if (currentUserData?.departments && Array.isArray(currentUserData.departments)) {
+      return currentUserData.departments.map((d) => d.toLowerCase());
+    }
+    if (currentUserData?.department) {
+      return [currentUserData.department.toLowerCase()];
+    }
+    return ["admin"];
+  }, [currentUserData]);
+
   const currentUserDepartmentComponents = getDepartmentComponents(
     currentUserDepartment,
   );
@@ -662,7 +673,7 @@ function Purchase() {
           const deptCode =
             DepartmentService.getDepartmentCode(intentDepartment);
           const prefix =
-            intentDepartment?.toLowerCase() === "dm" ? "ICEM" : "GA";
+            intentDepartment?.toLowerCase() === "dm" ? "GA" : "GA";
           const currentCount = targetBudget.data().poCounter || 0;
           const newCount = currentCount + 1;
           const poNumber = `${prefix}/${currentFiscalYear}/${deptCode}/${newCount
@@ -813,6 +824,20 @@ function Purchase() {
     [currentUser],
   );
 
+  const handleEditIntent = useCallback(
+    async (intentId, updatedFields) => {
+      try {
+        await DepartmentService.updateIntent(intentId, updatedFields, currentUser);
+        toast.success("Purchase intent updated successfully!");
+      } catch (error) {
+        console.error("Error updating intent:", error);
+        toast.error("Failed to update purchase intent.");
+        throw error;
+      }
+    },
+    [currentUser],
+  );
+
   const handleApproveOrder = async (order) => {
     if (!order || !order.id) {
       console.error("Invalid order object:", order);
@@ -830,6 +855,28 @@ function Purchase() {
       console.error("Error approving order:", error);
     }
   };
+
+  const handleRejectPurchaseOrder = useCallback(
+    async (order) => {
+      try {
+        await DepartmentService.rejectPurchaseOrder(order, currentUser);
+        toast.success(`Purchase Order ${order.poNumber} rejected and budget reversed.`);
+      } catch (error) {
+        console.error("Error rejecting purchase order:", error);
+        let errorMessage = "Failed to reject purchase order. ";
+        if (error.message.includes("already rejected")) {
+          errorMessage = "This purchase order is already rejected.";
+        } else if (error.message.includes("No active budget")) {
+          errorMessage += "No active budget found for this department.";
+        } else {
+          errorMessage += error.message || "Please try again.";
+        }
+        toast.error(errorMessage);
+        throw error;
+      }
+    },
+    [currentUser],
+  );
 
   // Action handlers for budget table
   const handleEditBudget = (budget) => {
@@ -1249,6 +1296,7 @@ function Purchase() {
                 showDepartment={true} // Show department column for purchase view
                 onUpdatePurchaseOrder={handleUpdatePurchaseOrder}
                 onApproveOrder={handleApproveOrder}
+                onRejectOrder={handleRejectPurchaseOrder}
               />
             )}
 
@@ -1258,6 +1306,7 @@ function Purchase() {
                 budgetComponents={currentUserDepartmentComponents}
                 componentColors={componentColors}
                 onDeleteIntent={handleDeleteIntent}
+                onEditIntent={handleEditIntent}
                 onApproveIntent={handleApproveIntent}
                 onCreatePurchaseOrder={(intent) => {
                   setSelectedIntent(intent);
@@ -1268,6 +1317,7 @@ function Purchase() {
                 currentUser={currentUser}
                 fiscalYear={currentFiscalYear}
                 userDepartment={currentUserDepartment}
+                userDepartments={currentUserDepartments}
                 getComponentsForItem={getComponentsForItem}
                 showDepartment={true} // Show department column for purchase view
               />

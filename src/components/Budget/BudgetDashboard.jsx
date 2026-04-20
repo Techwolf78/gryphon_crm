@@ -340,6 +340,17 @@ function BudgetDashboard({
     return department || "admin";
   }, [currentUserData, department]);
 
+  // Full list of departments the user belongs to (lowercased)
+  const currentUserDepartments = useMemo(() => {
+    if (currentUserData?.departments && Array.isArray(currentUserData.departments)) {
+      return currentUserData.departments.map((d) => d.toLowerCase());
+    }
+    if (currentUserData?.department) {
+      return [currentUserData.department.toLowerCase()];
+    }
+    return [department?.toLowerCase() || "admin"];
+  }, [currentUserData, department]);
+
   const currentUserDepartmentComponents = getDepartmentComponents(
     currentUserDepartment,
   );
@@ -617,6 +628,20 @@ function BudgetDashboard({
     }
   }, []);
 
+  const handleEditIntent = useCallback(
+    async (intentId, updatedFields) => {
+      try {
+        await DepartmentService.updateIntent(intentId, updatedFields, currentUser);
+        toast.success("Purchase intent updated successfully!");
+      } catch (error) {
+        console.error("Error updating intent:", error);
+        toast.error("Failed to update purchase intent.");
+        throw error;
+      }
+    },
+    [currentUser],
+  );
+
   const handleCreatePurchaseOrder = useCallback(
     async (orderData) => {
       try {
@@ -691,6 +716,28 @@ function BudgetDashboard({
       toast.error("Failed to update PO");
     }
   };
+
+  const handleRejectPurchaseOrder = useCallback(
+    async (order) => {
+      try {
+        await DepartmentService.rejectPurchaseOrder(order, currentUser);
+        toast.success(`Purchase Order ${order.poNumber} rejected and budget reversed.`);
+      } catch (error) {
+        console.error("Error rejecting purchase order:", error);
+        let errorMessage = "Failed to reject purchase order. ";
+        if (error.message.includes("already rejected")) {
+          errorMessage = "This purchase order is already rejected.";
+        } else if (error.message.includes("No active budget")) {
+          errorMessage += "No active budget found for this department.";
+        } else {
+          errorMessage += error.message || "Please try again.";
+        }
+        toast.error(errorMessage);
+        throw error;
+      }
+    },
+    [currentUser],
+  );
 
   // UI Handlers (Simple state setters)
   const handleEditBudget = (budget) => {
@@ -1065,6 +1112,7 @@ function BudgetDashboard({
                 getComponentsForItem={getComponentsForItem}
                 showDepartment={showDepartment}
                 onUpdatePurchaseOrder={handleUpdatePurchaseOrder}
+                onRejectOrder={handleRejectPurchaseOrder}
               />
             )}
 
@@ -1074,6 +1122,7 @@ function BudgetDashboard({
                 budgetComponents={currentUserDepartmentComponents}
                 componentColors={componentColors}
                 onDeleteIntent={handleDeleteIntent}
+                onEditIntent={handleEditIntent}
                 onCreatePurchaseOrder={(intent) => {
                   setSelectedIntent(intent);
                   setShowPurchaseOrderModal(true);
@@ -1083,6 +1132,7 @@ function BudgetDashboard({
                 currentUser={currentUser}
                 fiscalYear={currentFiscalYear}
                 userDepartment={currentUserDepartment}
+                userDepartments={currentUserDepartments}
                 getComponentsForItem={getComponentsForItem}
                 showDepartment={showDepartment}
               />

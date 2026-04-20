@@ -225,6 +225,15 @@ export const DepartmentService = {
     await deleteDoc(doc(db, "purchase_intents", intentId));
   },
 
+  async updateIntent(intentId, updatedFields, user) {
+    const intentRef = doc(db, "purchase_intents", intentId);
+    await updateDoc(intentRef, {
+      ...updatedFields,
+      updatedAt: serverTimestamp(),
+      updatedBy: user.uid,
+    });
+  },
+
   // ==========================================
   // 5. PURCHASE ORDERS (THE COMPLEX TRANSACTION)
   // ==========================================
@@ -240,7 +249,7 @@ export const DepartmentService = {
 
     // 1. Prepare Data
     const deptCode = this.getDepartmentCode(department);
-    const prefix = department?.toLowerCase() === "dm" ? "ICEM" : "GA";
+    const prefix = department?.toLowerCase() === "dm" ? "GA" : "GA";
     const totalAmount = orderData.finalAmount;
     const intentId = orderData.intentId;
     const budgetComponent =
@@ -412,6 +421,146 @@ export const DepartmentService = {
   },
 
   // ==========================================
+  // 5c. REJECT APPROVED PURCHASE ORDER
+  // Reverses budget changes made during PO creation
+  // Does NOT touch poCounter
+  // ==========================================
+
+  async rejectPurchaseOrder(order, user) {
+    if (!order?.id) throw new Error("Invalid order — missing ID");
+
+    const totalAmount = order.finalAmount || order.totalCost || 0;
+    if (totalAmount <= 0) throw new Error("Order has no valid amount to reverse");
+
+    const isCsdd = order.intentType === "csdd";
+
+    await runTransaction(db, async (transaction) => {
+      // ========== READ PHASE (all reads must come first) ==========
+
+      // 1. Read: PO document
+      const poRef = doc(db, "purchase_orders", order.id);
+      const poDoc = await transaction.get(poRef);
+      if (!poDoc.exists()) throw new Error("Purchase order not found");
+      if (poDoc.data().status === "rejected") {
+        throw new Error("Purchase order is already rejected");
+      }
+
+      // 2. Read: Find the active budget for the PO's department
+      const department = order.department;
+      const budgetsQuery = query(
+        collection(db, "department_budgets"),
+        where("department", "==", department),
+        where("status", "==", "active"),
+      );
+      const budgetsSnapshot = await getDocs(budgetsQuery);
+      if (budgetsSnapshot.empty) {
+        throw new Error(`No active budget found for ${department} department`);
+      }
+
+      const targetBudget = budgetsSnapshot.docs[0];
+      const budgetRef = doc(db, "department_budgets", targetBudget.id);
+      const budgetDoc = await transaction.get(budgetRef);
+      if (!budgetDoc.exists()) throw new Error("Budget document not found");
+      const budgetData = budgetDoc.data();
+
+      // 3. Read: Intent document (if linked)
+      let intentRef = null;
+      let intentExists = false;
+      if (order.intentId) {
+        intentRef = doc(db, "purchase_intents", order.intentId);
+        const intentDoc = await transaction.get(intentRef);
+        intentExists = intentDoc.exists();
+      }
+
+      // 4. Read: CSDD client subcollection doc (if applicable)
+      let clientRef = null;
+      let clientExists = false;
+      if (isCsdd && order.clientKey && order.csddComponent) {
+        clientRef = doc(budgetRef, "csdd_clients", order.clientKey);
+        const clientDoc = await transaction.get(clientRef);
+        clientExists = clientDoc.exists();
+      }
+
+      // ========== WRITE PHASE (all writes after reads) ==========
+
+      // 5. Write: Mark PO as rejected
+      transaction.update(poRef, {
+        status: "rejected",
+        rejectedAt: serverTimestamp(),
+        rejectedBy: user.displayName || user.uid,
+        lastUpdatedAt: serverTimestamp(),
+        updatedBy: user.uid,
+      });
+
+      // 6. Write: Reset linked purchase intent back to "submitted"
+      if (intentRef && intentExists) {
+        transaction.update(intentRef, {
+          status: "rejected",
+          poCreated: false,
+          poNumber: null,
+          approvedAt: null,
+          approvedBy: null,
+          updatedAt: serverTimestamp(),
+        });
+      }
+
+      // 7. Write: Reverse budget amounts
+      if (isCsdd) {
+        // CSDD PO: reverse csddExpenses.{clientKey}.spent + summary.totalSpent
+        const clientKey = order.clientKey;
+        if (!clientKey) throw new Error("CSDD PO missing clientKey");
+
+        const budgetUpdate = {
+          "summary.totalSpent": increment(-totalAmount),
+          lastUpdatedAt: serverTimestamp(),
+          updatedBy: user.uid,
+        };
+
+        if (budgetData.csddExpenses?.[clientKey]) {
+          budgetUpdate[`csddExpenses.${clientKey}.spent`] =
+            increment(-totalAmount);
+        }
+
+        transaction.update(budgetRef, budgetUpdate);
+
+        // Reverse the client subcollection component spent
+        if (clientRef && clientExists) {
+          transaction.update(clientRef, {
+            [`client_components.${order.csddComponent}.spent`]:
+              increment(-totalAmount),
+            lastUpdatedAt: serverTimestamp(),
+          });
+        }
+      } else {
+        // Standard PO: reverse {section}.{component}.spent + summary.totalSpent
+        const budgetComponent =
+          order.budgetComponent || order.selectedBudgetComponent;
+
+        const section = budgetData.departmentExpenses?.[budgetComponent]
+          ? "departmentExpenses"
+          : budgetData.fixedCosts?.[budgetComponent]
+            ? "fixedCosts"
+            : budgetData.csddExpenses?.[budgetComponent]
+              ? "csddExpenses"
+              : null;
+
+        const budgetUpdate = {
+          "summary.totalSpent": increment(-totalAmount),
+          lastUpdatedAt: serverTimestamp(),
+          updatedBy: user.uid,
+        };
+
+        if (section) {
+          budgetUpdate[`${section}.${budgetComponent}.spent`] =
+            increment(-totalAmount);
+        }
+
+        transaction.update(budgetRef, budgetUpdate);
+      }
+    });
+  },
+
+  // ==========================================
   // 6. ADMIN / PURCHASE SPECIFIC METHODS
   // ==========================================
 
@@ -514,7 +663,7 @@ export const DepartmentService = {
       // 3. Generate PO Number
       // (Reusing logic: In a real app, extract generatePurchaseOrderNumber to a shared helper)
       const deptCode = this.getDepartmentCode(department);
-      const prefix = department?.toLowerCase() === "dm" ? "ICEM" : "GA";
+      const prefix = department?.toLowerCase() === "dm" ? "GA" : "GA";
       const currentCount = targetBudget.data().poCounter || 0;
       const newCount = currentCount + 1;
       const poNumber = `${prefix}/${currentFiscalYear}/${deptCode}/${newCount
