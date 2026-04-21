@@ -264,6 +264,15 @@ const TaskCard = ({
         {task.description}
       </p>
 
+      {task.remarks && (
+        <div className="mt-2 p-2 bg-amber-50/50 border border-amber-100 rounded-lg">
+          <p className="text-[9px] text-amber-700 leading-tight italic">
+            <span className="font-bold not-italic mr-1 uppercase text-[8px]">Remarks:</span>
+            {task.remarks}
+          </p>
+        </div>
+      )}
+
 
       <div className="flex items-center justify-between mt-auto pt-2 border-t border-gray-50 gap-1">
         <div className="flex flex-wrap gap-1 items-center">
@@ -327,12 +336,14 @@ const TableView = ({ tasks, handleDelete, onEditTask, user, moveTask, handleCopy
         <table className="w-full text-left">
           <thead className="bg-slate-50/50 border-b border-slate-100">
             <tr>
-              <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Tracking ID</th>
-              <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Information</th>
-              <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Assignee</th>
-              <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Timeline</th>
-              <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Status</th>
-              <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right whitespace-nowrap">Control Panel</th>
+              <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Information</th>
+              <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center whitespace-nowrap">Category</th>
+              <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center whitespace-nowrap">Classification</th>
+              <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Assignee</th>
+              <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Timeline</th>
+              <th className="px-3 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center w-24">Status</th>
+              <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Remarks</th>
+              <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right whitespace-nowrap">Control Panel</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
@@ -341,18 +352,21 @@ const TableView = ({ tasks, handleDelete, onEditTask, user, moveTask, handleCopy
               const actionButtons = getActionButtons(task, canEdit);
               return (
                 <tr key={task.id} className="hover:bg-blue-50/30 transition-colors group">
-                  <td className="px-6 py-5">
-                     <span className="text-[11px] font-black text-blue-600 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-100">{task.customId}</span>
-                  </td>
-                  <td className="px-6 py-5">
-                    <div className="text-sm font-black text-slate-800 leading-tight">{task.title}</div>
-                    <div className="flex items-center gap-2 mt-1">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2 mb-1">
+                       <span className="text-[11px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">{task.customId}</span>
                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{task.role}</span>
-                       <div className="w-1 h-1 rounded-full bg-slate-200"></div>
-                       <div className="text-[10px] text-slate-400 font-medium line-clamp-1 max-w-[200px]">{task.description}</div>
                     </div>
+                    <div className="text-sm font-black text-slate-800 leading-tight">{task.title}</div>
+                    <div className="text-[10px] text-slate-400 font-medium line-clamp-1 max-w-[300px] mt-1">{task.description}</div>
                   </td>
-                  <td className="px-6 py-5">
+                  <td className="px-4 py-3 text-center">
+                    <span className="text-[9px] font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg border border-indigo-100 uppercase tracking-widest whitespace-nowrap">{task.category || "-"}</span>
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <span className="text-[9px] font-black text-purple-600 bg-purple-50 px-2 py-1 rounded-lg border border-purple-100 uppercase tracking-widest whitespace-nowrap">{task.classification || "-"}</span>
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
                     <div className="flex flex-col items-center gap-1.5">
                       <div className="w-8 h-8 rounded-xl bg-linear-to-br from-slate-100 to-slate-200 border border-slate-200 flex items-center justify-center text-xs text-slate-600 font-black shadow-xs">
                         {task.assignedTo?.charAt(0)}
@@ -360,17 +374,13 @@ const TableView = ({ tasks, handleDelete, onEditTask, user, moveTask, handleCopy
                       <span className="text-[10px] text-slate-600 font-black tracking-tight">{task.assignedTo}</span>
                     </div>
                   </td>
-                  <td className="px-6 py-5">
-                     <div className="flex flex-col gap-0.5">
-                        <div className="flex items-center gap-1.5 text-slate-600 font-black text-[11px]">
-                          <FiCalendar size={12} className="text-slate-300" />
-                          {new Date(task.dueDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })}
-                        </div>
-                        <span className="text-[9px] font-bold text-slate-400 px-1 uppercase tracking-tighter">Submission Limit</span>
+                  <td className="px-4 py-3">
+                     <div className="text-slate-600 text-[11px] font-black">
+                        {task.startDate && task.dueDate ? `${new Date(task.startDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })} - ${new Date(task.dueDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })}` : "-"}
                      </div>
                   </td>
-                  <td className="px-6 py-5 text-center">
-                    <span className={`px-3 py-1.5 rounded-xl text-[9px] font-black border uppercase tracking-widest inline-block ${
+                  <td className="px-3 py-3 text-center">
+                    <span className={`px-2 py-1 rounded-lg text-[8px] font-black border uppercase tracking-tighter inline-block ${
                       task.status === "completed" ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
                       task.status === "in_progress" ? "bg-blue-50 text-blue-600 border-blue-100" :
                       task.status === "cancelled" ? "bg-rose-50 text-rose-600 border-rose-100" :
@@ -378,6 +388,11 @@ const TableView = ({ tasks, handleDelete, onEditTask, user, moveTask, handleCopy
                     }`}>
                       {task.status.replace("_", " ")}
                     </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="text-[10px] text-slate-500 font-medium line-clamp-2 max-w-[150px]" title={task.remarks}>
+                      {task.remarks || "-"}
+                    </div>
                   </td>
                   <td className="px-6 py-5 text-right">
                     <div className="flex justify-end gap-1">
@@ -659,6 +674,7 @@ const LDTaskManager = ({ onBack }) => {
   const [formData, setFormData] = useState({
     title: "",
     description: "",
+    remarks: "",
     category: "",
     classification: "",
     projectCode: "",
@@ -845,6 +861,7 @@ const LDTaskManager = ({ onBack }) => {
     setFormData({
       title: task.title,
       description: task.description,
+      remarks: task.remarks || "",
       role: task.role,
       assignedTo: task.assignedTo,
       startDate: task.startDate,
@@ -859,6 +876,7 @@ const LDTaskManager = ({ onBack }) => {
     setFormData({
       title: "",
       description: "",
+      remarks: "",
       category: "",
       classification: "",
       projectCode: "",
@@ -1140,6 +1158,16 @@ const LDTaskManager = ({ onBack }) => {
                     />
                     {showProjectCodeDropdown && (
                       <div className="absolute z-20 left-0 right-0 mt-1 max-h-44 overflow-y-auto bg-white border border-gray-200 rounded-2xl shadow-xl">
+                        <button
+                          type="button"
+                          onMouseDown={() => {
+                            setFormData({...formData, projectCode: "Internal"});
+                            setShowProjectCodeDropdown(false);
+                          }}
+                          className="w-full text-left px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100 font-semibold"
+                        >
+                          Internal
+                        </button>
                         {filteredProjectCodeOptions.length > 0 ? (
                           filteredProjectCodeOptions.map(code => (
                             <button
@@ -1167,6 +1195,17 @@ const LDTaskManager = ({ onBack }) => {
                       <option value="">Resource Selection</option>
                       {assignees.map(a => <option key={a} value={a}>{a.toUpperCase()}</option>)}
                     </select>
+                  </div>
+
+                  <div className="col-span-2">
+                    <label className="block text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">Remarks</label>
+                    <textarea
+                      value={formData.remarks}
+                      onChange={e => setFormData({...formData, remarks: e.target.value})}
+                      className="w-full px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg focus:border-indigo-500 outline-none transition-all text-gray-700 text-sm"
+                      placeholder="Additional notes..."
+                      rows={2}
+                    />
                   </div>
 
                   <div>

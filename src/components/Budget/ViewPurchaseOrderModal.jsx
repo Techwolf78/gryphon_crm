@@ -16,8 +16,6 @@ const ViewPurchaseOrderModal = ({
     if (order) setFormData(order);
   }, [order]);
 
-  if (!show || !order) return null;
-
   // 🔹 Handle input updates
   const handleChange = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -77,8 +75,10 @@ const ViewPurchaseOrderModal = ({
     return () => window.removeEventListener("wheel", preventScrollChange);
   }, []);
 
+  if (!show || !order) return null;
+
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[1000]">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-1000">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex justify-between items-center p-5 border-b border-gray-200">
@@ -88,7 +88,7 @@ const ViewPurchaseOrderModal = ({
           </h2>
 
           <div className="flex gap-2">
-            {/* {!isEditing ? (
+            {!isEditing ? (
               <button
                 onClick={() => setIsEditing(true)}
                 className="
@@ -116,7 +116,7 @@ const ViewPurchaseOrderModal = ({
               >
                 Save
               </button>
-            )} */}
+            )}
             <button
               onClick={onClose}
               className="px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-100"
@@ -133,7 +133,7 @@ const ViewPurchaseOrderModal = ({
             <div className="flex justify-evenly items-center">
               <div>
                 <img
-                  src="/gryphon_logo.png"
+                  src={`${import.meta.env.BASE_URL}gryphon_logo.png`}
                   alt="Logo"
                   className="mx-auto h-20 mb-2"
                 />

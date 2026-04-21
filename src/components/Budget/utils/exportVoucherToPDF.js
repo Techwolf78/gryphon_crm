@@ -91,7 +91,7 @@ export default async function exportVoucherToPDF(voucher, budgetData = {}) {
   /* -------------------------------------------------- */
 
   try {
-    pdf.addImage("/gryphon_logo.png", "PNG", 14, 10, 45, 25);
+    pdf.addImage(`${import.meta.env.BASE_URL}gryphon_logo.png`, "PNG", 14, 10, 45, 25);
   } catch {}
 
   pdf.setTextColor(40, 40, 40);

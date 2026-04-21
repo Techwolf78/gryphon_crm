@@ -73,7 +73,7 @@ export default async function exportCashVoucherToPDF(voucher, budgetData = {}) {
     // --- LOGO & HEADER ---
     try {
       // Slightly smaller logo to save vertical space
-      pdf.addImage("/gryphon_logo.png", "PNG", 14, Y, 35, 20);
+      pdf.addImage(`${import.meta.env.BASE_URL}gryphon_logo.png`, "PNG", 14, Y, 35, 20);
     } catch {}
 
     pdf.setTextColor(0, 0, 0);

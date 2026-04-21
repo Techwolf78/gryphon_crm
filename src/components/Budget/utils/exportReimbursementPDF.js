@@ -81,7 +81,7 @@ export default async function exportReimbursementPDF(
 
   /* ---------------- LOGO + HEADER ---------------- */
   try {
-    pdf.addImage("/gryphon_logo.png", "PNG", marginX, 8, 40, 22);
+    pdf.addImage(`${import.meta.env.BASE_URL}gryphon_logo.png`, "PNG", marginX, 8, 40, 22);
   } catch {}
 
   pdf.setFont("helvetica", "bold");

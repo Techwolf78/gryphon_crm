@@ -18,7 +18,7 @@ export const exportClientBudgetSheetToPDF = ({
   const pdf = new jsPDF("p", "mm", "a4");
 
   // ── Logo ──
-  const logoUrl = "/gryphon_logo.png";
+  const logoUrl = `${import.meta.env.BASE_URL}gryphon_logo.png`;
   try {
     pdf.addImage(logoUrl, "PNG", 14, 10, 45, 25);
   } catch {
