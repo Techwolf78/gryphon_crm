@@ -120,13 +120,20 @@ const Admin = () => {
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      const [usersSnap, logsSnap] = await Promise.all([
+      const [usersSnap, logsSnap, sessionsSnap] = await Promise.all([
         getDocs(collection(db, "users")),
         getDocs(
           query(
             collection(db, "audit_logs"),
             orderBy("timestamp", "desc"),
             limit(50)
+          )
+        ),
+        getDocs(
+          query(
+            collection(db, "user_sessions"),
+            orderBy("startTime", "desc"),
+            limit(2000)
           )
         ),
       ]);
@@ -161,11 +168,25 @@ const Admin = () => {
         timestamp: doc.data().timestamp?.toDate ? doc.data().timestamp.toDate().toISOString() : doc.data().timestamp,
       }));
 
+      const sessionData = sessionsSnap.docs.map((doc) => {
+        const data = doc.data();
+        const ts = data.startTime || data.timestamp;
+        return {
+          id: doc.id,
+          ...data,
+          action: "Logged in", // Synthesize action for LoginAnalytics
+          timestamp: ts?.toDate ? ts.toDate().toISOString() : ts,
+        };
+      });
+
+      // Combine audit logs and sessions for analytics
+      const combinedLogs = [...logData, ...sessionData];
+
       setUsers(userData);
-      setLogs(logData);
+      setLogs(combinedLogs);
 
       sessionStorage.setItem("userList", JSON.stringify(userData));
-      sessionStorage.setItem("auditLogs", JSON.stringify(logData));
+      sessionStorage.setItem("auditLogs", JSON.stringify(combinedLogs));
     } catch {
       // Refresh error - handled silently
     }
