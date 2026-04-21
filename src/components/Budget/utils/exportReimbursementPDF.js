@@ -41,6 +41,83 @@ const parseValue = (val) => {
   return isNaN(num) ? 0 : num;
 };
 
+// ── Vector Icon Drawers (for footer) ──
+
+const drawGlobeIcon = (pdf, cx, cy, r) => {
+  pdf.setDrawColor(100, 100, 100);
+  pdf.setLineWidth(0.2);
+  pdf.circle(cx, cy, r, "S");
+  pdf.line(cx - r, cy, cx + r, cy);
+  pdf.line(cx, cy - r, cx, cy + r);
+  pdf.ellipse(cx, cy, r * 0.5, r, "S");
+};
+
+const drawEmailIcon = (pdf, cx, cy, r) => {
+  pdf.setDrawColor(100, 100, 100);
+  pdf.setLineWidth(0.2);
+  const w = r * 2.4;
+  const h = r * 1.6;
+  const left = cx - w / 2;
+  const top = cy - h / 2;
+  pdf.rect(left, top, w, h, "S");
+  pdf.line(left, top, cx, cy + 0.3);
+  pdf.line(left + w, top, cx, cy + 0.3);
+};
+
+const drawPhoneIcon = (pdf, cx, cy, r) => {
+  pdf.setDrawColor(100, 100, 100);
+  pdf.setLineWidth(0.2);
+  const w = r * 1.2;
+  const h = r * 2;
+  pdf.rect(cx - w / 2, cy - h / 2, w, h, "S");
+  pdf.line(cx - w / 2 + 0.3, cy - h / 2 + 0.4, cx + w / 2 - 0.3, cy - h / 2 + 0.4);
+  pdf.line(cx - w / 2 + 0.3, cy + h / 2 - 0.4, cx + w / 2 - 0.3, cy + h / 2 - 0.4);
+};
+
+const addFooterToAllPages = (pdf) => {
+  const totalPages = pdf.internal.getNumberOfPages();
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const lineY = pageHeight - 18;
+  const textY = lineY + 5;
+
+  for (let i = 1; i <= totalPages; i++) {
+    pdf.setPage(i);
+
+    // Horizontal divider
+    pdf.setDrawColor(160, 160, 160);
+    pdf.setLineWidth(0.4);
+    pdf.line(14, lineY, pageWidth - 14, lineY);
+
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(8);
+    pdf.setTextColor(100, 100, 100);
+
+    // Globe + website
+    const iconR = 1.5;
+    drawGlobeIcon(pdf, 18, textY - 1, iconR);
+    pdf.text("www.gryphonacademy.co.in", 22, textY);
+
+    // Email + address
+    drawEmailIcon(pdf, 82, textY - 1, iconR);
+    pdf.text("connect@gryphonacademy.co.in", 86, textY);
+
+    // Phone + number
+    drawPhoneIcon(pdf, 152, textY - 1, iconR);
+    pdf.text("8956444509", 156, textY);
+
+    // Page number
+    pdf.setFontSize(7);
+    pdf.setTextColor(140, 140, 140);
+    pdf.text(
+      `Page ${i} of ${totalPages}`,
+      pageWidth - 14,
+      pageHeight - 8,
+      { align: "right" },
+    );
+  }
+};
+
 /* -------------------------------------------------- */
 /*               EXPORT REIMBURSEMENT PDF            */
 /* -------------------------------------------------- */
@@ -81,7 +158,7 @@ export default async function exportReimbursementPDF(
 
   /* ---------------- LOGO + HEADER ---------------- */
   try {
-    pdf.addImage("/gryphon_logo.png", "PNG", marginX, 8, 40, 22);
+    pdf.addImage("/sync/gryphon_logo.png", "PNG", marginX, 8, 40, 22);
   } catch {}
 
   pdf.setFont("helvetica", "bold");
@@ -252,6 +329,50 @@ export default async function exportReimbursementPDF(
     tableWidth: full7,
   });
 
+  /* ---------------- PAGE 1 — SIGNATURES ---------------- */
+  {
+    const pgHeight = pdf.internal.pageSize.getHeight();
+    const pgWidth = pdf.internal.pageSize.getWidth();
+    const sigTableWidth = 250; // 5 × 50
+    const sigMarginLeft = (pgWidth - sigTableWidth) / 2;
+    const sigTableHeight = 42;
+    const footerTopY = pgHeight - 18;
+    const idealSigY = footerTopY - sigTableHeight - 3;
+    const sigStartY = Math.max(pdf.lastAutoTable.finalY + 5, idealSigY);
+
+    autoTable(pdf, {
+      startY: sigStartY,
+      tableWidth: sigTableWidth,
+      margin: { left: sigMarginLeft },
+      body: [
+        ["", "", "", "", ""],
+        [
+          "Signature\n\n(Dept. Head)",
+          "Signature\n\n(HR)",
+          "Signature\n\n(Delivery Head)",
+          "Signature\n\n(Co-Founder)",
+          "Signature\n\n(Founder )",
+        ],
+      ],
+      theme: "grid",
+      styles: {
+        fontSize: 9,
+        halign: "center",
+        minCellHeight: 20,
+        textColor: [40, 40, 40],
+        lineColor: [0, 0, 0],
+        lineWidth: 0.2,
+      },
+      columnStyles: {
+        0: { cellWidth: 50 },
+        1: { cellWidth: 50 },
+        2: { cellWidth: 50 },
+        3: { cellWidth: 50 },
+        4: { cellWidth: 50 },
+      },
+    });
+  }
+
   /* ---------------- PAGE 2 — BUDGET SUMMARY ---------------- */
 
   pdf.addPage();
@@ -353,6 +474,8 @@ export default async function exportReimbursementPDF(
     styles: {
       fontSize: 9,
       textColor: [40, 40, 40],
+      lineColor: [0, 0, 0],
+      lineWidth: 0.2,
     },
 
     didParseCell: (data) => {
@@ -373,10 +496,42 @@ export default async function exportReimbursementPDF(
     },
   });
 
-  pdf.setFontSize(8);
-  pdf.text("Generated via Gryphon Budget System", 150, 200, {
-    align: "center",
-  });
+  /* ---------------- PAGE 2 — SIGNATURES ---------------- */
+  {
+    const pgHeight = pdf.internal.pageSize.getHeight();
+    const sigTableHeight = 42;
+    const footerTopY = pgHeight - 18;
+    const idealSigY = footerTopY - sigTableHeight - 3;
+    const sigStartY = Math.max(pdf.lastAutoTable.finalY + 5, idealSigY);
+
+    const pgWidth = pdf.internal.pageSize.getWidth();
+    const sigTableWidth = 182;
+    const sigMarginLeft = (pgWidth - sigTableWidth) / 2;
+
+    autoTable(pdf, {
+      startY: sigStartY,
+      tableWidth: sigTableWidth,
+      margin: { left: sigMarginLeft },
+      body: [
+        ["", ""],
+        ["Signature\n\n(Founder )", "Signature\n\n(Co-Founder)"],
+      ],
+      theme: "grid",
+      styles: {
+        fontSize: 9,
+        halign: "center",
+        minCellHeight: 20,
+        textColor: [40, 40, 40],
+        lineColor: [0, 0, 0],
+        lineWidth: 0.2,
+      },
+      columnStyles: { 0: { cellWidth: 91 }, 1: { cellWidth: 91 } },
+    });
+  }
+
+  /* ---------------- FOOTER ON ALL PAGES ---------------- */
+  addFooterToAllPages(pdf);
+
   /* ---------------- SAVE ---------------- */
 
   const clean = safe(voucher.name || voucher.name || "reimbursement").replace(
