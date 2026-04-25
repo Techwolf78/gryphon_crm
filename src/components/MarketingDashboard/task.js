@@ -1876,13 +1876,14 @@ const tasksData = [
 
 // Ensure all Event roles contain the required mandatory tasks (do not remove existing tasks)
 // Normalizes to a single "Backdrop" entry (removes "Backdrops" if present) and adds any missing items.
+// Adds new Event-specific tasks across all accounts.
 tasksData.forEach(account => {
   account.roles.forEach(role => {
     if (role.name === 'Event') {
       // normalize Backdrops -> Backdrop
       role.tasks = role.tasks.filter(task => task !== 'Backdrops');
 
-      ['Hoarding', 'Certificates', 'Standees', 'Backdrop'].forEach(task => {
+      ['Hoarding', 'Certificates', 'Standees', 'Backdrop', 'Brochure', 'Flyer'].forEach(task => {
         if (!role.tasks.includes(task)) {
           role.tasks.push(task);
         }
