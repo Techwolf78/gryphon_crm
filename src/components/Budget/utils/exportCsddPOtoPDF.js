@@ -228,6 +228,15 @@ export const exportCsddPurchaseOrderToPDF = async (order, vendorData) => {
     itemRows.push(["", "", "", "", "", ""]);
   }
 
+  // 💰 Total row (sum of all item estTotals)
+  if (order.items?.length > 0) {
+    const itemsTotal = order.items.reduce(
+      (sum, item) => sum + (parseFloat(item.estTotal) || 0),
+      0,
+    );
+    itemRows.push(["", "", "Total", "", "", formatNum(itemsTotal)]);
+  }
+
   // GST Logic
   if (order.gstDetails) {
     const gst = order.gstDetails;
@@ -267,7 +276,7 @@ export const exportCsddPurchaseOrderToPDF = async (order, vendorData) => {
   }
 
   autoTable(pdf, {
-    startY: pdf.lastAutoTable.finalY + 10,
+    startY: pdf.lastAutoTable.finalY + 4,
     head: [["S.N.", "Category", "Description", "Qty", "Unit Price", "Total"]],
     body: itemRows,
     theme: "grid",
@@ -288,12 +297,25 @@ export const exportCsddPurchaseOrderToPDF = async (order, vendorData) => {
         data.cell.styles.fillColor = [245, 245, 245];
       if (desc.includes("Total (with GST)"))
         data.cell.styles.fillColor = [230, 230, 230];
+
+      // Highlight the items Total row
+      if (desc === "Total" && !data.row.raw?.[0]) {
+        data.cell.styles.fontStyle = "bold";
+        data.cell.styles.fillColor = [235, 235, 235];
+      }
     },
   });
 
-  // Signatures
+  // Signatures — anchor near bottom, above footer (footer line at pageHeight-18)
+  const pg1Height = pdf.internal.pageSize.getHeight();
+  const sigTableHeight1 = 42; // 2 rows × minCellHeight 20 + borders
+  const footerTopY1 = pg1Height - 18;
+  const paymentLineH = 10; // space for payment info below signatures
+  const idealSigY1 = footerTopY1 - sigTableHeight1 - paymentLineH - 3;
+  const sigStartY1 = Math.max(pdf.lastAutoTable.finalY + 5, idealSigY1);
+
   autoTable(pdf, {
-    startY: pdf.lastAutoTable.finalY + 10,
+    startY: sigStartY1,
     body: [
       ["", "", "", "", ""],
       [
@@ -301,7 +323,7 @@ export const exportCsddPurchaseOrderToPDF = async (order, vendorData) => {
         "Signature\n\n(HR)",
         "Signature\n\n(Delivery Head)",
         "Signature\n\n(Co-Founder)",
-        "Signature\n\n(Founder )",
+        "Signature\n\n(Founder)",
       ],
     ],
     theme: "grid",
@@ -322,7 +344,7 @@ export const exportCsddPurchaseOrderToPDF = async (order, vendorData) => {
   });
 
   // Payment Info
-  const payY = pdf.lastAutoTable.finalY + 20;
+  const payY = pdf.lastAutoTable.finalY + 5;
   pdf.text("Payment Date: ___________________", 20, payY);
   pdf.text("Payment Terms: ___________________", 120, payY);
 

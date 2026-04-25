@@ -214,6 +214,15 @@ export const exportPurchaseOrderToPDF = async (order, vendorData) => {
     itemRows.push(["", "", "", "", "", ""]);
   }
 
+  // 💰 Total row (sum of all item estTotals)
+  if (order.items?.length > 0) {
+    const itemsTotal = order.items.reduce(
+      (sum, item) => sum + (parseFloat(item.estTotal) || 0),
+      0,
+    );
+    itemRows.push(["", "", "Total", "", "", formatNum(itemsTotal)]);
+  }
+
   // 🟢 ENHANCED GST LOGIC (Read-Time Calculation)
   if (order.gstDetails) {
     const gst = order.gstDetails;
@@ -259,7 +268,7 @@ export const exportPurchaseOrderToPDF = async (order, vendorData) => {
   }
 
   autoTable(docPDF, {
-    startY: docPDF.lastAutoTable.finalY + 10,
+    startY: docPDF.lastAutoTable.finalY + 4,
     head: [["S.N.", "Category", "Description", "Qty", "Unit Price", "Total"]],
     body: itemRows,
     theme: "grid",
@@ -283,12 +292,25 @@ export const exportPurchaseOrderToPDF = async (order, vendorData) => {
 
       if (desc.includes("Total (with GST)"))
         data.cell.styles.fillColor = [230, 230, 230];
+
+      // Highlight the items Total row
+      if (desc === "Total" && !data.row.raw?.[0]) {
+        data.cell.styles.fontStyle = "bold";
+        data.cell.styles.fillColor = [235, 235, 235];
+      }
     },
   });
 
-  // ✍️ Signatures
+  // ✍️ Signatures — anchor near bottom, above footer (footer line at pageHeight-18)
+  const pg1Height = docPDF.internal.pageSize.getHeight();
+  const sigTableHeight1 = 42; // 2 rows × minCellHeight 20 + borders
+  const footerTopY1 = pg1Height - 18;
+  const paymentLineH = 10; // space for payment info below signatures
+  const idealSigY1 = footerTopY1 - sigTableHeight1 - paymentLineH - 3;
+  const sigStartY1 = Math.max(docPDF.lastAutoTable.finalY + 5, idealSigY1);
+
   autoTable(docPDF, {
-    startY: docPDF.lastAutoTable.finalY + 10,
+    startY: sigStartY1,
     body: [
       ["", "", "", "", ""],
       [
@@ -317,7 +339,7 @@ export const exportPurchaseOrderToPDF = async (order, vendorData) => {
   });
 
   // 💳 Payment Info
-  const payY = docPDF.lastAutoTable.finalY + 20;
+  const payY = docPDF.lastAutoTable.finalY + 5;
   docPDF.text("Payment Date: ___________________", 20, payY);
   docPDF.text("Payment Terms: ___________________", 120, payY);
 
