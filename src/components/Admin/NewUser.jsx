@@ -26,7 +26,7 @@ import {
 import emailjs from "@emailjs/browser";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-const departmentsList = ["Sales", "Placement", "L & D", "DM", "Admin", "CA", "HR", "Accounts"];
+const departmentsList = ["Sales", "Placement", "L & D", "DM", "Admin", "CA", "HR", "Accounts", "IT"];
 const roles = ["Director", "Head", "Manager", "Assistant Manager", "Executive"];
  
 // Validation constants

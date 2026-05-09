@@ -38,6 +38,7 @@ const BudgetUpdateForm = ({
       intercity_outstation_visits: "",
       lunch_dinner_with_client: "",
       mobile_sim: "",
+      ...(department === "management" ? { visits: "" } : {}),
     },
     components: {},
     csddComponents: {},
@@ -88,6 +89,9 @@ const BudgetUpdateForm = ({
         csdd.intercity_outstation_visits?.allocated ?? "",
       lunch_dinner_with_client: csdd.lunch_dinner_with_client?.allocated ?? "",
       mobile_sim: csdd.mobile_sim?.allocated ?? "",
+      ...(existingBudget.department === "management"
+        ? { visits: csdd.visits?.allocated ?? "" }
+        : {}),
     };
 
     // -------------------------------
@@ -104,6 +108,7 @@ const BudgetUpdateForm = ({
               "intercity_outstation_visits",
               "lunch_dinner_with_client",
               "mobile_sim",
+              "visits",
             ].includes(key),
         )
         .map(([key, val]) => [
@@ -1107,6 +1112,22 @@ const BudgetUpdateForm = ({
                       placeholder="0"
                     />
                   </div>
+
+                  {formData.department === "management" && (
+                    <div className="p-4 border-r border-gray-200 last:border-r-0">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Visits (₹)
+                      </label>
+                      <input
+                        type="number"
+                        name="csddExpenses.visits"
+                        value={formData.csddExpenses.visits}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="0"
+                      />
+                    </div>
+                  )}
 
                   {Object.entries(formData.csddComponents || {}).map(
                     ([componentId, component], index) => (

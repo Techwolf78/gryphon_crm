@@ -41,6 +41,7 @@ export const budgetComponents = {
     diwali_gifts: "Diwali Gifts",
     hrms: "HRMS",
     background_verification: "Background Verification",
+    bags: "Bags",
   },
   dm: {
     laptops: "Laptops",
@@ -71,7 +72,6 @@ export const budgetComponents = {
     tshirts: "T-shirts",
     printmedia: "Print Media",
     diwaligifts: "Diwali Gifts",
-
     salary: "Employee Salary",
     emailsim: "E-Mails & SIM",
     bags: "Bags",
@@ -94,11 +94,18 @@ export const budgetComponents = {
     placement_events: "Placement Events",
     diwaligifts: "Diwali Gifts",
     travel_expenses: "Travel Expenses",
-
     salary: "Employee Salary",
     emailsim: "E-Mails & SIM",
     bags: "Bags",
 
+  },
+  it: {
+    laptops: "Laptops",
+    emails: "Email Subscriptions",
+    softwareinstallation: "Software Installation",
+    salary: "Employee Salary",
+    emailsim: "E-Mails & SIM",
+    bags: "Bags",
   },
   management: {
     emails: "Email Subscriptions",
@@ -130,4 +137,8 @@ export const componentColors = {
   placement_events: "bg-violet-100 text-violet-800 border-violet-200",
   corporate_gifts: "bg-rose-100 text-rose-800 border-rose-200",
   travel_expenses: "bg-lime-100 text-lime-800 border-lime-200",
+  visits: "bg-teal-100 text-teal-800 border-teal-200",
+  intercity_outstation_visits: "bg-emerald-100 text-emerald-800 border-emerald-200",
+  lunch_dinner_with_client: "bg-amber-100 text-amber-800 border-amber-200",
+  mobile_sim: "bg-slate-100 text-slate-800 border-slate-200",
 };

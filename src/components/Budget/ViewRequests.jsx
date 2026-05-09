@@ -7,6 +7,7 @@ import {
   where,
   updateDoc,
   doc,
+  getDoc,
   increment,
   serverTimestamp,
   runTransaction,
@@ -37,7 +38,9 @@ export default function ViewRequests({
 
   const csddCollection = collection(db, "csdd_expenses");
 
-  const canApprove = department?.toLowerCase() === "purchase";
+  const canApprove = ["purchase", "hr", "management"].includes(
+    department?.toLowerCase(),
+  );
 
   const totalPages = Math.ceil(requests.length / pageSize);
   const paginated = requests.slice(
@@ -992,33 +995,56 @@ export default function ViewRequests({
                 {(selectedRequest.type === "voucher" ||
                   selectedRequest.type === "reimbursement") && (
                   <button
-                    onClick={() => {
+                    onClick={async () => {
+                      // Resolve the correct budget for this request's department
+                      let budgetForExport = currentBudget;
+                      const reqBudgetId = selectedRequest.budgetId;
+
+                      if (reqBudgetId && reqBudgetId !== currentBudget?.id) {
+                        try {
+                          const budgetSnap = await getDoc(
+                            doc(db, "department_budgets", reqBudgetId),
+                          );
+                          if (budgetSnap.exists()) {
+                            budgetForExport = {
+                              id: budgetSnap.id,
+                              ...budgetSnap.data(),
+                            };
+                          }
+                        } catch (err) {
+                          console.error(
+                            "Failed to fetch request's budget for export:",
+                            err,
+                          );
+                          toast.error(
+                            "Could not load the correct budget. Using current budget.",
+                          );
+                        }
+                      }
+
                       // 1. Handle Reimbursement
                       if (selectedRequest.type === "reimbursement") {
                         return exportReimbursementPDF(
                           selectedRequest,
-                          currentBudget,
+                          budgetForExport,
                         );
                       }
 
                       // 2. Handle Voucher (Cash vs Normal)
                       if (selectedRequest.type === "voucher") {
-                        // Check the 'modeOfPayment' field from your database
                         const isCash =
                           selectedRequest.modeOfPayment?.toLowerCase() ===
                           "cash";
 
                         if (isCash) {
-                          // Use the new Cash PDF generator
                           return exportCashVoucherToPDF(
                             selectedRequest,
-                            currentBudget,
+                            budgetForExport,
                           );
                         } else {
-                          // Use the standard PDF generator
                           return exportVoucherToPDF(
                             selectedRequest,
-                            currentBudget,
+                            budgetForExport,
                           );
                         }
                       }
