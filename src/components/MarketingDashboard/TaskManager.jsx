@@ -96,6 +96,7 @@ import {
   where,
 } from "firebase/firestore";
 import EditTaskModal from "./EditTaskModal";
+import TaskAdminPanel from "./TaskAdminPanel";
 
 const SkeletonLoader = ({ className }) => (
   <div className={`animate-pulse bg-gray-200 rounded ${className}`}></div>
@@ -239,7 +240,7 @@ const TableSkeleton = () => (
   </div>
 );
 
-const TaskCard = ({ task, getRoleDisplay, getRoleColor, handleDelete, moveTask, onImageDelete, onEditTask, onDuplicateTask, isDraggable = true, user }) => {
+const TaskCard = ({ task, getRoleDisplay, handleDelete, moveTask, onImageDelete, onEditTask, onDuplicateTask, isDraggable = true, user }) => {
   const [showImageModal, setShowImageModal] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
@@ -1562,6 +1563,7 @@ const LogsView = ({ logs, loading, confirmed, onConfirm }) => {
 const TaskManager = ({ onBack }) => {
   const [tasks, setTasks] = useState([]);
   const [title, setTitle] = useState("");
+  const [dynamicTasksData, setDynamicTasksData] = useState([]);
   const { user } = useAuth();
   const canEditDueDate = ["Admin", "Director", "Head"].includes(user?.role);
   const canAssignOthers = ["Admin", "Director", "Head"].includes(user?.role);
@@ -1646,7 +1648,7 @@ const TaskManager = ({ onBack }) => {
   // Helper function to get all tasks from the new structure
   const getAllTasksFromData = () => {
     const allTasks = [];
-    tasksData.forEach(account => {
+    dynamicTasksData.forEach(account => {
       account.roles.forEach(role => {
         role.tasks.forEach(task => {
           if (task) {
@@ -1662,15 +1664,7 @@ const TaskManager = ({ onBack }) => {
     return allTasks;
   };
 
-  // Helper function to get tasks for a specific account and role
-  const getTasksForAccountAndRole = (account, roleName) => {
-    const accountData = tasksData.find(acc => acc.account === account);
-    if (accountData) {
-      const roleData = accountData.roles.find(r => r.name === roleName);
-      return roleData ? roleData.tasks : [];
-    }
-    return [];
-  };
+
 
   const allTasksFlat = getAllTasksFromData();
   const uniqueTasksList = [...new Set(allTasksFlat.map((item) => item.task))];
@@ -1680,14 +1674,14 @@ const TaskManager = ({ onBack }) => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [charIndex, setCharIndex] = useState(0);
 
-  const uniqueAccounts = tasksData.map((item) => item.account);
+  const uniqueAccounts = dynamicTasksData.map((item) => item.account);
   
   const rolesForAccount = selectedAccount
-    ? tasksData.find(acc => acc.account === selectedAccount)?.roles.map(r => r.name) || []
+    ? dynamicTasksData.find(acc => acc.account === selectedAccount)?.roles.map(r => r.name) || []
     : [];
   
   const tasksForRole = selectedRole && selectedAccount
-    ? getTasksForAccountAndRole(selectedAccount, selectedRole)
+    ? dynamicTasksData.find(acc => acc.account === selectedAccount)?.roles.find(r => r.name === selectedRole)?.tasks || []
     : [];
 
   const sensors = useSensors(
@@ -1698,6 +1692,36 @@ const TaskManager = ({ onBack }) => {
     }),
     useSensor(KeyboardSensor),
   );
+
+  useEffect(() => {
+    const fetchDynamicTasks = async () => {
+      try {
+        const q = query(collection(db, "dmtaskadmin"));
+        const querySnapshot = await getDocs(q);
+        const data = [];
+        querySnapshot.forEach((doc) => {
+          data.push({ id: doc.id, ...doc.data() });
+        });
+        
+        if (data.length > 0) {
+          const mappedData = data.map(item => ({
+            account: item.account,
+            roles: item.roles.map(r => ({
+              name: r.name,
+              tasks: r.tasks.map(t => typeof t === 'string' ? t : t.name)
+            }))
+          }));
+          setDynamicTasksData(mappedData);
+        } else {
+          setDynamicTasksData(tasksData);
+        }
+      } catch (error) {
+        console.error("Error fetching dynamic tasks:", error);
+        setDynamicTasksData(tasksData);
+      }
+    };
+    fetchDynamicTasks();
+  }, []);
 
   useEffect(() => {
     if (!user?.uid) {
@@ -1879,7 +1903,6 @@ const TaskManager = ({ onBack }) => {
         try {
           const logsQuery = query(
             collection(db, "marketing_audit_logs"),
-            where("action", "==", "Task Deleted"),
             orderBy("timestamp", "desc"),
             limit(100)
           );
@@ -2520,6 +2543,18 @@ const TaskManager = ({ onBack }) => {
                           }`}
                         >
                           Logs
+                        </button>
+                      )}
+                      {user?.department === "Admin" && (
+                        <button
+                          onClick={() => setCurrentView("admin")}
+                          className={`px-2 py-1 text-xs font-medium rounded-xl transition-colors ${
+                            currentView === "admin"
+                              ? "bg-blue-500 text-white shadow-sm"
+                              : "text-gray-600 hover:bg-gray-100"
+                          }`}
+                        >
+                          Admin
                         </button>
                       )}
                     </div>
@@ -3171,6 +3206,8 @@ const TaskManager = ({ onBack }) => {
                 </div>
               ) : currentView === "logs" ? (
                 <LogsView logs={logs} loading={logsLoading} confirmed={logsConfirmed} onConfirm={() => setLogsConfirmed(true)} />
+              ) : currentView === "admin" ? (
+                <TaskAdminPanel />
               ) : null}
             </>
           )}
@@ -3227,7 +3264,7 @@ const TaskManager = ({ onBack }) => {
         }}
         onSave={handleSaveTaskDates}
         assignees={assignees}
-        tasksData={tasksData}
+        tasksData={dynamicTasksData}
       />
     </DndContext>
   );
