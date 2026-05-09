@@ -61,6 +61,7 @@ const roleLinks = {
     },
     { label: "Placement", path: "/dashboard/placement", icon: <img src={`${briefcaseGif}?v=${gifVersion}`} alt="Placement" className="w-6 h-6" /> },
     { label: "D M", path: "/dashboard/marketing", icon: <img src={`${lineChartGif}?v=${gifVersion}`} alt="D M" className="w-6 h-6" /> },
+    { label: "IT", path: "/dashboard/it", icon: <img src={`${hackerGif}?v=${gifVersion}`} alt="IT" className="w-6 h-6" /> },
     { label: "CA", path: "/dashboard/ca", icon: <img src={`${checklistGif}?v=${gifVersion}`} alt="CA" className="w-6 h-6" /> },
     { label: "HR", path: "/dashboard/hr", icon: <img src={`${customerGif}?v=${gifVersion}`} alt="HR" className="w-6 h-6" /> },
     { label: "Accounts", path: "/dashboard/accounts", icon: <img src={`${calculatorGif}?v=${gifVersion}`} alt="Accounts" className="w-6 h-6" /> },
@@ -112,6 +113,9 @@ const roleLinks = {
   accounts: [
     { label: "Accounts", path: "/dashboard/accounts", icon: <img src={`${calculatorGif}?v=${gifVersion}`} alt="Accounts" className="w-6 h-6" /> },
   ],
+  it: [
+    { label: "IT", path: "/dashboard/it", icon: <img src={`${dashboardGif}?v=${gifVersion}`} alt="IT" className="w-6 h-6" /> },
+  ],
 };
 
 const normalizeRole = (role) => {
@@ -128,6 +132,7 @@ const normalizeRole = (role) => {
   if (norm.includes("ca")) return "ca";
   if (norm.includes("hr")) return "hr";
   if (norm.includes("placement")) return "placement";
+  if (norm.includes("it")) return "it";
   if (norm.includes("accountant") || norm.includes("accounts")) return "accounts";
   return "";
 };

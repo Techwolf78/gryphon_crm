@@ -52,6 +52,7 @@ const UploadStudentData = React.lazy(() => import("./components/Placement/AddJd/
 const Purchase = React.lazy(() => import("./pages/Purchase"));
 const Accountant = React.lazy(() => import("./pages/Accountant"));
 const TrainerInvoiceAuditLogs = React.lazy(() => import("./components/Learning/Invoice/TrainerInvoiceAuditLogs"));
+const IT = React.lazy(() => import("./pages/IT"));
 
 // Lazy load Intro page
 const Intro = React.lazy(() => import("./pages/Intro"));
@@ -129,6 +130,7 @@ const AppContent = () => {
             </Route>
             <Route path="hr" element={<HR />} />
             <Route path="ca" element={<CA />} />
+            <Route path="it" element={<IT />} />
             <Route path="purchase" element={<Purchase />} />
             <Route path="accounts/*" element={<Accountant />} />
             <Route path="accounts/admin" element={<TrainerInvoiceAuditLogs />} />

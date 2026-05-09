@@ -239,15 +239,23 @@ const PurchaseIntentModal = ({
   const remainingBudget = getRemainingBudget();
   const exceedsBudget = grandTotal > remainingBudget;
 
-  const availableCategories = Object.keys(
-    currentBudget?.departmentExpenses || {},
-  )
-    .filter((key) => key !== "employeeSalary")
-    .map((key) => ({
-      value: key,
-      label:
-        budgetComponents?.[key] || key.charAt(0).toUpperCase() + key.slice(1),
-    }));
+  const availableCategories = [
+    ...Object.keys(currentBudget?.departmentExpenses || {}).filter(
+      (key) => key !== "employeeSalary",
+    ),
+    ...Object.keys(currentBudget?.csddExpenses || {}).filter((key) => {
+      const val = currentBudget.csddExpenses[key];
+      // Exclude DM client objects (type === "client")
+      return !(typeof val === "object" && val.type === "client");
+    }),
+  ].map((key) => ({
+    value: key,
+    label:
+      budgetComponents?.[key] ||
+      key
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (c) => c.toUpperCase()),
+  }));
 
   const hasBudget =
     currentBudget &&

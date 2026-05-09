@@ -6,7 +6,7 @@ import { FaUser } from "react-icons/fa";
 import { toast } from "react-toastify";
 import PropTypes from "prop-types";
 
-const departments = ["Sales", "Placement", "L & D", "DM", "Admin", "CA", "HR", "Accounts"];
+const departments = ["Sales", "Placement", "L & D", "DM", "Admin", "CA", "HR", "Accounts", "IT"];
 const roles = ["Director", "Head", "Manager", "Assistant Manager", "Executive"];
 
 // Validation constants
