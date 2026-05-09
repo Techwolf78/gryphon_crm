@@ -13,14 +13,9 @@ import {
   FiRefreshCw,
   FiCheck
 } from "react-icons/fi";
-import ExportLead from "./ExportLead";
-import ImportLead from "./ImportLead";
 import { db } from "../../firebase";
-import { collection, getDocs } from "firebase/firestore";
 
 function LeadFilters({
-  filteredLeads,
-  handleImportComplete,
   filters,
   setFilters,
   isFilterOpen,
@@ -30,23 +25,8 @@ function LeadFilters({
   activeTab,
 }) {
   const [localFilters, setLocalFilters] = useState(filters);
-  const [allLeads, setAllLeads] = useState([]);
   const [activeSection, setActiveSection] = useState(null);
   const filterPanelRef = useRef(null);
-
-  // Fetch all leads from Firebase
-  useEffect(() => {
-    const fetchAllLeads = async () => {
-      try {
-        const snapshot = await getDocs(collection(db, "leads"));
-        const fetchedLeads = snapshot.docs.map((doc) => [doc.id, doc.data()]);
-        setAllLeads(fetchedLeads);
-      } catch (error) {
-        console.error("Error fetching leads for filters:", error);
-      }
-    };
-    fetchAllLeads();
-  }, []);
 
   // Generate filter options from leads and users data
   const filterOptions = {
@@ -134,13 +114,6 @@ function LeadFilters({
 
   return (
     <div className="flex items-center gap-3 relative">
-      {/* Export & Import */}
-      <ExportLead filteredLeads={filteredLeads} allLeads={allLeads} />
-      <ImportLead 
-        handleImportComplete={handleImportComplete} 
-        activeTab={activeTab}
-      />
-
       {/* Filter Button */}
       <div className="relative">
         <button

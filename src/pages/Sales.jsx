@@ -21,11 +21,14 @@ const TrainingForm = lazy(() => import("../components/Sales/ClosureForm/Training
 const LeadDetailsModal = lazy(() => import("../components/Sales/EditDetailsModal"));
 const ExpectedDateModal = lazy(() => import("../components/Sales/ExpectedDateWarning"));
 const LeadsTable = lazy(() => import("../components/Sales/LeadTable"));
+const KanbanLeadsView = lazy(() => import("../components/Sales/KanbanLeadsView"));
 const LeadFilters = lazy(() => import("../components/Sales/LeadFilters"));
 const SalesTour = lazy(() => import("../components/tours/SalesTour"));
 const BudgetDashboard = lazy(() => import("../components/Budget/BudgetDashboard"));
 const LeadTransferModal = lazy(() => import("../components/Sales/LeadTransferModal"));
 const TransferClosedLeadsModal = lazy(() => import("../components/Sales/TransferClosedLeadsModal"));
+const ExportLead = lazy(() => import("../components/Sales/ExportLead"));
+const ImportLead = lazy(() => import("../components/Sales/ImportLead"));
 
 // Loading component for lazy loaded components
 const ComponentLoader = () => (
@@ -90,6 +93,11 @@ function Sales() {
   const [filters, setFilters] = useState({});
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
+  // Sales view mode: "table" or "kanban"
+  const [salesViewMode, setSalesViewMode] = useState(() => {
+    return localStorage.getItem("salesViewMode") || "table";
+  });
+
   // View mode state with localStorage persistence
   const [viewMyLeadsOnly, setViewMyLeadsOnly] = useState(() => {
     const saved = localStorage.getItem("viewMyLeadsOnly");
@@ -107,6 +115,11 @@ function Sales() {
       localStorage.setItem("viewMyLeadsOnly", JSON.stringify(viewMyLeadsOnly));
     }
   }, [viewMyLeadsOnly]);
+
+  // Persist sales view mode to localStorage
+  useEffect(() => {
+    localStorage.setItem("salesViewMode", salesViewMode);
+  }, [salesViewMode]);
 
   // Debounce the filter updates
   useEffect(() => {
@@ -674,7 +687,7 @@ function Sales() {
 
   const handleTabChange = useCallback((tab) => setActiveTab(tab), []);
 
-  // View Mode Toggle Component
+  // View Mode Toggle Component (My Leads / My Team)
   const ViewModeToggle = ({ isHigherRole }) => {
     if (!isHigherRole) return null;
 
@@ -706,6 +719,42 @@ function Sales() {
     );
   };
 
+  // View Style Toggle Component (Table / Kanban)
+  const ViewStyleToggle = () => (
+    <div className="flex items-center bg-gray-100 rounded-full p-0.5 gap-0.5" title="Switch between Table and Kanban view">
+      <button
+        onClick={() => setSalesViewMode("table")}
+        className={`flex items-center gap-1 text-[10px] font-medium px-2.5 py-1 rounded-full transition-all duration-200 ${
+          salesViewMode === "table"
+            ? "bg-white text-gray-800 shadow-sm"
+            : "text-gray-500 hover:text-gray-700"
+        }`}
+        aria-label="Table View"
+        title="Table View"
+      >
+        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M3 14h18M3 6h18M3 18h18" />
+        </svg>
+        Table
+      </button>
+      <button
+        onClick={() => setSalesViewMode("kanban")}
+        className={`flex items-center gap-1 text-[10px] font-medium px-2.5 py-1 rounded-full transition-all duration-200 ${
+          salesViewMode === "kanban"
+            ? "bg-white text-gray-800 shadow-sm"
+            : "text-gray-500 hover:text-gray-700"
+        }`}
+        aria-label="Kanban View"
+        title="Kanban View - Drag and drop leads between phases"
+      >
+        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+        </svg>
+        Kanban
+      </button>
+    </div>
+  );
+
   if (showBudget) {
     return (
       <Suspense fallback={<ComponentLoader />}>
@@ -731,6 +780,12 @@ function Sales() {
             </div>
 
             <div className="flex items-center gap-4">
+              <Suspense fallback={<div className="text-xs text-gray-500">Loading...</div>}>
+                <ExportLead filteredLeads={filteredLeads} allLeads={Object.entries(leads)} />
+              </Suspense>
+              <Suspense fallback={<div className="text-xs text-gray-500">Loading...</div>}>
+                <ImportLead handleImportComplete={handleImportComplete} />
+              </Suspense>
               <button
                 onClick={() => setShowModal(true)}
                 className="bg-linear-to-r from-blue-600 to-indigo-700 text-white px-3 py-1.5 rounded-xl font-semibold hover:opacity-90 transition-all shadow-md flex items-center"
@@ -836,6 +891,7 @@ function Sales() {
                           : "My Leads Only"}
                       </p>
                       <ViewModeToggle isHigherRole={isHigherRole} />
+                      <ViewStyleToggle />
                     </div>
                   );
                 })()}
@@ -860,8 +916,6 @@ function Sales() {
 
             <Suspense fallback={<ComponentLoader />}>
               <LeadFilters
-                filteredLeads={filteredLeads}
-                handleImportComplete={handleImportComplete}
                 filters={rawFilters}
                 setFilters={setRawFilters}
                 isFilterOpen={isFilterOpen}
@@ -880,79 +934,104 @@ function Sales() {
             </Suspense>
           </div>
 
-          {/* Phase Tabs */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 mb-1.5" data-tour="phase-tabs">
-            {Object.keys(tabLabels).map((key) => (
-              <button
-                key={key}
-                onClick={() => handleTabChange(key)}
-                className={`py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 ease-out transform hover:scale-[1.02] ${
-                  activeTab === key
-                    ? tabColorMap[key].active
-                    : tabColorMap[key].inactive
-                } ${
-                  activeTab === key
-                    ? "ring-2 ring-offset-2 ring-opacity-50"
-                    : ""
-                } ${
-                  activeTab === key
-                    ? key === "hot"
-                      ? "ring-red-500"
-                      : key === "warm"
-                      ? "ring-amber-400"
-                      : key === "cold"
-                      ? "ring-cyan-400"
-                      : "ring-green-500"
-                    : ""
-                }`}
-                data-tour={`${key}-leads-tab`}
-              >
-                {tabLabels[key]}{" "}
-                <span className="ml-1 text-xs font-bold">
-                  ({phaseCounts[key]})
-                </span>
-              </button>
-            ))}
-          </div>
+          {/* Phase Tabs - only shown in table view */}
+          {salesViewMode === "table" && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 mb-1.5" data-tour="phase-tabs">
+              {Object.keys(tabLabels).map((key) => (
+                <button
+                  key={key}
+                  onClick={() => handleTabChange(key)}
+                  className={`py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 ease-out transform hover:scale-[1.02] ${
+                    activeTab === key
+                      ? tabColorMap[key].active
+                      : tabColorMap[key].inactive
+                  } ${
+                    activeTab === key
+                      ? "ring-2 ring-offset-2 ring-opacity-50"
+                      : ""
+                  } ${
+                    activeTab === key
+                      ? key === "hot"
+                        ? "ring-red-500"
+                        : key === "warm"
+                        ? "ring-amber-400"
+                        : key === "cold"
+                        ? "ring-cyan-400"
+                        : "ring-green-500"
+                      : ""
+                  }`}
+                  data-tour={`${key}-leads-tab`}
+                >
+                  {tabLabels[key]}{" "}
+                  <span className="ml-1 text-xs font-bold">
+                    ({phaseCounts[key]})
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Leads Table - This will scroll under the sticky header */}
-        <Suspense fallback={<ComponentLoader />}>
-          <LeadsTable
-            loading={loading}
-            activeTab={activeTab}
-            filteredLeads={filteredLeads}
-            users={users}
-            dropdownOpenId={dropdownOpenId}
-            setDropdownOpenId={setDropdownOpenId}
-            toggleDropdown={toggleDropdown}
-            setSelectedLead={setSelectedLead}
-            setShowFollowUpModal={setShowFollowUpModal}
-            setShowDetailsModal={setShowDetailsModal}
-            setShowClosureModal={setShowClosureModal}
-            updateLeadPhase={updateLeadPhase}
-            dropdownRef={dropdownRef}
-            setShowExpectedDateModal={setShowExpectedDateModal}
-            setPendingPhaseChange={setPendingPhaseChange}
-            setLeadBeingUpdated={setLeadBeingUpdated}
-            gridColumns="grid grid-cols-11 gap-4"
-            headerColorMap={{
-              open: "bg-blue-100",
-              inProgress: "bg-yellow-100",
-              closed: "bg-gray-100",
-            }}
-            borderColorMap={{
-              open: "border-blue-400",
-              inProgress: "border-yellow-400",
-              closed: "border-gray-400",
-            }}
-            setShowModal={setShowModal}
-            leads={leads}
-            viewMyLeadsOnly={viewMyLeadsOnly}
-            currentUser={currentUser}
-            onClosedLeadsCountChange={setClosedLeadsCount} // Add this prop
-          />
-        </Suspense>
+        {/* Conditional View Rendering */}
+        {salesViewMode === "table" ? (
+          /* Table View - existing LeadsTable */
+          <Suspense fallback={<ComponentLoader />}>
+            <LeadsTable
+              loading={loading}
+              activeTab={activeTab}
+              filteredLeads={filteredLeads}
+              users={users}
+              dropdownOpenId={dropdownOpenId}
+              setDropdownOpenId={setDropdownOpenId}
+              toggleDropdown={toggleDropdown}
+              setSelectedLead={setSelectedLead}
+              setShowFollowUpModal={setShowFollowUpModal}
+              setShowDetailsModal={setShowDetailsModal}
+              setShowClosureModal={setShowClosureModal}
+              updateLeadPhase={updateLeadPhase}
+              dropdownRef={dropdownRef}
+              setShowExpectedDateModal={setShowExpectedDateModal}
+              setPendingPhaseChange={setPendingPhaseChange}
+              setLeadBeingUpdated={setLeadBeingUpdated}
+              gridColumns="grid grid-cols-11 gap-4"
+              headerColorMap={{
+                open: "bg-blue-100",
+                inProgress: "bg-yellow-100",
+                closed: "bg-gray-100",
+              }}
+              borderColorMap={{
+                open: "border-blue-400",
+                inProgress: "border-yellow-400",
+                closed: "border-gray-400",
+              }}
+              setShowModal={setShowModal}
+              leads={leads}
+              viewMyLeadsOnly={viewMyLeadsOnly}
+              currentUser={currentUser}
+              onClosedLeadsCountChange={setClosedLeadsCount}
+            />
+          </Suspense>
+        ) : (
+          /* Kanban View */
+          <Suspense fallback={<ComponentLoader />}>
+            <KanbanLeadsView
+              loading={loading}
+              allVisibleLeads={allVisibleLeads}
+              users={users}
+              currentUser={currentUser}
+              setSelectedLead={setSelectedLead}
+              setShowFollowUpModal={setShowFollowUpModal}
+              setShowDetailsModal={setShowDetailsModal}
+              setShowClosureModal={setShowClosureModal}
+              updateLeadPhase={updateLeadPhase}
+              setShowExpectedDateModal={setShowExpectedDateModal}
+              setPendingPhaseChange={setPendingPhaseChange}
+              setLeadBeingUpdated={setLeadBeingUpdated}
+              setShowModal={setShowModal}
+              showTCV={showTCV}
+            />
+          </Suspense>
+        )}
       </div>
 
       <Suspense fallback={<ComponentLoader />}>

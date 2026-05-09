@@ -266,8 +266,6 @@ const BudgetForm = ({
     }));
   };
 
-
-
   // Add CSDD input handler
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -428,7 +426,8 @@ const BudgetForm = ({
             `A budget for FY-${formData.fiscalYear} already exists for this department`,
           );
         }
-      } catch (e) { // eslint-disable-line no-unused-vars
+      } catch (e) {
+        // eslint-disable-line no-unused-vars
         newErrors.fiscalYear = "Error checking fiscal year availability";
       }
     }
@@ -684,6 +683,7 @@ const BudgetForm = ({
                     <option value="hr">HR</option>
                     <option value="sales">Sales</option>
                     <option value="management">Management</option>
+                    <option value="it">IT</option>
                   </select>
                   {errors.department && (
                     <p className="mt-1 text-sm text-red-600">

@@ -239,7 +239,7 @@ const TableSkeleton = () => (
   </div>
 );
 
-const TaskCard = ({ task, getRoleDisplay, getRoleColor, handleDelete, moveTask, onImageDelete, onEditTask, onDuplicateTask, isDraggable = true, user }) => {
+const TaskCard = ({ task, getRoleDisplay, handleDelete, moveTask, onImageDelete, onEditTask, onDuplicateTask, isDraggable = true, user }) => {
   const [showImageModal, setShowImageModal] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
@@ -951,9 +951,7 @@ const TableView = ({
                 className="hover:bg-gray-50/30 transition-colors duration-150"
               >
                 <td className="px-2 py-4 text-sm text-gray-900 font-medium">
-                  {task.id && !isNaN(parseInt(task.id.replace("dmtask", "")))
-                    ? parseInt(task.id.replace("dmtask", ""))
-                    : "-"}
+                  {task.id ? parseInt(task.id.replace("ittask", ""), 10) : "-"}
                 </td>
                 <td className="px-2 py-4 min-w-[250px]">
                   <div className="flex items-center">
@@ -1259,9 +1257,7 @@ const SummaryView = ({ tasks, selectedMonth, selectedUser, customDateRange }) =>
                 accountTasks.map((task) => (
                   <tr key={task.id} className="hover:bg-gray-50/50">
                     <td className="px-4 py-3 text-xs font-medium text-gray-600">
-                      {task.id && !isNaN(parseInt(task.id.replace("dmtask", "")))
-                        ? parseInt(task.id.replace("dmtask", ""))
-                        : "-"}
+                      {task.id ? parseInt(task.id.replace("ittask", ""), 10) : "-"}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-900 font-medium">
                       {task.title || task.description}

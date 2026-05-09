@@ -24,34 +24,38 @@ const Dashboard = React.lazy(() => import("./pages/Dashboard"));
 const Admin = React.lazy(() => import("./pages/Admin"));
 const Sales = React.lazy(() => import("./pages/Sales"));
 const Placement = React.lazy(() => import("./pages/Placement"));
-const LearningDevelopment = React.lazy(() =>
-  import("./pages/LearningDevelopment")
+const LearningDevelopment = React.lazy(
+  () => import("./pages/LearningDevelopment"),
 );
 const DigitalMarketing = React.lazy(() => import("./pages/Marketing"));
 const Footer = React.lazy(() => import("./pages/footer"));
 const UpdateProfile = React.lazy(() => import("./components/UpdateProfile"));
 const Help = React.lazy(() => import("./pages/Help"));
-const TrainersDashboard = React.lazy(() =>
-  import("./components/Learning/TrainersDashboard")
+const TrainersDashboard = React.lazy(
+  () => import("./components/Learning/TrainersDashboard"),
 );
-const LearningAdminAuditLogs = React.lazy(() =>
-  import("./components/Learning/LearningAdminAuditLogs")
+const LearningAdminAuditLogs = React.lazy(
+  () => import("./components/Learning/LearningAdminAuditLogs"),
 );
-const PlacementAdminAuditLogs = React.lazy(() =>
-  import("./components/Placement/PlacementAdminAuditLogs")
+const PlacementAdminAuditLogs = React.lazy(
+  () => import("./components/Placement/PlacementAdminAuditLogs"),
 );
 const HR = React.lazy(() => import("./pages/HR"));
 const CA = React.lazy(() => import("./pages/CA"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
 const Roadmap = React.lazy(() => import("./pages/Roadmap"));
-const PublicInvoiceDetails = React.lazy(() =>
-  import("./pages/PublicInvoiceDetails")
+const PublicInvoiceDetails = React.lazy(
+  () => import("./pages/PublicInvoiceDetails"),
 );
 const Maintenance = React.lazy(() => import("./pages/Maintenance"));
-const UploadStudentData = React.lazy(() => import("./components/Placement/AddJd/UploadStudentData")); // ✅ Space removed
+const UploadStudentData = React.lazy(
+  () => import("./components/Placement/AddJd/UploadStudentData"),
+); // ✅ Space removed
 const Purchase = React.lazy(() => import("./pages/Purchase"));
 const Accountant = React.lazy(() => import("./pages/Accountant"));
-const TrainerInvoiceAuditLogs = React.lazy(() => import("./components/Learning/Invoice/TrainerInvoiceAuditLogs"));
+const TrainerInvoiceAuditLogs = React.lazy(
+  () => import("./components/Learning/Invoice/TrainerInvoiceAuditLogs"),
+);
 const IT = React.lazy(() => import("./pages/IT"));
 
 // Lazy load Intro page
@@ -76,12 +80,13 @@ const AppContent = () => {
   const isMaintenanceMode = false;
 
   // Routes where navbar should not appear
-  const hideNavbarRoutes = ['/404', '/upload-student-data'];
+  const hideNavbarRoutes = ["/404", "/upload-student-data"];
 
   // Component to handle dashboard redirection based on user department
   const DashboardOrRedirect = () => {
     return <Dashboard />;
-  };  if (isMaintenanceMode) {
+  };
+  if (isMaintenanceMode) {
     return (
       <Suspense fallback={<PageLoader />}>
         <Maintenance />
@@ -99,9 +104,9 @@ const AppContent = () => {
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/invoice/*" element={<PublicInvoiceDetails />} />
-          
+
           {/* Public route for college data upload */}
-<Route path="/upload-student-data" element={<UploadStudentData />} />
+          <Route path="/upload-student-data" element={<UploadStudentData />} />
 
           <Route
             path="/dashboard"
@@ -117,7 +122,10 @@ const AppContent = () => {
             <Route path="admin/code" element={<ExportProjectCode />} />
             <Route path="sales" element={<Sales />} />
             <Route path="placement" element={<Placement />} />
-            <Route path="placement/admin" element={<PlacementAdminAuditLogs />} />
+            <Route
+              path="placement/admin"
+              element={<PlacementAdminAuditLogs />}
+            />
             <Route path="help" element={<Help />} />
             <Route path="learning-development">
               <Route index element={<LearningDevelopment />} />
@@ -133,7 +141,10 @@ const AppContent = () => {
             <Route path="it" element={<IT />} />
             <Route path="purchase" element={<Purchase />} />
             <Route path="accounts/*" element={<Accountant />} />
-            <Route path="accounts/admin" element={<TrainerInvoiceAuditLogs />} />
+            <Route
+              path="accounts/admin"
+              element={<TrainerInvoiceAuditLogs />}
+            />
             <Route path="intro" element={<Intro />} />
           </Route>
 
@@ -141,9 +152,10 @@ const AppContent = () => {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
-      
+
       {/* Show footer only on home page and upload page */}
-      {(location.pathname === "/" || location.pathname === "/upload-student-data") && (
+      {(location.pathname === "/" ||
+        location.pathname === "/upload-student-data") && (
         <Suspense fallback={<div>Loading footer...</div>}>
           <Footer />
         </Suspense>
@@ -177,6 +189,5 @@ const App = () => (
     />
   </>
 );
- 
-export default App;
 
+export default App;
