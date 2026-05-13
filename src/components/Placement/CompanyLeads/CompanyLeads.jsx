@@ -391,7 +391,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
                         (decodedCompany.companyUrl && decodedCompany.companyUrl.includes('@') ? decodedCompany.companyUrl : ''),
                 pocLocation: decodedCompany.location || decodedCompany.pocLocation || '',
                 pocLandline: decodedCompany.landline || decodedCompany.pocLandline || '',
-                industry: decodedCompany.industry || decodedCompany.sector || '',
+                industry: decodedCompany.industry || decodedCompany.sector || decodedCompany.Industry || decodedCompany.Sector || '',
                 companySize: decodedCompany.companySize || decodedCompany.employeeCount || '',
                 source: decodedCompany.source || 'Excel Upload',
                 notes: decodedCompany.notes || '',
@@ -440,7 +440,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
                         (decodedCompany.companyUrl && decodedCompany.companyUrl.includes('@') ? decodedCompany.companyUrl : ''),
                 pocLocation: decodedCompany.location || decodedCompany.pocLocation || '',
                 pocLandline: decodedCompany.landline || decodedCompany.pocLandline || '',
-                industry: decodedCompany.industry || decodedCompany.sector || '',
+                industry: decodedCompany.industry || decodedCompany.sector || decodedCompany.Industry || decodedCompany.Sector || '',
                 companySize: decodedCompany.companySize || decodedCompany.employeeCount || '',
                 source: decodedCompany.source || 'Excel Upload',
                 notes: decodedCompany.notes || '',
@@ -1903,8 +1903,8 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
           return {
             ...lead,
             assignedTo: assignment.userId,
-            assignedBy: user?.uid,
-            assignedAt: new Date(assignmentDate).toISOString(),
+            assignedBy: assignment.userId ? user?.uid : null,
+            assignedAt: assignment.userId ? new Date(assignmentDate).toISOString() : null,
             updatedAt: new Date().toISOString(),
           };
         }
@@ -2670,7 +2670,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
       <BulkAssignModal
         show={showBulkAssignModal}
         onClose={() => setShowBulkAssignModal(false)}
-        unassignedLeads={leads.filter(lead => !lead.assignedTo)}
+        availableLeads={leads}
         allUsers={allUsers}
         onAssign={handleBulkAssign}
         currentUser={user}

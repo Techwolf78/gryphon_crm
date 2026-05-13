@@ -1,9 +1,10 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { doc, getDoc, writeBatch, setDoc } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { logPlacementActivity, AUDIT_ACTIONS } from '../../../utils/placementAuditLogger';
+import { INDUSTRY_OPTIONS } from '../../../utils/constants';
 
-const BulkAssignModal = ({ show, onClose, unassignedLeads, allUsers, onAssign, currentUser, onRefresh, showToast }) => {
+const BulkAssignModal = ({ show, onClose, availableLeads = [], allUsers, onAssign, currentUser, onRefresh, showToast }) => {
   const [selectedUser, setSelectedUser] = useState(null);
   const [assignmentDate, setAssignmentDate] = useState(new Date().toISOString().split('T')[0]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -13,6 +14,9 @@ const BulkAssignModal = ({ show, onClose, unassignedLeads, allUsers, onAssign, c
   const [refreshing, setRefreshing] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 100;
+  const [isAssignMode, setIsAssignMode] = useState(true);
+  const cancelRef = useRef(false);
+  const [selectedIndustry, setSelectedIndustry] = useState('');
 
   // Filter users to managers, assistant managers, executives
   const assignableUsers = useMemo(() => {
@@ -22,17 +26,33 @@ const BulkAssignModal = ({ show, onClose, unassignedLeads, allUsers, onAssign, c
     );
   }, [allUsers]);
 
-  // Filter unassigned leads based on search
+  // Filter leads based on mode and search
   const filteredLeads = useMemo(() => {
-    if (!searchTerm.trim()) return unassignedLeads;
+    let baseLeads = availableLeads;
+    if (isAssignMode) {
+      baseLeads = availableLeads.filter(lead => !lead.assignedTo);
+    } else {
+      baseLeads = selectedUser 
+        ? availableLeads.filter(lead => lead.assignedTo === selectedUser)
+        : [];
+    }
+    
+    // Filter by industry if selected
+    if (selectedIndustry) {
+      baseLeads = baseLeads.filter(lead => 
+        String(lead.industry || '').trim().toLowerCase() === selectedIndustry.trim().toLowerCase()
+      );
+    }
+    
+    if (!searchTerm.trim()) return baseLeads;
     const lowerSearch = searchTerm.toLowerCase();
-    return unassignedLeads.filter(lead =>
+    return baseLeads.filter(lead =>
       (lead.companyName || '').toLowerCase().includes(lowerSearch) ||
       (lead.pocName || '').toLowerCase().includes(lowerSearch) ||
       String(lead.pocPhone || '').toLowerCase().includes(lowerSearch) ||
       (lead.pocMail || '').toLowerCase().includes(lowerSearch)
     );
-  }, [unassignedLeads, searchTerm]);
+  }, [availableLeads, searchTerm, isAssignMode, selectedUser, selectedIndustry]);
 
   // Paginated leads
   const paginatedLeads = useMemo(() => {
@@ -187,6 +207,7 @@ const BulkAssignModal = ({ show, onClose, unassignedLeads, allUsers, onAssign, c
 
     setLoading(true);
     setProgress({ current: 0, total: selectedLeads.length, errors: [], status: 'Assigning...' });
+    cancelRef.current = false;
 
     console.log('Starting bulk assign with:', { selectedUser, assignmentDate, selectedLeadsCount: selectedLeads.length });
 
@@ -194,7 +215,7 @@ const BulkAssignModal = ({ show, onClose, unassignedLeads, allUsers, onAssign, c
       // Assign all leads to the single selected user
       const assignments = [];
       selectedLeads.forEach((leadId) => {
-        assignments.push({ leadId, userId: selectedUser });
+        assignments.push({ leadId, userId: isAssignMode ? selectedUser : null });
       });
 
       console.log('Created assignments array:', assignments.length);
@@ -202,9 +223,13 @@ const BulkAssignModal = ({ show, onClose, unassignedLeads, allUsers, onAssign, c
       let errorList = [];
 
       // Process assignments in batches to avoid overloading
-      const batchSize = 1; // Process one batch at a time for slower, safer updates
+      const batchSize = 50; // Process in larger batches for speed
       console.log('Starting batch processing, batchSize:', batchSize);
       for (let i = 0; i < assignments.length; i += batchSize) {
+        if (cancelRef.current) {
+          console.log('Processing cancelled by user');
+          break;
+        }
         const batchAssignments = assignments.slice(i, i + batchSize);
 
         console.log(`Processing batch ${Math.floor(i / batchSize) + 1}, assignments:`, batchAssignments.length);
@@ -212,7 +237,7 @@ const BulkAssignModal = ({ show, onClose, unassignedLeads, allUsers, onAssign, c
         // Group assignments by batchId
         const batchGroups = {};
         batchAssignments.forEach(({ leadId, userId }) => {
-          const lead = unassignedLeads.find(l => l.id === leadId);
+          const lead = availableLeads.find(l => l.id === leadId);
           if (!lead || !lead.batchId) {
             errorList.push(`Lead ${leadId}: Invalid lead data`);
             return;
@@ -281,10 +306,10 @@ const BulkAssignModal = ({ show, onClose, unassignedLeads, allUsers, onAssign, c
 
               const updatedCompany = {
                 ...decodedCompany,
-                assignedTo: userId,
-                assignedBy: currentUser.uid,
-                assignedAt: assignedAtValue,
-                dateField: assignedAtValue,
+                assignedTo: isAssignMode ? userId : null,
+                assignedBy: isAssignMode ? currentUser.uid : null,
+                assignedAt: isAssignMode ? assignedAtValue : null,
+                dateField: isAssignMode ? assignedAtValue : null,
               };
               
               // Encode back
@@ -368,11 +393,15 @@ const BulkAssignModal = ({ show, onClose, unassignedLeads, allUsers, onAssign, c
           logPlacementActivity({
             userId: currentUser.uid,
             userName: currentUser.displayName || currentUser.name || 'Unknown User',
-            action: AUDIT_ACTIONS.ASSIGN_LEAD,
+            action: isAssignMode ? AUDIT_ACTIONS.ASSIGN_LEAD : 'UNASSIGN_LEAD',
             companyId: null, // No specific company for bulk
             companyName: null,
-            details: `Bulk assigned ${count} leads to ${assigneeName} for ${assignmentDate}`,
-            changes: { assignedTo: userId, assignedAt: assignmentDate, leadCount: count },
+            details: isAssignMode 
+              ? `Bulk assigned ${count} leads to ${assigneeName} for ${assignmentDate}`
+              : `Bulk unassigned ${count} leads from ${assigneeName}`,
+            changes: isAssignMode 
+              ? { assignedTo: userId, assignedAt: assignmentDate, leadCount: count }
+              : { assignedTo: null, leadCount: count },
             sessionId: sessionStorage.getItem('sessionId') || 'unknown'
           });
         });
@@ -383,8 +412,8 @@ const BulkAssignModal = ({ show, onClose, unassignedLeads, allUsers, onAssign, c
 
         // Take a break after each batch except the last
         if (i + batchSize < assignments.length) {
-          setProgress(prev => ({ ...prev, status: 'Taking a break to avoid overloading the backend...' }));
-          await new Promise(resolve => setTimeout(resolve, 5000)); // 5 second break
+          setProgress(prev => ({ ...prev, status: 'Taking a short break...' }));
+          await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second break
           setProgress(prev => ({ ...prev, status: 'Assigning...' }));
           console.log('Took break after batch');
         }
@@ -409,11 +438,15 @@ const BulkAssignModal = ({ show, onClose, unassignedLeads, allUsers, onAssign, c
         logPlacementActivity({
           userId: currentUser.uid,
           userName: currentUser.displayName || currentUser.name || 'Unknown User',
-          action: AUDIT_ACTIONS.ASSIGN_LEAD,
+          action: isAssignMode ? AUDIT_ACTIONS.ASSIGN_LEAD : 'UNASSIGN_LEAD',
           companyId: null,
           companyName: null,
-          details: `Bulk assigned ${count} leads to ${assigneeName} for ${assignmentDate}`,
-          changes: { assignedTo: userId, assignedAt: assignmentDate, leadCount: count },
+          details: isAssignMode 
+            ? `Bulk assigned ${count} leads to ${assigneeName} for ${assignmentDate}`
+            : `Bulk unassigned ${count} leads from ${assigneeName}`,
+          changes: isAssignMode 
+            ? { assignedTo: userId, assignedAt: assignmentDate, leadCount: count }
+            : { assignedTo: null, leadCount: count },
           sessionId: sessionStorage.getItem('sessionId') || 'unknown'
         });
       });
@@ -428,7 +461,7 @@ const BulkAssignModal = ({ show, onClose, unassignedLeads, allUsers, onAssign, c
       setProgress(prev => ({ ...prev, errors: errorList }));
 
       if (errorList.length === 0) {
-        showToast(`${selectedLeads.length}/${selectedLeads.length} Successfully assigned!`, 'success');
+        showToast(`${selectedLeads.length}/${selectedLeads.length} Successfully ${isAssignMode ? 'assigned' : 'unassigned'}!`, 'success');
         // Reset and close
         setSelectedUser(null);
         setSelectedLeads([]);
@@ -450,11 +483,26 @@ const BulkAssignModal = ({ show, onClose, unassignedLeads, allUsers, onAssign, c
 
   return (
     <div className="fixed inset-0 bg-opacity-30 backdrop-blur-sm flex items-center justify-center z-54 p-4">
-      <div className="bg-white rounded-2xl shadow-xl border border-gray-200 max-w-5xl w-full max-h-[95vh] overflow-hidden flex flex-col">
+      <div className={`${isAssignMode ? 'bg-white' : 'bg-red-50'} rounded-2xl shadow-xl border ${isAssignMode ? 'border-gray-200' : 'border-red-200'} max-w-5xl w-full max-h-[95vh] overflow-hidden flex flex-col`}>
         {/* Header */}
-        <div className="bg-white border-b border-gray-200 px-4 py-3">
+        <div className={`${isAssignMode ? 'bg-white' : 'bg-red-50'} border-b border-gray-200 px-4 py-3`}>
           <div className="flex justify-between items-center">
-            <h2 className="text-lg font-semibold text-gray-900">Bulk Lead Assignment</h2>
+            <div className="flex items-center space-x-4">
+              <h2 className="text-lg font-semibold text-gray-900">Bulk Lead Assignment</h2>
+              {/* Toggle */}
+              <div className="flex items-center space-x-2">
+                <span className={`text-xs font-medium ${isAssignMode ? 'text-blue-600' : 'text-gray-500'}`}>Assign</span>
+                <button
+                  onClick={() => setIsAssignMode(!isAssignMode)}
+                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${isAssignMode ? 'bg-blue-600' : 'bg-red-500'}`}
+                >
+                  <span
+                    className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${isAssignMode ? 'translate-x-5' : 'translate-x-1'}`}
+                  />
+                </button>
+                <span className={`text-xs font-medium ${!isAssignMode ? 'text-red-600' : 'text-gray-500'}`}>Unassign</span>
+              </div>
+            </div>
             <div className="flex items-center space-x-2">
               <button
                 onClick={handleRefresh}
@@ -531,8 +579,18 @@ const BulkAssignModal = ({ show, onClose, unassignedLeads, allUsers, onAssign, c
                   placeholder="Company, contact, phone..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none text-sm"
+                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none text-sm mb-2"
                 />
+                <select
+                  value={selectedIndustry}
+                  onChange={(e) => setSelectedIndustry(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none text-sm"
+                >
+                  <option value="">All Industries</option>
+                  {(INDUSTRY_OPTIONS || []).map(option => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
               </div>
             </div>
 
@@ -541,7 +599,7 @@ const BulkAssignModal = ({ show, onClose, unassignedLeads, allUsers, onAssign, c
               <div className="flex justify-between items-center mb-3">
                 <h3 className="font-medium text-gray-900 text-sm flex items-center">
                   <div className="w-1.5 h-1.5 bg-orange-500 rounded-full mr-2"></div>
-                  Available Leads ({filteredLeads.length} total)
+                  {isAssignMode ? 'Available Leads' : 'Assigned Leads'} ({filteredLeads.length} total)
                 </h3>
                 <div className="flex items-center space-x-2">
                   {selectedLeads.length > 0 && (
@@ -577,7 +635,7 @@ const BulkAssignModal = ({ show, onClose, unassignedLeads, allUsers, onAssign, c
                     <div className="ml-3 flex-1 min-w-0">
                       <div className="font-medium text-gray-900 text-sm truncate">{lead.companyName || 'N/A'}</div>
                       <div className="text-xs text-gray-600 truncate">
-                        {lead.pocName || 'N/A'} • {lead.pocPhone || 'N/A'}
+                        {lead.pocName || 'N/A'} • {lead.pocPhone || 'N/A'} {lead.industry ? `• ${lead.industry}` : ''}
                       </div>
                     </div>
                   </label>
@@ -667,21 +725,20 @@ const BulkAssignModal = ({ show, onClose, unassignedLeads, allUsers, onAssign, c
         </div>
 
         {/* Fixed Footer */}
-        <div className="shrink-0 bg-white border-t border-gray-200 px-4 py-3">
+        <div className={`shrink-0 ${isAssignMode ? 'bg-white' : 'bg-red-50'} border-t border-gray-200 px-4 py-3`}>
           <div className="flex justify-end space-x-2">
             <button
-              onClick={onClose}
+              onClick={loading ? () => { cancelRef.current = true; setProgress(prev => ({ ...prev, status: 'Cancelling...' })); } : onClose}
               className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium text-sm border border-gray-300 shadow-sm"
-              disabled={loading}
             >
-              Cancel
+              {loading ? 'Stop' : 'Cancel'}
             </button>
             <button
               onClick={handleAssign}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium text-sm shadow-sm"
+              className={`px-4 py-2 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium text-sm shadow-sm ${isAssignMode ? 'bg-blue-600 hover:bg-blue-700' : 'bg-red-600 hover:bg-red-700'}`}
               disabled={loading || selectedLeads.length === 0 || !selectedUser}
             >
-              {loading ? 'Processing...' : 'Assign Leads'}
+              {loading ? 'Processing...' : isAssignMode ? 'Assign Leads' : 'Unassign Leads'}
             </button>
           </div>
         </div>
