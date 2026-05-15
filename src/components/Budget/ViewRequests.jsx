@@ -134,13 +134,19 @@ export default function ViewRequests({
 
         // 2. Prepare Budget Logic
         // We check conditions here to see if we need to touch the budget doc
-        if (budgetIdToUse && request.csddComponent && request.totalAmount > 0) {
+        if (
+          budgetIdToUse &&
+          request.csddComponent &&
+          (Number(request.totalAmount) > 0 ||
+            Number(request.usedFromEmployeeBalance) > 0)
+        ) {
           const budgetRef = doc(db, "department_budgets", budgetIdToUse);
 
           // Calculate values safely
-          const advanceUsed = Number(
-            request.advanceUsed || request.totalAmount || 0,
-          );
+          const advanceUsed =
+            request.advanceUsed !== undefined
+              ? Number(request.advanceUsed)
+              : Number(request.totalAmount || 0);
           const usedFromBalance = Number(request.usedFromEmployeeBalance || 0);
 
           const budgetUpdate = {

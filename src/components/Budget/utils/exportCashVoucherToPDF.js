@@ -129,7 +129,7 @@ export default async function exportCashVoucherToPDF(voucher, budgetData = {}) {
     ...autoTable.defaults,
     styles: {
       lineColor: [0, 0, 0],
-      lineWidth: 0.1, // Thinner lines to save space
+      lineWidth: 0.4, // Thicker lines for better visibility
       textColor: [0, 0, 0],
     },
     headStyles: {
@@ -137,7 +137,7 @@ export default async function exportCashVoucherToPDF(voucher, budgetData = {}) {
       textColor: [0, 0, 0],
       fontStyle: "bold",
       lineColor: [0, 0, 0],
-      lineWidth: 0.1,
+      lineWidth: 0.4,
     },
   };
 
@@ -235,16 +235,26 @@ export default async function exportCashVoucherToPDF(voucher, budgetData = {}) {
         cellPadding: 2, // Reduced padding
         valign: "middle",
         lineColor: [0, 0, 0],
-        lineWidth: 0.1,
+        lineWidth: 0.4,
       },
     });
 
     // --- SIGNATURES (autoTable, centred) ---
     const sigTableWidth = 180; // 5 × 36
     const sigMarginLeft = (W - sigTableWidth) / 2;
+    const sigTableHeight = 20; // approximate
+    const footerTopY = H - 10; // Reserve space for page end
+
+    let sigStartY = pdf.lastAutoTable.finalY + 4;
+
+    // If it doesn't fit on this page, move to next
+    if (sigStartY + sigTableHeight > footerTopY) {
+      pdf.addPage();
+      sigStartY = 20;
+    }
 
     autoTable(pdf, {
-      startY: pdf.lastAutoTable.finalY + 4,
+      startY: sigStartY,
       tableWidth: sigTableWidth,
       margin: { left: sigMarginLeft },
       body: [
@@ -264,7 +274,7 @@ export default async function exportCashVoucherToPDF(voucher, budgetData = {}) {
         minCellHeight: 16,
         textColor: [40, 40, 40],
         lineColor: [0, 0, 0],
-        lineWidth: 0.2,
+        lineWidth: 0.4,
       },
       columnStyles: {
         0: { cellWidth: 36 },
@@ -390,7 +400,7 @@ export default async function exportCashVoucherToPDF(voucher, budgetData = {}) {
     body: rows,
     theme: "grid",
     headStyles: { fillColor: [230, 230, 230], textColor: [40, 40, 40] },
-    styles: { fontSize: 9, textColor: [40, 40, 40], lineColor: [0, 0, 0], lineWidth: 0.2 },
+    styles: { fontSize: 9, textColor: [40, 40, 40], lineColor: [0, 0, 0], lineWidth: 0.4 },
     didParseCell: (data) => {
       const description = data.row.raw?.[1] || "";
       const isTotalRow = data.row.raw?.[0] === "TOTAL";
@@ -431,7 +441,7 @@ export default async function exportCashVoucherToPDF(voucher, budgetData = {}) {
         minCellHeight: 20,
         textColor: [40, 40, 40],
         lineColor: [0, 0, 0],
-        lineWidth: 0.2,
+        lineWidth: 0.4,
       },
       columnStyles: { 0: { cellWidth: 91 }, 1: { cellWidth: 91 } },
     });
