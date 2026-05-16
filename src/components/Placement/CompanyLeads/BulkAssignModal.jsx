@@ -61,6 +61,18 @@ const BulkAssignModal = ({ show, onClose, availableLeads = [], allUsers, onAssig
     return filteredLeads.slice(start, end);
   }, [filteredLeads, currentPage, pageSize]);
 
+  const areAllFilteredSelected = useMemo(() => {
+    if (filteredLeads.length === 0) return false;
+    const selectedSet = new Set(selectedLeads);
+    return filteredLeads.every(lead => selectedSet.has(lead.id));
+  }, [filteredLeads, selectedLeads]);
+
+  const areAllViewSelected = useMemo(() => {
+    if (paginatedLeads.length === 0) return false;
+    const selectedSet = new Set(selectedLeads);
+    return paginatedLeads.every(lead => selectedSet.has(lead.id));
+  }, [paginatedLeads, selectedLeads]);
+
   // Reset progress when modal closes
   useEffect(() => {
     if (!show) {
@@ -102,16 +114,21 @@ const BulkAssignModal = ({ show, onClose, availableLeads = [], allUsers, onAssig
     );
   };
 
-  const handleSelectAllLeads = () => {
-    const currentSelected = selectedLeads.filter(id => paginatedLeads.some(lead => lead.id === id));
+  const handleSelectAllView = () => {
     const allCurrentPageIds = paginatedLeads.map(lead => lead.id);
-    if (currentSelected.length === paginatedLeads.length) {
-      // Deselect all on current page
+    if (areAllViewSelected) {
       setSelectedLeads(prev => prev.filter(id => !allCurrentPageIds.includes(id)));
     } else {
-      // Select all on current page
-      const newSelected = [...new Set([...selectedLeads, ...allCurrentPageIds])];
-      setSelectedLeads(newSelected);
+      setSelectedLeads(prev => [...new Set([...prev, ...allCurrentPageIds])]);
+    }
+  };
+
+  const handleSelectAllTotal = () => {
+    const allFilteredIds = filteredLeads.map(lead => lead.id);
+    if (areAllFilteredSelected) {
+      setSelectedLeads(prev => prev.filter(id => !allFilteredIds.includes(id)));
+    } else {
+      setSelectedLeads(prev => [...new Set([...prev, ...allFilteredIds])]);
     }
   };
 
@@ -608,10 +625,16 @@ const BulkAssignModal = ({ show, onClose, availableLeads = [], allUsers, onAssig
                     </span>
                   )}
                   <button
-                    onClick={handleSelectAllLeads}
+                    onClick={handleSelectAllView}
                     className="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs font-medium shadow-sm"
                   >
-                    {selectedLeads.filter(id => paginatedLeads.some(lead => lead.id === id)).length === paginatedLeads.length ? 'Deselect All' : 'Select All'}
+                    {areAllViewSelected ? 'Deselect View' : 'Select View'}
+                  </button>
+                  <button
+                    onClick={handleSelectAllTotal}
+                    className="px-3 py-1 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-xs font-medium shadow-sm"
+                  >
+                    {areAllFilteredSelected ? 'Deselect Total' : `Select All (${filteredLeads.length})`}
                   </button>
                   <button
                     onClick={handleRefresh}
