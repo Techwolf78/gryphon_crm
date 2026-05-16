@@ -137,22 +137,22 @@ export default async function exportReimbursementPDF(
     styles: {
       ...(autoTable.defaults?.styles || {}),
       lineColor: [0, 0, 0],
-      lineWidth: 0.2,
+      lineWidth: 0.4,
     },
     headStyles: {
       ...(autoTable.defaults?.headStyles || {}),
       lineColor: [0, 0, 0],
-      lineWidth: 0.2,
+      lineWidth: 0.4,
     },
     bodyStyles: {
       ...(autoTable.defaults?.bodyStyles || {}),
       lineColor: [0, 0, 0],
-      lineWidth: 0.2,
+      lineWidth: 0.4,
     },
     footStyles: {
       ...(autoTable.defaults?.footStyles || {}),
       lineColor: [0, 0, 0],
-      lineWidth: 0.2,
+      lineWidth: 0.4,
     },
   };
 
@@ -218,7 +218,7 @@ export default async function exportReimbursementPDF(
     body: topRows,
     theme: "grid",
     margin: { left: marginX, right: marginX },
-    styles: { fontSize: 9, cellPadding: 3 },
+    styles: { fontSize: 9, cellPadding: 3, lineColor: [0, 0, 0], lineWidth: 0.4 },
     tableWidth: fullTopWidth,
   });
 
@@ -273,14 +273,14 @@ export default async function exportReimbursementPDF(
     theme: "grid",
     margin: { left: marginX, right: marginX },
 
-    styles: { fontSize: 9, cellPadding: 3 },
+    styles: { fontSize: 9, cellPadding: 3, lineColor: [0, 0, 0], lineWidth: 0.4 },
 
     headStyles: {
       fillColor: [255, 255, 255],
       textColor: [0, 0, 0],
       fontStyle: "normal",
-      lineColor: [200, 200, 200],
-      lineWidth: 0.2,
+      lineColor: [0, 0, 0],
+      lineWidth: 0.4,
     },
 
     columnStyles: {
@@ -322,7 +322,7 @@ export default async function exportReimbursementPDF(
     body: summaryRows,
     theme: "grid",
     margin: { left: marginX, right: marginX },
-    styles: { fontSize: 9, cellPadding: 3 },
+    styles: { fontSize: 9, cellPadding: 3, lineColor: [0, 0, 0], lineWidth: 0.4 },
     columnStyles: {
       0: { cellWidth: full7 - amountW, halign: "right" },
       1: { cellWidth: amountW, halign: "left" },
@@ -337,9 +337,19 @@ export default async function exportReimbursementPDF(
     const sigTableWidth = 250; // 5 × 50
     const sigMarginLeft = (pgWidth - sigTableWidth) / 2;
     const sigTableHeight = 42;
-    const footerTopY = pgHeight - 18;
-    const idealSigY = footerTopY - sigTableHeight - 3;
-    const sigStartY = Math.max(pdf.lastAutoTable.finalY + 5, idealSigY);
+    const footerTopY = pgHeight - 20; // Reserve slightly more space for footer
+    const idealSigY = footerTopY - sigTableHeight;
+
+    let sigStartY = pdf.lastAutoTable.finalY + 10;
+
+    // If it doesn't fit on this page, move to next
+    if (sigStartY + sigTableHeight > footerTopY) {
+      pdf.addPage();
+      sigStartY = 20; // Top of new page
+    } else {
+      // If it fits, we try to push it to the bottom of the page if there's space
+      sigStartY = Math.max(sigStartY, idealSigY);
+    }
 
     autoTable(pdf, {
       startY: sigStartY,
@@ -362,7 +372,7 @@ export default async function exportReimbursementPDF(
         minCellHeight: 20,
         textColor: [40, 40, 40],
         lineColor: [0, 0, 0],
-        lineWidth: 0.2,
+        lineWidth: 0.4,
       },
       columnStyles: {
         0: { cellWidth: 50 },
@@ -419,13 +429,18 @@ export default async function exportReimbursementPDF(
   /* =======================================================
    APPLY REIMBURSEMENT IMPACT BEFORE BUILDING SUMMARY
    ======================================================= */
-  if (voucher.csddComponent && budgetData.csddExpenses) {
+  if (
+    voucher.status !== "approved" &&
+    voucher.csddComponent &&
+    budgetData.csddExpenses
+  ) {
     const comp = voucher.csddComponent;
     const compObj = budgetData.csddExpenses[comp];
 
     if (compObj) {
       compObj.spent =
-        Number(compObj.spent || 0) + Number(voucher.totalAmount || 0); // reimbursement adds to spent
+        Number(compObj.spent || 0) +
+        Number(voucher.advanceUsed !== undefined ? voucher.advanceUsed : voucher.totalAmount || 0);
     }
   }
 
@@ -476,7 +491,7 @@ export default async function exportReimbursementPDF(
       fontSize: 9,
       textColor: [40, 40, 40],
       lineColor: [0, 0, 0],
-      lineWidth: 0.2,
+      lineWidth: 0.4,
     },
 
     didParseCell: (data) => {
@@ -524,7 +539,7 @@ export default async function exportReimbursementPDF(
         minCellHeight: 20,
         textColor: [40, 40, 40],
         lineColor: [0, 0, 0],
-        lineWidth: 0.2,
+        lineWidth: 0.4,
       },
       columnStyles: { 0: { cellWidth: 91 }, 1: { cellWidth: 91 } },
     });

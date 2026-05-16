@@ -139,22 +139,22 @@ export default async function exportVoucherToPDF(voucher, budgetData = {}) {
     styles: {
       ...(autoTable.defaults?.styles || {}),
       lineColor: [0, 0, 0],
-      lineWidth: 0.2,
+      lineWidth: 0.4,
     },
     headStyles: {
       ...(autoTable.defaults?.headStyles || {}),
       lineColor: [0, 0, 0],
-      lineWidth: 0.2,
+      lineWidth: 0.4,
     },
     bodyStyles: {
       ...(autoTable.defaults?.bodyStyles || {}),
       lineColor: [0, 0, 0],
-      lineWidth: 0.2,
+      lineWidth: 0.4,
     },
     footStyles: {
       ...(autoTable.defaults?.footStyles || {}),
       lineColor: [0, 0, 0],
-      lineWidth: 0.2,
+      lineWidth: 0.4,
     },
   };
 
@@ -236,7 +236,7 @@ export default async function exportVoucherToPDF(voucher, budgetData = {}) {
     body: mainRows,
     theme: "grid",
     margin: { left: marginX, right: marginX },
-    styles: { fontSize: 9, cellPadding: 3 },
+    styles: { fontSize: 9, cellPadding: 3, lineColor: [0, 0, 0], lineWidth: 0.4 },
   });
 
   Y = pdf.lastAutoTable.finalY;
@@ -262,7 +262,7 @@ export default async function exportVoucherToPDF(voucher, budgetData = {}) {
     body: expenseRows.map((r) => [{ content: r[0] }, { content: r[1] }]),
     theme: "grid",
     margin: { left: marginX, right: marginX },
-    styles: { fontSize: 9, cellPadding: 3 },
+    styles: { fontSize: 9, cellPadding: 3, lineColor: [0, 0, 0], lineWidth: 0.4 },
     columnStyles: {
       0: { cellWidth: 50 },
       1: { cellWidth: W - marginX * 2 - 50 },
@@ -279,9 +279,19 @@ export default async function exportVoucherToPDF(voucher, budgetData = {}) {
     const sigTableWidth = 180; // 5 × 36
     const sigMarginLeft = (W - sigTableWidth) / 2;
     const sigTableHeight = 42;
-    const footerTopY = pgHeight - 18;
-    const idealSigY = footerTopY - sigTableHeight - 3;
-    const sigStartY = Math.max(pdf.lastAutoTable.finalY + 8, idealSigY);
+    const footerTopY = pgHeight - 20;
+    const idealSigY = footerTopY - sigTableHeight;
+
+    let sigStartY = pdf.lastAutoTable.finalY + 10;
+
+    // If it doesn't fit on this page, move to next
+    if (sigStartY + sigTableHeight > footerTopY) {
+      pdf.addPage();
+      sigStartY = 20; // Top of new page
+    } else {
+      // If it fits, we try to push it to the bottom of the page if there's space
+      sigStartY = Math.max(sigStartY, idealSigY);
+    }
 
     autoTable(pdf, {
       startY: sigStartY,
@@ -304,7 +314,7 @@ export default async function exportVoucherToPDF(voucher, budgetData = {}) {
         minCellHeight: 18,
         textColor: [40, 40, 40],
         lineColor: [0, 0, 0],
-        lineWidth: 0.2,
+        lineWidth: 0.4,
       },
       columnStyles: {
         0: { cellWidth: 36 },
@@ -424,7 +434,7 @@ export default async function exportVoucherToPDF(voucher, budgetData = {}) {
     body: rows,
     theme: "grid",
     headStyles: { fillColor: [230, 230, 230], textColor: [40, 40, 40] },
-    styles: { fontSize: 9, textColor: [40, 40, 40], lineColor: [0, 0, 0], lineWidth: 0.2 },
+    styles: { fontSize: 9, textColor: [40, 40, 40], lineColor: [0, 0, 0], lineWidth: 0.4 },
 
     didParseCell: (data) => {
       const description = data.row.raw?.[1] || "";
@@ -469,7 +479,7 @@ export default async function exportVoucherToPDF(voucher, budgetData = {}) {
         minCellHeight: 20,
         textColor: [40, 40, 40],
         lineColor: [0, 0, 0],
-        lineWidth: 0.2,
+        lineWidth: 0.4,
       },
       columnStyles: { 0: { cellWidth: 91 }, 1: { cellWidth: 91 } },
     });

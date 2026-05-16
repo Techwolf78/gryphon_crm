@@ -37,7 +37,6 @@ export default function RequestReimbursement({
   const [formDate, setFormDate] = useState(
     new Date().toISOString().slice(0, 10),
   );
-  const [advanceReceived, setAdvanceReceived] = useState("");
   const [csddComponent, setCsddComponent] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [name, setName] = useState(currentUser?.displayName || "");
@@ -52,7 +51,15 @@ export default function RequestReimbursement({
     return rows.reduce((sum, r) => sum + Number(r.amount || 0), 0);
   }, [rows]);
 
-  const advance = Number(advanceReceived || 0);
+  const employeeIdTrimmed = (employeeId || "").trim();
+  const employeeBalance = useMemo(() => {
+    if (!employeeIdTrimmed) return 0;
+    return Number(
+      currentBudget?.employeeAdvanceBalances?.[employeeIdTrimmed] || 0,
+    );
+  }, [currentBudget, employeeIdTrimmed]);
+
+  const advance = employeeBalance;
   const amountToBeReceived = Math.max(0, totalAmount - advance);
   const amountToBeSettled = Math.max(0, advance - totalAmount);
 
@@ -176,6 +183,8 @@ export default function RequestReimbursement({
         totalAmount,
         amountInWords,
         advanceReceived: advance,
+        advanceUsed: amountToBeReceived,
+        usedFromEmployeeBalance: Math.min(advance, totalAmount),
         amountToBeReceived,
         amountToBeSettled,
         rows: rows.map((r) => ({
@@ -203,7 +212,6 @@ export default function RequestReimbursement({
   const resetForm = () => {
     setRows([emptyRow]);
     setPurpose("");
-    setAdvanceReceived("");
     setCsddComponent("");
     setEmployeeId("");
     setName(currentUser?.displayName || "");
@@ -214,8 +222,7 @@ export default function RequestReimbursement({
   const handleClose = () => {
     if (
       rows.some((row) => row.date || row.description || row.amount) ||
-      purpose ||
-      advanceReceived
+      purpose
     ) {
       if (
         window.confirm(
@@ -623,18 +630,12 @@ export default function RequestReimbursement({
                 variant="primary"
               />
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">
-                  Advance Received (₹)
-                </label>
-                <input
-                  type="number"
-                  value={advanceReceived}
-                  onChange={(e) => setAdvanceReceived(e.target.value)}
-                  placeholder="0.00"
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200"
-                />
-              </div>
+              <SummaryCard
+                title="Employee Balance"
+                value={employeeBalance}
+                subtitle="Available advance amount"
+                variant="default"
+              />
 
               <SummaryCard
                 title="Amount to be Received"
