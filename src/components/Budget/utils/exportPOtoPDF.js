@@ -94,23 +94,11 @@ const addFooterToAllPages = (pdf) => {
 };
 
 // 🔹 Main Export Function
-export const exportPurchaseOrderToPDF = async (
-  order,
-  vendorData,
-  budgetComponents,
-  getComponentsForItem,
-  users = [],
-) => {
+export const exportPurchaseOrderToPDF = async (order, vendorData) => {
   const db = getFirestore();
   const docId = `${order.department}_FY-20${order.fiscalYear}`;
   const docRef = doc(db, "department_budgets", docId);
   let budgetData = {};
-
-  const getNormalizedUserName = (uid, fallbackName) => {
-    if (!users || users.length === 0) return fallbackName;
-    const user = users.find((u) => u.uid === uid);
-    return user ? user.name : fallbackName;
-  };
 
   try {
     const snap = await getDoc(docRef);
@@ -193,7 +181,7 @@ export const exportPurchaseOrderToPDF = async (
   autoTable(docPDF, {
     startY: docPDF.lastAutoTable.finalY + 4,
     body: [
-      ["Requested By:", capitalizeFirst(getNormalizedUserName(order.createdBy, order.ownerName))],
+      ["Requested By:", capitalizeFirst(order.ownerName)],
       ["Business Name:", "Gryphon Academy Pvt Ltd"],
       ["Address:", "Baner, Pune"],
       ["City, State, Zip Code:", "Maharashtra"],

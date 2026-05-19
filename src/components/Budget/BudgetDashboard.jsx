@@ -318,17 +318,10 @@ function BudgetDashboard({
     }
   }, [currentUser, usersLoaded, getUserByEmail]);
 
-  const [users, setUsers] = useState([]);
-
-  // Subscribe to Users Collection (For ready state and canonical names)
+  // Subscribe to Users Collection (For ready state)
   useEffect(() => {
     if (!currentUser) return;
-    const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
-      const usersList = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setUsers(usersList);
+    const unsubUsers = onSnapshot(collection(db, "users"), () => {
       setUsersLoaded(true);
       setLoading(false);
     });
@@ -1118,7 +1111,6 @@ function BudgetDashboard({
                 showDepartment={showDepartment}
                 onUpdatePurchaseOrder={handleUpdatePurchaseOrder}
                 onRejectOrder={handleRejectPurchaseOrder}
-                users={users}
               />
             )}
 

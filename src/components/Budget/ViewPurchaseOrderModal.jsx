@@ -8,16 +8,9 @@ const ViewPurchaseOrderModal = ({
   budgetComponents,
   onExport,
   onUpdate,
-  users = [],
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState(order);
-
-  const getNormalizedUserName = (uid, fallbackName) => {
-    if (!users || users.length === 0) return fallbackName;
-    const user = users.find((u) => u.uid === uid);
-    return user ? user.name : fallbackName;
-  };
 
   useEffect(() => {
     if (order) setFormData(order);
@@ -253,7 +246,7 @@ const ViewPurchaseOrderModal = ({
               <table className="w-full border-collapse text-sm">
                 <tbody>
                   {[
-                    ["Requested By", "ownerName", getNormalizedUserName(formData.createdBy, formData.ownerName)],
+                    ["Requested By", "ownerName", formData.ownerName],
                     [
                       "Business Name",
                       "Business Name",

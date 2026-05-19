@@ -181,7 +181,6 @@ function Purchase() {
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [deletingBudget, setDeletingBudget] = useState(false);
   const [usersLoaded, setUsersLoaded] = useState(false);
-  const [users, setUsers] = useState([]);
   const [currentUserData, setCurrentUserData] = useState(null);
   const [selectedBudgetForDelete, setSelectedBudgetForDelete] = useState(null);
   const [selectedBudgetForOverview, setSelectedBudgetForOverview] =
@@ -327,20 +326,9 @@ function Purchase() {
   useEffect(() => {
     if (!currentUser) return;
 
-    const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
-      const usersList = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setUsers(usersList);
-      setUsersLoaded(true);
-      setLoading(false);
-    });
-    return () => unsubUsers();
-  }, [currentUser]);
-
-  useEffect(() => {
-    if (!currentUser) return;
+    // Mark users as ready immediately - no need to listen to the entire users collection
+    setUsersLoaded(true);
+    setLoading(false);
 
     // Budget query for ALL departments (purchase can see all)
     const budgetQuery = query(
@@ -1309,7 +1297,6 @@ function Purchase() {
                 onUpdatePurchaseOrder={handleUpdatePurchaseOrder}
                 onApproveOrder={handleApproveOrder}
                 onRejectOrder={handleRejectPurchaseOrder}
-                users={users}
               />
             )}
 
