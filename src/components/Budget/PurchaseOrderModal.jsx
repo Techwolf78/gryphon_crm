@@ -13,7 +13,7 @@ const PurchaseOrderModal = ({
     finalPrice: 0, // This is the BASE PRICE (before tax)
     terms: "",
     deliveryDate: "",
-    paymentTerms: "net30",
+    paymentTerms: "",
     notes: "",
   });
   const [selectedVendor, setSelectedVendor] = useState(null);
@@ -477,24 +477,27 @@ const PurchaseOrderModal = ({
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Payment Terms
+                Payment Terms (%)
               </label>
-              <select
-                value={formData.paymentTerms}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    paymentTerms: e.target.value,
-                  }))
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-              >
-                <option value="net15">Net 15</option>
-                <option value="net30">Net 30</option>
-                <option value="net45">Net 45</option>
-                <option value="net60">Net 60</option>
-                <option value="uponDelivery">Upon Delivery</option>
-              </select>
+              <div className="relative">
+                <input
+                  type="number"
+                  value={formData.paymentTerms}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      paymentTerms: e.target.value,
+                    }))
+                  }
+                  placeholder="e.g. 10"
+                  min="0"
+                  max="100"
+                  step="any"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg pr-8 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                  required
+                />
+                <span className="absolute right-3 top-2.5 text-gray-400 font-medium">%</span>
+              </div>
             </div>
           </div>
 

@@ -106,6 +106,9 @@ export const budgetComponents = {
     salary: "Employee Salary",
     emailsim: "E-Mails & SIM",
     bags: "Bags",
+    aws: "AWS Server",
+    trademark: "Trademark/Domain",
+    tshirts: "Tshirts"
   },
   management: {
     emails: "Email Subscriptions",

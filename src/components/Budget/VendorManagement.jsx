@@ -19,7 +19,12 @@ import {
   X,
 } from "lucide-react";
 
-const VendorManagement = ({ vendors, purchaseOrders, currentUser }) => {
+const VendorManagement = ({ vendors, purchaseOrders, currentUser, currentUserDepartment }) => {
+  const isAuthorizedToModify =
+    !currentUserDepartment ||
+    currentUserDepartment.toLowerCase() === "purchase" ||
+    currentUserDepartment.toLowerCase() === "admin";
+
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
   const [sortBy, setSortBy] = useState("name-asc");
@@ -113,6 +118,10 @@ const VendorManagement = ({ vendors, purchaseOrders, currentUser }) => {
   };
 
   const handleDeleteVendor = async (vendor) => {
+    if (!isAuthorizedToModify) {
+      alert("You do not have permission to delete vendors.");
+      return;
+    }
     if (
       window.confirm(
         `Are you sure you want to delete vendor "${vendor.name}"? This action cannot be undone.`
@@ -133,6 +142,10 @@ const VendorManagement = ({ vendors, purchaseOrders, currentUser }) => {
   };
 
   const handleUpdateVendor = async (vendorData) => {
+    if (!isAuthorizedToModify) {
+      alert("You do not have permission to update vendors.");
+      return;
+    }
     if (!selectedVendor) return;
 
     setIsSubmitting(true);
@@ -374,25 +387,29 @@ const VendorManagement = ({ vendors, purchaseOrders, currentUser }) => {
                         </svg>
                         View
                       </button>
-                      <button
-                        onClick={() => handleEditVendor(vendor)}
-                        className="flex-1 text-green-600 hover:text-green-800 text-xs font-medium flex items-center justify-center py-1.5 rounded hover:bg-green-50 transition-colors"
-                      >
-                        <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDeleteVendor(vendor)}
-                        disabled={loading}
-                        className="flex-1 text-red-600 hover:text-red-800 text-xs font-medium flex items-center justify-center py-1.5 rounded hover:bg-red-50 transition-colors disabled:opacity-50"
-                      >
-                        <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                        Delete
-                      </button>
+                      {isAuthorizedToModify && (
+                        <>
+                          <button
+                            onClick={() => handleEditVendor(vendor)}
+                            className="flex-1 text-green-600 hover:text-green-800 text-xs font-medium flex items-center justify-center py-1.5 rounded hover:bg-green-50 transition-colors"
+                          >
+                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteVendor(vendor)}
+                            disabled={loading}
+                            className="flex-1 text-red-600 hover:text-red-800 text-xs font-medium flex items-center justify-center py-1.5 rounded hover:bg-red-50 transition-colors disabled:opacity-50"
+                          >
+                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            Delete
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 );
@@ -478,7 +495,7 @@ const AddVendorModal = ({ show, onClose, vendorCategories, currentUser }) => {
       state: "",
       pincode: "",
     },
-    paymentTerms: "net30",
+    paymentTerms: "",
     deliveryTime: "7-10 days",
     notes: "",
   });
@@ -580,7 +597,7 @@ const AddVendorModal = ({ show, onClose, vendorCategories, currentUser }) => {
           state: "",
           pincode: "",
         },
-        paymentTerms: "net30",
+        paymentTerms: "",
         deliveryTime: "7-10 days",
         notes: "",
       });
@@ -844,20 +861,22 @@ const AddVendorModal = ({ show, onClose, vendorCategories, currentUser }) => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Payment Terms
+                    Payment Terms (%)
                   </label>
-                  <select
-                    name="paymentTerms"
-                    value={formData.paymentTerms}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                  >
-                    <option value="net15">Net 15</option>
-                    <option value="net30">Net 30</option>
-                    <option value="net45">Net 45</option>
-                    <option value="net60">Net 60</option>
-                    <option value="uponDelivery">Upon Delivery</option>
-                  </select>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      name="paymentTerms"
+                      value={formData.paymentTerms}
+                      onChange={handleInputChange}
+                      placeholder="e.g. 10"
+                      min="0"
+                      max="100"
+                      step="any"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg pr-8 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                    />
+                    <span className="absolute right-3 top-2.5 text-gray-400 font-medium">%</span>
+                  </div>
                 </div>
 
                 <div>
@@ -948,7 +967,7 @@ const EditVendorModal = ({
       state: vendor.address?.state || "",
       pincode: vendor.address?.pincode || "",
     },
-    paymentTerms: vendor.paymentTerms || "net30",
+    paymentTerms: vendor.paymentTerms || "",
     deliveryTime: vendor.deliveryTime || "7-10 days",
     notes: vendor.notes || "",
   });
@@ -968,7 +987,7 @@ const EditVendorModal = ({
           state: vendor.address?.state || "",
           pincode: vendor.address?.pincode || "",
         },
-        paymentTerms: vendor.paymentTerms || "net30",
+        paymentTerms: vendor.paymentTerms || "",
         deliveryTime: vendor.deliveryTime || "7-10 days",
         notes: vendor.notes || "",
       });
@@ -1249,20 +1268,22 @@ const EditVendorModal = ({
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Payment Terms
+                  Payment Terms (%)
                 </label>
-                <select
-                  name="paymentTerms"
-                  value={formData.paymentTerms}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                >
-                  <option value="net15">Net 15</option>
-                  <option value="net30">Net 30</option>
-                  <option value="net45">Net 45</option>
-                  <option value="net60">Net 60</option>
-                  <option value="uponDelivery">Upon Delivery</option>
-                </select>
+                <div className="relative">
+                  <input
+                    type="number"
+                    name="paymentTerms"
+                    value={formData.paymentTerms}
+                    onChange={handleInputChange}
+                    placeholder="e.g. 10"
+                    min="0"
+                    max="100"
+                    step="any"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg pr-8 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                  />
+                  <span className="absolute right-3 top-2.5 text-gray-400 font-medium">%</span>
+                </div>
               </div>
 
               <div>
@@ -1412,7 +1433,11 @@ const ViewVendorModal = ({ show, onClose, vendor, vendorStats }) => {
                 <div className="flex justify-between items-center py-2 border-b border-gray-100">
                   <span className="text-sm text-gray-600">Payment Terms</span>
                   <span className="text-sm font-medium text-gray-900">
-                    {vendor.paymentTerms?.replace(/([A-Z])/g, " $1").trim() || "Net 30"}
+                    {vendor.paymentTerms
+                      ? !isNaN(parseFloat(vendor.paymentTerms))
+                        ? `${vendor.paymentTerms}%`
+                        : vendor.paymentTerms.replace(/([A-Z])/g, " $1").trim()
+                      : "N/A"}
                   </span>
                 </div>
                 <div className="flex justify-between items-center py-2">
