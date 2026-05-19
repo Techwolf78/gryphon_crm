@@ -104,11 +104,17 @@ const addFooterToAllPages = (pdf) => {
 // Page 2: Main Department Budget Summary
 // Page 3: Client Budget Component Sheet (NEW for CSDD)
 
-export const exportCsddPurchaseOrderToPDF = async (order, vendorData) => {
+export const exportCsddPurchaseOrderToPDF = async (order, vendorData, users = []) => {
   const db = getFirestore();
   const docId = `${order.department}_FY-20${order.fiscalYear}`;
   const budgetRef = doc(db, "department_budgets", docId);
   let budgetData = {};
+
+  const getNormalizedUserName = (uid, fallbackName) => {
+    if (!users || users.length === 0) return fallbackName;
+    const user = users.find((u) => u.uid === uid);
+    return user ? user.name : fallbackName;
+  };
 
   try {
     const snap = await getDoc(budgetRef);
@@ -195,7 +201,7 @@ export const exportCsddPurchaseOrderToPDF = async (order, vendorData) => {
   autoTable(pdf, {
     startY: pdf.lastAutoTable.finalY + 4,
     body: [
-      ["Requested By:", capitalizeFirst(order.ownerName)],
+      ["Requested By:", capitalizeFirst(getNormalizedUserName(order.createdBy, order.ownerName))],
       ["Business Name:", "Gryphon Academy Pvt Ltd"],
       ["Address:", "Baner, Pune"],
       ["City, State, Zip Code:", "Maharashtra"],
@@ -346,7 +352,29 @@ export const exportCsddPurchaseOrderToPDF = async (order, vendorData) => {
   // Payment Info
   const payY = pdf.lastAutoTable.finalY + 5;
   pdf.text("Payment Date: ___________________", 20, payY);
-  pdf.text("Payment Terms: ___________________", 120, payY);
+
+  const pct = parseFloat(order.paymentTerms);
+  let paymentTermsStr = "___________________";
+  if (!isNaN(pct)) {
+    const totalVal = parseFloat(order.finalAmount || order.totalCost || order.finalPrice || 0);
+    const advanceAmount = (totalVal * pct) / 100;
+    paymentTermsStr = `Advance ${pct}% : Rs. ${formatNum(advanceAmount)}`;
+  } else if (order.paymentTerms) {
+    paymentTermsStr = order.paymentTerms;
+  }
+
+  const ptLabel = "Payment Terms: ";
+  pdf.text(ptLabel, 120, payY);
+  const ptLabelWidth = pdf.getTextWidth(ptLabel);
+  pdf.text(paymentTermsStr, 120 + ptLabelWidth, payY);
+
+  if (paymentTermsStr !== "___________________") {
+    const ptValueWidth = pdf.getTextWidth(paymentTermsStr);
+    const oldLineWidth = pdf.getLineWidth();
+    pdf.setLineWidth(0.2);
+    pdf.line(120 + ptLabelWidth, payY + 0.8, 120 + ptLabelWidth + ptValueWidth, payY + 0.8);
+    pdf.setLineWidth(oldLineWidth); // restore original line width
+  }
 
 
 

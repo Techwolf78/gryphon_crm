@@ -8,9 +8,16 @@ const ViewPurchaseOrderModal = ({
   budgetComponents,
   onExport,
   onUpdate,
+  users = [],
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState(order);
+
+  const getNormalizedUserName = (uid, fallbackName) => {
+    if (!users || users.length === 0) return fallbackName;
+    const user = users.find((u) => u.uid === uid);
+    return user ? user.name : fallbackName;
+  };
 
   useEffect(() => {
     if (order) setFormData(order);
@@ -246,7 +253,7 @@ const ViewPurchaseOrderModal = ({
               <table className="w-full border-collapse text-sm">
                 <tbody>
                   {[
-                    ["Requested By", "ownerName", formData.ownerName],
+                    ["Requested By", "ownerName", getNormalizedUserName(formData.createdBy, formData.ownerName)],
                     [
                       "Business Name",
                       "Business Name",
@@ -538,7 +545,38 @@ const ViewPurchaseOrderModal = ({
               <p>Payment Date: ___________________</p>
             </div>
             <div>
-              <p>Payment Terms: ___________________</p>
+              {isEditing ? (
+                <div className="flex items-center gap-2">
+                  <label className="font-semibold text-gray-700 text-sm">Payment Terms (%):</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      value={formData.paymentTerms || ""}
+                      onChange={(e) => handleChange("paymentTerms", e.target.value)}
+                      className="border border-dashed border-gray-900 rounded px-2 py-1 text-xs w-20 pr-5 focus:ring-2 focus:ring-blue-500"
+                      placeholder="e.g. 10"
+                      min="0"
+                      max="100"
+                      step="any"
+                    />
+                    <span className="absolute right-1 top-1 text-gray-400 font-medium text-xs">%</span>
+                  </div>
+                </div>
+              ) : (
+                <p>
+                  Payment Terms:{" "}
+                  <span className="underline">
+                    {(() => {
+                      const pct = parseFloat(formData.paymentTerms);
+                      if (!isNaN(pct)) {
+                        const advanceAmount = ((formData.finalAmount || 0) * pct) / 100;
+                        return `Advance ${pct}% : ₹${advanceAmount.toLocaleString("en-IN")}`;
+                      }
+                      return formData.paymentTerms || "___________________";
+                    })()}
+                  </span>
+                </p>
+              )}
             </div>
           </div>
         </div>

@@ -318,10 +318,17 @@ function BudgetDashboard({
     }
   }, [currentUser, usersLoaded, getUserByEmail]);
 
-  // Subscribe to Users Collection (For ready state)
+  const [users, setUsers] = useState([]);
+
+  // Subscribe to Users Collection (For ready state and canonical names)
   useEffect(() => {
     if (!currentUser) return;
-    const unsubUsers = onSnapshot(collection(db, "users"), () => {
+    const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
+      const usersList = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setUsers(usersList);
       setUsersLoaded(true);
       setLoading(false);
     });
@@ -759,9 +766,7 @@ function BudgetDashboard({
     budgets: { name: "Budgets", color: "bg-sky-500" },
     intents: { name: "Purchase Intents", color: "bg-emerald-600" },
     orders: { name: "Purchase Orders", color: "bg-violet-500" },
-    ...(showVendorManagement && {
-      vendors: { name: "Vendor Management", color: "bg-indigo-500" },
-    }),
+    vendors: { name: "Vendor Management", color: "bg-indigo-500" },
     csdd: { name: "CSDD", color: "bg-amber-600" },
     history: { name: "Budget History", color: "bg-gray-500" },
   };
@@ -1113,6 +1118,7 @@ function BudgetDashboard({
                 showDepartment={showDepartment}
                 onUpdatePurchaseOrder={handleUpdatePurchaseOrder}
                 onRejectOrder={handleRejectPurchaseOrder}
+                users={users}
               />
             )}
 
@@ -1138,11 +1144,12 @@ function BudgetDashboard({
               />
             )}
 
-            {activeTab === "vendors" && showVendorManagement && (
+            {activeTab === "vendors" && (
               <VendorManagement
                 vendors={vendors}
                 purchaseOrders={purchaseOrders}
                 currentUser={currentUser}
+                currentUserDepartment={currentUserDepartment}
               />
             )}
 

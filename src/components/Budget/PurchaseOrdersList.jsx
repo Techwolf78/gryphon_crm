@@ -14,6 +14,7 @@ const PurchaseOrdersList = ({
   showDepartment = false,
   onUpdatePurchaseOrder,
   onRejectOrder,
+  users = [],
 }) => {
   const [sortConfig, setSortConfig] = useState({
     key: "createdAt",
@@ -173,13 +174,14 @@ const PurchaseOrdersList = ({
 
     // Use CSDD-specific export for CSDD POs (includes client budget sheet)
     if (order.intentType === "csdd") {
-      exportCsddPurchaseOrderToPDF(order, vendorData);
+      exportCsddPurchaseOrderToPDF(order, vendorData, users);
     } else {
       exportPurchaseOrderToPDF(
         order,
         vendorData,
         budgetComponents,
         getComponentsForItem,
+        users,
       );
     }
   };
@@ -551,6 +553,7 @@ const PurchaseOrdersList = ({
             email: getVendorEmail(viewModal),
             phone: getVendorPhone(viewModal),
           }}
+          users={users}
         />
       )}
 
