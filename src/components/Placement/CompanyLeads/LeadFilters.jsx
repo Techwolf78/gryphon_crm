@@ -251,6 +251,79 @@ function LeadFilters({
                 )}
               </div>
 
+              {/* Sorting Section */}
+              <div className="bg-gray-50/50 rounded-lg p-2 border border-gray-100/50">
+                <button
+                  onClick={() => toggleSection('sort')}
+                  className="flex justify-between items-center w-full text-left group"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="w-5 h-5 bg-blue-600 rounded-md flex items-center justify-center shadow-sm">
+                      {localFilters.sortOrder === 'asc' ? <FiChevronUp className="w-3 h-3 text-white" /> : <FiChevronDown className="w-3 h-3 text-white" />}
+                    </div>
+                    <span className="font-medium text-gray-900 text-sm">Sort by Uploaded Date</span>
+                  </div>
+                  <div className={`w-4 h-4 rounded-full bg-gray-100 flex items-center justify-center transition-transform duration-200 ${activeSection === 'sort' ? 'rotate-180' : ''}`}>
+                    <FiChevronDown className="w-2.5 h-2.5 text-gray-500" />
+                  </div>
+                </button>
+                {activeSection === 'sort' && (
+                  <div className="mt-2 ml-7 flex flex-col gap-2">
+                    <label className="flex items-center gap-2 cursor-pointer p-1 hover:bg-white rounded-md transition-colors">
+                      <input
+                        type="radio"
+                        name="sortOrder"
+                        checked={(localFilters.sortOrder || 'desc') === 'desc'}
+                        onChange={() => setLocalFilters({ ...localFilters, sortOrder: 'desc' })}
+                        className="w-3 h-3 text-blue-600"
+                      />
+                      <span className="text-xs text-gray-700">Latest First (Default)</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer p-1 hover:bg-white rounded-md transition-colors">
+                      <input
+                        type="radio"
+                        name="sortOrder"
+                        checked={localFilters.sortOrder === 'asc'}
+                        onChange={() => setLocalFilters({ ...localFilters, sortOrder: 'asc' })}
+                        className="w-3 h-3 text-blue-600"
+                      />
+                      <span className="text-xs text-gray-700">Oldest First</span>
+                    </label>
+                  </div>
+                )}
+              </div>
+
+              {/* Uploaded Date Section - Available to everyone */}
+              <div className="bg-gray-50/50 rounded-lg p-2 border border-gray-100/50">
+                <button
+                  onClick={() => toggleSection('uploadedDate')}
+                  className="flex justify-between items-center w-full text-left group"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="w-5 h-5 bg-indigo-500 rounded-md flex items-center justify-center shadow-sm">
+                      <FiCalendar className="w-3 h-3 text-white" />
+                    </div>
+                    <span className="font-medium text-gray-900 text-sm">Uploaded Date</span>
+                  </div>
+                  <div className={`w-4 h-4 rounded-full bg-gray-100 flex items-center justify-center transition-transform duration-200 ${activeSection === 'uploadedDate' ? 'rotate-180' : ''}`}>
+                    <FiChevronDown className="w-2.5 h-2.5 text-gray-500" />
+                  </div>
+                </button>
+                {activeSection === 'uploadedDate' && (
+                  <div className="mt-2 ml-7">
+                    <input
+                      type="date"
+                      value={localFilters.uploadedDateFilter || ''}
+                      onChange={(e) => {
+                        setLocalFilters({ ...localFilters, uploadedDateFilter: e.target.value });
+                      }}
+                      className="w-full px-2 py-1.5 text-xs bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all duration-200 shadow-sm"
+                    />
+                    <p className="text-[10px] text-gray-500 mt-1">Shows leads added on this specific date.</p>
+                  </div>
+                )}
+              </div>
+
               {/* Company and Phone Sections - Hidden in team view cold tab */}
               {!(!viewMyLeadsOnly && activeTab === "cold") && (
                 <>

@@ -17,6 +17,7 @@ const BulkAssignModal = ({ show, onClose, availableLeads = [], allUsers, onAssig
   const [isAssignMode, setIsAssignMode] = useState(true);
   const cancelRef = useRef(false);
   const [selectedIndustry, setSelectedIndustry] = useState('');
+  const [bulkSortOrder, setBulkSortOrder] = useState('desc'); // 'asc' or 'desc'
 
   // Filter users to managers, assistant managers, executives
   const assignableUsers = useMemo(() => {
@@ -44,15 +45,30 @@ const BulkAssignModal = ({ show, onClose, availableLeads = [], allUsers, onAssig
       );
     }
     
-    if (!searchTerm.trim()) return baseLeads;
+    if (!searchTerm.trim()) {
+      // Sort even if no search term, using the new sort order
+      return [...baseLeads].sort((a, b) => {
+        const timeA = new Date(a.createdAt || a.updatedAt || 0).getTime();
+        const timeB = new Date(b.createdAt || b.updatedAt || 0).getTime();
+        return bulkSortOrder === 'desc' ? timeB - timeA : timeA - timeB;
+      });
+    }
+
     const lowerSearch = searchTerm.toLowerCase();
-    return baseLeads.filter(lead =>
+    const result = baseLeads.filter(lead =>
       (lead.companyName || '').toLowerCase().includes(lowerSearch) ||
       (lead.pocName || '').toLowerCase().includes(lowerSearch) ||
       String(lead.pocPhone || '').toLowerCase().includes(lowerSearch) ||
       (lead.pocMail || '').toLowerCase().includes(lowerSearch)
     );
-  }, [availableLeads, searchTerm, isAssignMode, selectedUser, selectedIndustry]);
+
+    // Sort filtered results
+    return result.sort((a, b) => {
+      const timeA = new Date(a.createdAt || a.updatedAt || 0).getTime();
+      const timeB = new Date(b.createdAt || b.updatedAt || 0).getTime();
+      return bulkSortOrder === 'desc' ? timeB - timeA : timeA - timeB;
+    });
+  }, [availableLeads, searchTerm, isAssignMode, selectedUser, selectedIndustry, bulkSortOrder]);
 
   // Paginated leads
   const paginatedLeads = useMemo(() => {
@@ -644,6 +660,29 @@ const BulkAssignModal = ({ show, onClose, availableLeads = [], allUsers, onAssig
                   >
                     {refreshing ? '⟳ Refreshing...' : '↻ Refresh'}
                   </button>
+
+                  <div className="flex bg-gray-100 p-0.5 rounded-lg border border-gray-200">
+                    <button
+                      onClick={() => setBulkSortOrder('desc')}
+                      className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all duration-200 ${
+                        bulkSortOrder === 'desc'
+                          ? 'bg-white text-blue-600 shadow-sm'
+                          : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                    >
+                      Latest
+                    </button>
+                    <button
+                      onClick={() => setBulkSortOrder('asc')}
+                      className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all duration-200 ${
+                        bulkSortOrder === 'asc'
+                          ? 'bg-white text-blue-600 shadow-sm'
+                          : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                    >
+                      Oldest
+                    </button>
+                  </div>
                 </div>
               </div>
               <div className="max-h-48 overflow-y-auto space-y-1">

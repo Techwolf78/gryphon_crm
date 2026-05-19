@@ -120,6 +120,8 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
   const [companyFilter, setCompanyFilter] = useState('');
   const [phoneFilter, setPhoneFilter] = useState('');
   const [industryFilter, setIndustryFilter] = useState('');
+  const [uploadedDateFilter, setUploadedDateFilter] = useState(''); // New filter state
+  const [sortOrder, setSortOrder] = useState('desc'); // 'asc' or 'desc'
   const [dateFilterType, setDateFilterType] = useState('single');
   const [singleDate, setSingleDate] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -405,7 +407,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
                 coldAt: decodedCompany.coldAt || null,
                 hotAt: decodedCompany.hotAt || null,
                 onboardedAt: decodedCompany.onboardedAt || null,
-                createdAt: decodedCompany.createdAt || new Date().toISOString(),
+                createdAt: decodedCompany.createdAt || decodedCompany.coldAt || decodedCompany.warmAt || decodedCompany.hotAt || new Date().toISOString(),
                 updatedAt: decodedCompany.updatedAt || new Date().toISOString(),
                 contacts: decodedCompany.contacts || [],
               });
@@ -454,7 +456,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
                 coldAt: decodedCompany.coldAt || null,
                 hotAt: decodedCompany.hotAt || null,
                 onboardedAt: decodedCompany.onboardedAt || null,
-                createdAt: decodedCompany.createdAt || new Date().toISOString(),
+                createdAt: decodedCompany.createdAt || decodedCompany.coldAt || decodedCompany.warmAt || decodedCompany.hotAt || new Date().toISOString(),
                 updatedAt: decodedCompany.updatedAt || new Date().toISOString(),
                 contacts: decodedCompany.contacts || [],
               });
@@ -823,7 +825,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
   const filteredLeads = useMemo(() => {
     
     // Early return for empty search and "all" tab
-    if (!debouncedSearchTerm && activeTab === "all" && selectedUserFilter === 'all' && !companyFilter.trim() && !phoneFilter.trim() && !industryFilter.trim()) {
+    if (!debouncedSearchTerm && activeTab === "all" && selectedUserFilter === 'all' && !companyFilter.trim() && !phoneFilter.trim() && !industryFilter.trim() && !uploadedDateFilter) {
       // Sort by manual leads first, then by completeness score
       return [...leads].sort((a, b) => {
         // Manual leads always come first
@@ -892,6 +894,14 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
         }
       }
 
+      // Filter by Uploaded Date
+      if (uploadedDateFilter) {
+        const createdAt = lead.createdAt || lead.updatedAt;
+        if (!createdAt) return false;
+        const uploadDate = new Date(createdAt).toISOString().split('T')[0];
+        if (uploadDate !== uploadedDateFilter) return false;
+      }
+
       // Filter by date
       if (dateFilterType && ((dateFilterType === 'single' && singleDate) || (dateFilterType === 'range' && startDate && endDate))) {
         const getDateField = (lead) => {
@@ -943,21 +953,21 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
       return true;
     });
 
-    // Sort filtered results by manual leads first, then completeness score
+    // Sort filtered results
     return filtered.sort((a, b) => {
-      // Manual leads always come first
-      const aIsManual = a.source === "Manual Add";
-      const bIsManual = b.source === "Manual Add";
+      // Manual leads logic removed/subordinated to time sort if preferred, 
+      // but keeping your request for "latest leads in top first" as priority:
       
-      if (aIsManual && !bIsManual) return -1;
-      if (!aIsManual && bIsManual) return 1;
+      const timeA = new Date(a.createdAt || a.updatedAt || 0).getTime();
+      const timeB = new Date(b.createdAt || b.updatedAt || 0).getTime();
       
-      // If both are manual or both are not manual, sort by completeness score
-      const scoreA = calculateCompletenessScore(a);
-      const scoreB = calculateCompletenessScore(b);
-      return scoreB - scoreA; // Higher score first
+      if (sortOrder === 'desc') {
+        return timeB - timeA;
+      } else {
+        return timeA - timeB;
+      }
     });
-  }, [leads, activeTab, debouncedSearchTerm, selectedUserFilter, companyFilter, phoneFilter, industryFilter, dateFilterType, singleDate, startDate, endDate, calculateCompletenessScore]);
+  }, [leads, activeTab, debouncedSearchTerm, selectedUserFilter, companyFilter, phoneFilter, industryFilter, uploadedDateFilter, sortOrder, dateFilterType, singleDate, startDate, endDate, calculateCompletenessScore]);
 
   const formatDate = useCallback((dateString) => {
     if (dateString === 'Unknown Date') return 'Unknown Date';
@@ -2197,7 +2207,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
                 setViewMode={setViewMode}
               />
               <LeadFilters
-                filters={{ selectedUserFilter, companyFilter, phoneFilter, industryFilter, dateFilterType, singleDate, startDate, endDate }}
+                filters={{ selectedUserFilter, companyFilter, phoneFilter, industryFilter, uploadedDateFilter, sortOrder, dateFilterType, singleDate, startDate, endDate }}
                 setFilters={(newFilters) => {
                   // Log filter application
                   logPlacementActivity({
@@ -2206,7 +2216,7 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
                     action: AUDIT_ACTIONS.FILTER_APPLIED,
                     companyId: null,
                     companyName: null,
-                    details: `Applied filters: User=${newFilters.selectedUserFilter || 'all'}, Company="${newFilters.companyFilter || ''}", Phone="${newFilters.phoneFilter || ''}", Industry="${newFilters.industryFilter || ''}", Date Type="${newFilters.dateFilterType || 'single'}", Single Date="${newFilters.singleDate || ''}", Start Date="${newFilters.startDate || ''}", End Date="${newFilters.endDate || ''}"`,
+                    details: `Applied filters: User=${newFilters.selectedUserFilter || 'all'}, Company="${newFilters.companyFilter || ''}", Phone="${newFilters.phoneFilter || ''}", Industry="${newFilters.industryFilter || ''}", Uploaded Date="${newFilters.uploadedDateFilter || ''}", Sort="${newFilters.sortOrder || 'desc'}", Date Type="${newFilters.dateFilterType || 'single'}", Single Date="${newFilters.singleDate || ''}", Start Date="${newFilters.startDate || ''}", End Date="${newFilters.endDate || ''}"`,
                     changes: newFilters,
                     sessionId: sessionStorage.getItem('sessionId') || 'unknown'
                   });
@@ -2215,6 +2225,8 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
                   setCompanyFilter(newFilters.companyFilter || '');
                   setPhoneFilter(newFilters.phoneFilter || '');
                   setIndustryFilter(newFilters.industryFilter || '');
+                  setUploadedDateFilter(newFilters.uploadedDateFilter || '');
+                  setSortOrder(newFilters.sortOrder || 'desc');
                   setDateFilterType(newFilters.dateFilterType || 'single');
                   setSingleDate(newFilters.singleDate || '');
                   setStartDate(newFilters.startDate || '');
@@ -2307,7 +2319,10 @@ const [selectedCompanyForJD, setSelectedCompanyForJD] = useState(null);
                          user?.department === "admin" || 
                          user?.department === "Admin" ||
                          user?.role === "admin" || 
-                         user?.role === "Admin") && (
+                         user?.role === "Admin" ||
+                         ((user?.departments?.includes("Placement") || 
+                           user?.department === "Placement") && 
+                          user?.role === "Head")) && (
                 <button
                   onClick={() => setShowBulkUploadForm(true)}
                   className="px-3 py-1 bg-blue-600 text-white rounded-lg font-semibold flex items-center justify-center hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-md text-xs h-full"

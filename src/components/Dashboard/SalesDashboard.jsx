@@ -780,6 +780,12 @@ const SalesDashboard = ({ filters }) => {
     setCurrentPeriodInfo(info);
   };
 
+  const getNormalizedUserName = (uid, fallbackName) => {
+    // Look up the user in the users array to get the canonical name
+    const user = users.find((u) => u.uid === uid);
+    return user ? user.name : fallbackName;
+  };
+
   const processLeadsData = (input, dateRange) => {
     const leadCategories = {
       Engineering: 0,
@@ -985,7 +991,7 @@ if (selectedUserId) {
       if (lead.assignedTo && lead.assignedTo.uid) {
         const user = users.find((u) => u.uid === lead.assignedTo.uid);
         const memberId = user ? user.id : lead.assignedTo.uid;
-        const memberName = lead.assignedTo.name || "Unknown";
+        const memberName = getNormalizedUserName(lead.assignedTo.uid, lead.assignedTo.name || "Unknown");
 
         if (!teamPerformance[memberId]) {
           teamPerformance[memberId] = {
@@ -1248,19 +1254,23 @@ if (selectedUserId) {
         return false;
       });
 
-      // Map DM contracts to look like leads
-      const dmAsLeads = dmContractsFiltered.map(dm => ({
-        id: dm.id,
-        businessName: dm.collegeName,
-        phase: "closed",
-        totalCost: dm.totalCost,
-        contractStartDate: dm.contractStartDate,
-        assignedTo: { uid: dm.createdBy?.uid || dm.createdBy, name: dm.createdBy?.name || "DM User" },
-        courses: [{ courseType: dm.course }],
-        createdAt: dm.createdAt,
-        studentCount: dm.studentCount,
-        tcv: dm.totalCost, // For projected, but since closed, use totalCost
-      }));
+      // Map DM contracts to look like leads with normalized names
+      const dmAsLeads = dmContractsFiltered.map(dm => {
+        const createdByUid = dm.createdBy?.uid || dm.createdBy;
+        const createdByName = getNormalizedUserName(createdByUid, dm.createdBy?.name || "DM User");
+        return {
+          id: dm.id,
+          businessName: dm.collegeName,
+          phase: "closed",
+          totalCost: dm.totalCost,
+          contractStartDate: dm.contractStartDate,
+          assignedTo: { uid: createdByUid, name: createdByName },
+          courses: [{ courseType: dm.course }],
+          createdAt: dm.createdAt,
+          studentCount: dm.studentCount,
+          tcv: dm.totalCost, // For projected, but since closed, use totalCost
+        };
+      });
 
       // Combine leads and DM contracts
       const allDocs = [...currentLeads, ...dmAsLeads];
@@ -1292,18 +1302,22 @@ if (selectedUserId) {
         return false;
       });
 
-      const prevDmAsLeads = prevDmContractsFiltered.map(dm => ({
-        id: dm.id,
-        businessName: dm.collegeName,
-        phase: "closed",
-        totalCost: dm.totalCost,
-        contractStartDate: dm.contractStartDate,
-        assignedTo: { uid: dm.createdBy?.uid || dm.createdBy, name: dm.createdBy?.name || "DM User" },
-        courses: [{ courseType: dm.course }],
-        createdAt: dm.createdAt,
-        studentCount: dm.studentCount,
-        tcv: dm.totalCost,
-      }));
+      const prevDmAsLeads = prevDmContractsFiltered.map(dm => {
+        const createdByUid = dm.createdBy?.uid || dm.createdBy;
+        const createdByName = getNormalizedUserName(createdByUid, dm.createdBy?.name || "DM User");
+        return {
+          id: dm.id,
+          businessName: dm.collegeName,
+          phase: "closed",
+          totalCost: dm.totalCost,
+          contractStartDate: dm.contractStartDate,
+          assignedTo: { uid: createdByUid, name: createdByName },
+          courses: [{ courseType: dm.course }],
+          createdAt: dm.createdAt,
+          studentCount: dm.studentCount,
+          tcv: dm.totalCost,
+        };
+      });
 
       const prevAllDocs = [...prevLeads, ...prevDmAsLeads];
 
@@ -1472,19 +1486,23 @@ if (selectedUserId) {
       // Filter DM by createdBy.uid
       let memberDmContracts = dmContracts.filter(dm => dm.createdBy?.uid === uid);
 
-      // Map DM to similar structure
-      const dmAsLeads = memberDmContracts.map(dm => ({
-        id: dm.id,
-        businessName: dm.collegeName,
-        phase: "closed",
-        totalCost: dm.totalCost,
-        contractStartDate: dm.contractStartDate,
-        assignedTo: { uid: dm.createdBy?.uid || dm.createdBy, name: dm.createdBy?.name || "DM User" },
-        courses: [{ courseType: dm.course }],
-        createdAt: dm.createdAt,
-        studentCount: dm.studentCount,
-        tcv: dm.totalCost,
-      }));
+      // Map DM to similar structure with normalized names
+      const dmAsLeads = memberDmContracts.map(dm => {
+        const createdByUid = dm.createdBy?.uid || dm.createdBy;
+        const createdByName = getNormalizedUserName(createdByUid, dm.createdBy?.name || "DM User");
+        return {
+          id: dm.id,
+          businessName: dm.collegeName,
+          phase: "closed",
+          totalCost: dm.totalCost,
+          contractStartDate: dm.contractStartDate,
+          assignedTo: { uid: createdByUid, name: createdByName },
+          courses: [{ courseType: dm.course }],
+          createdAt: dm.createdAt,
+          studentCount: dm.studentCount,
+          tcv: dm.totalCost,
+        };
+      });
 
       // Combine
       let allLeads = [...leads, ...dmAsLeads];

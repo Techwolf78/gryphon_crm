@@ -163,6 +163,7 @@ export const uploadCompaniesFromExcel = async (file, onProgress = null, assignee
             notes: row['Notes'] || row['notes'] || '',
             status: status.toLowerCase() || 'cold',
             contacts: [], // Initialize empty contacts array
+            createdAt: currentTimestamp, // Ensure createdAt is explicitly set
           };
 
           // Add status-specific timestamp when company is created from Excel
