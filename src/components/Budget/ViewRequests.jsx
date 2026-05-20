@@ -49,6 +49,8 @@ export default function ViewRequests({
   );
 
   useEffect(() => {
+    if (!fiscalYear || !department) return;
+
     let q;
 
     if (department?.toLowerCase() === "purchase") {
