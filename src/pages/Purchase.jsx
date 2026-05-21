@@ -598,6 +598,11 @@ function Purchase() {
           // CSDD PO: delegate to DepartmentService for atomic subcollection update
           // Find the active budget for the intent's department
           const intentDept = selectedIntent?.department || orderData.department;
+          
+          if (!intentDept) {
+            throw new Error("No department found for this intent or order");
+          }
+
           const budgetsQuery = query(
             collection(db, "department_budgets"),
             where("department", "==", intentDept),
